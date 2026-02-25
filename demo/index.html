@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reach Calendar — Dev Playground</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      color: #1a1a1a;
+    }
+    h1 { margin-bottom: 0.5rem; }
+    h2 { margin-top: 2rem; color: #555; }
+    .example { border: 1px solid #e5e7eb; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+  </style>
+</head>
+<body>
+  <h1>Reach Calendar — Dev Playground</h1>
+  <p>Visual test bed for development. Hot-reloads on TS and CSS changes.</p>
+
+  <h2>Inline — Single Date</h2>
+  <div class="example">
+    <div x-data="calendar({ mode: 'single', display: 'inline' })">
+      <p>Mode: <span x-text="mode"></span> | Display: <span x-text="display"></span></p>
+      <p>Calendar component placeholder — will render once Phase 3+ is complete.</p>
+    </div>
+  </div>
+
+  <h2>Inline — Range</h2>
+  <div class="example">
+    <div x-data="calendar({ mode: 'range', display: 'inline' })">
+      <p>Mode: <span x-text="mode"></span> | Display: <span x-text="display"></span></p>
+    </div>
+  </div>
+
+  <h2>Popup — Single Date</h2>
+  <div class="example">
+    <div x-data="calendar({ mode: 'single', display: 'popup' })">
+      <p>Mode: <span x-text="mode"></span> | Display: <span x-text="display"></span></p>
+    </div>
+  </div>
+
+  <h2>Wizard — Birth Date</h2>
+  <div class="example">
+    <div x-data="calendar({ mode: 'single', wizard: true })">
+      <p>Mode: <span x-text="mode"></span> | Wizard: placeholder</p>
+    </div>
+  </div>
+
+  <script type="module">
+    import Alpine from 'alpinejs'
+    import { calendarPlugin } from '../src/index.ts'
+
+    Alpine.plugin(calendarPlugin)
+    Alpine.start()
+  </script>
+</body>
+</html>

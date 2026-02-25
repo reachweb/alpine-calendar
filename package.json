@@ -1,0 +1,85 @@
+{
+  "name": "@reachgr/alpine-calendar",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "A lightweight, AlpineJS-native calendar component with inline/popup display, input binding with masking, and TailwindCSS 4 theming.",
+  "main": "dist/alpine-calendar.umd.js",
+  "module": "dist/alpine-calendar.es.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/alpine-calendar.es.js",
+      "require": "./dist/alpine-calendar.umd.js"
+    },
+    "./cdn": "./dist/alpine-calendar.cdn.js",
+    "./css": "./dist/alpine-calendar.css"
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": [
+    "*.css"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "pnpm build:lib && pnpm build:cdn && tsc --emitDeclarationOnly",
+    "build:lib": "vite build --config vite.config.lib.ts",
+    "build:cdn": "vite build --config vite.config.cdn.ts",
+    "preview": "vite preview",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "format": "prettier --write 'src/**/*.{ts,css}'",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm run build"
+  },
+  "peerDependencies": {
+    "alpinejs": "^3.0.0"
+  },
+  "keywords": [
+    "alpinejs",
+    "calendar",
+    "datepicker",
+    "tailwindcss",
+    "livewire"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.3",
+    "@tailwindcss/vite": "^4.2.1",
+    "@types/alpinejs": "^3.13.11",
+    "@vitest/coverage-v8": "^4.0.18",
+    "alpinejs": "^3.15.8",
+    "eslint": "^9.39.3",
+    "eslint-config-prettier": "^10.1.8",
+    "jsdom": "^28.1.0",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.8.1",
+    "simple-git-hooks": "^2.13.1",
+    "tailwindcss": "^4.2.1",
+    "terser": "^5.46.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1",
+    "vite": "^6.4.1",
+    "vitest": "^4.0.18"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm lint-staged"
+  },
+  "lint-staged": {
+    "*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.css": [
+      "prettier --write"
+    ]
+  }
+}

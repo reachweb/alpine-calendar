@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+  --color-calendar-bg: var(--color-white);
+  --color-calendar-text: var(--color-gray-900);
+  --color-calendar-primary: var(--color-blue-600);
+  --color-calendar-primary-text: var(--color-white);
+  --color-calendar-hover: var(--color-gray-100);
+  --color-calendar-disabled: var(--color-gray-300);
+  --color-calendar-range: var(--color-blue-50);
+  --color-calendar-today-ring: var(--color-blue-400);
+  --color-calendar-border: var(--color-gray-200);
+  --radius-calendar: var(--radius-lg);
+  --shadow-calendar: var(--shadow-lg);
+}
