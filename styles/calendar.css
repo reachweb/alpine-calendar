@@ -10,6 +10,334 @@
   --color-calendar-range: var(--color-blue-50);
   --color-calendar-today-ring: var(--color-blue-400);
   --color-calendar-border: var(--color-gray-200);
+  --color-calendar-other-month: var(--color-gray-400);
   --radius-calendar: var(--radius-lg);
   --shadow-calendar: var(--shadow-lg);
+}
+
+/* ---------------------------------------------------------------------------
+ * Calendar container
+ * ------------------------------------------------------------------------- */
+
+.rc-calendar {
+  background-color: var(--color-calendar-bg);
+  color: var(--color-calendar-text);
+  border-radius: var(--radius-calendar);
+  border: 1px solid var(--color-calendar-border);
+  box-shadow: var(--shadow-calendar);
+  padding: 1rem;
+  width: fit-content;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* 2-month layout: stacked on mobile, side-by-side on sm+ */
+.rc-months {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 640px) {
+  .rc-months--dual {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Month header (nav arrows + month/year label)
+ * ------------------------------------------------------------------------- */
+
+.rc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  padding: 0 0.25rem;
+}
+
+.rc-header__label {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-calendar);
+  transition: background-color 150ms;
+}
+
+.rc-header__label:hover {
+  background-color: var(--color-calendar-hover);
+}
+
+.rc-header__nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-calendar-text);
+  font-size: 1rem;
+  transition: background-color 150ms;
+}
+
+.rc-header__nav:hover {
+  background-color: var(--color-calendar-hover);
+}
+
+/* ---------------------------------------------------------------------------
+ * Weekday header row
+ * ------------------------------------------------------------------------- */
+
+.rc-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-calendar-disabled);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+}
+
+.rc-weekday {
+  padding: 0.25rem 0;
+}
+
+/* ---------------------------------------------------------------------------
+ * Day grid
+ * ------------------------------------------------------------------------- */
+
+.rc-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  overflow: hidden;
+  position: relative;
+}
+
+.rc-day {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  font-size: 0.875rem;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: background-color 150ms, color 150ms;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.rc-day:hover:not(.rc-day--disabled):not(.rc-day--selected):not(.rc-day--range-start):not(.rc-day--range-end) {
+  background-color: var(--color-calendar-hover);
+}
+
+/* Other month */
+.rc-day--other-month {
+  color: var(--color-calendar-other-month);
+}
+
+/* Hidden: other-month days in multi-month layout (still occupies grid space) */
+.rc-day--hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Today */
+.rc-day--today:not(.rc-day--selected):not(.rc-day--range-start):not(.rc-day--range-end) {
+  box-shadow: inset 0 0 0 1.5px var(--color-calendar-today-ring);
+}
+
+/* Selected */
+.rc-day--selected,
+.rc-day--range-start,
+.rc-day--range-end {
+  background-color: var(--color-calendar-primary);
+  color: var(--color-calendar-primary-text);
+  font-weight: 600;
+}
+
+/* In-range (between start and end) */
+.rc-day--in-range {
+  background-color: var(--color-calendar-range);
+  border-radius: 0;
+}
+
+/* Range start: pill on left */
+.rc-day--range-start {
+  border-radius: 9999px 0 0 9999px;
+}
+
+/* Range end: pill on right */
+.rc-day--range-end {
+  border-radius: 0 9999px 9999px 0;
+}
+
+/* When both start and end are same day */
+.rc-day--range-start.rc-day--range-end {
+  border-radius: 9999px;
+}
+
+/* Disabled */
+.rc-day--disabled {
+  color: var(--color-calendar-disabled);
+  cursor: not-allowed;
+}
+
+.rc-day--disabled:hover {
+  background-color: transparent;
+}
+
+/* Focused (keyboard navigation) */
+.rc-day--focused:not(.rc-day--selected):not(.rc-day--range-start):not(.rc-day--range-end) {
+  box-shadow: 0 0 0 2px var(--color-calendar-primary);
+}
+
+/* ---------------------------------------------------------------------------
+ * Popup overlay
+ * ------------------------------------------------------------------------- */
+
+.rc-popup-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* ---------------------------------------------------------------------------
+ * Popup close header
+ * ------------------------------------------------------------------------- */
+
+.rc-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--color-calendar-border);
+}
+
+.rc-popup-header__title {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.rc-popup-header__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 9999px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-calendar-text);
+  transition: background-color 150ms;
+}
+
+.rc-popup-header__close:hover {
+  background-color: var(--color-calendar-hover);
+}
+
+/* ---------------------------------------------------------------------------
+ * Month picker (4×3 grid of months)
+ * ------------------------------------------------------------------------- */
+
+.rc-month-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  padding: 0.25rem;
+}
+
+.rc-month {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.75rem;
+  font-size: 0.875rem;
+  border-radius: var(--radius-calendar);
+  cursor: pointer;
+  transition: background-color 150ms, color 150ms;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.rc-month:hover:not(.rc-month--disabled):not(.rc-month--selected) {
+  background-color: var(--color-calendar-hover);
+}
+
+/* Current month (today's month) */
+.rc-month--current:not(.rc-month--selected) {
+  box-shadow: inset 0 0 0 1.5px var(--color-calendar-today-ring);
+}
+
+/* Selected month (the month currently being viewed in day view) */
+.rc-month--selected {
+  background-color: var(--color-calendar-primary);
+  color: var(--color-calendar-primary-text);
+  font-weight: 600;
+}
+
+/* Disabled month (outside min/max range) */
+.rc-month--disabled {
+  color: var(--color-calendar-disabled);
+  cursor: not-allowed;
+}
+
+.rc-month--disabled:hover {
+  background-color: transparent;
+}
+
+/* ---------------------------------------------------------------------------
+ * Month transition animation
+ * ------------------------------------------------------------------------- */
+
+.rc-grid-wrapper {
+  position: relative;
+  overflow: hidden;
+}
+
+@keyframes rc-slide-in-from-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes rc-slide-in-from-left {
+  from { transform: translateX(-100%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+.rc-grid--slide-next {
+  animation: rc-slide-in-from-right 200ms ease-out;
+}
+
+.rc-grid--slide-prev {
+  animation: rc-slide-in-from-left 200ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rc-grid--slide-next,
+  .rc-grid--slide-prev {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Touch-friendly: enlarge day cells on mobile
+ * ------------------------------------------------------------------------- */
+
+@media (max-width: 639px) {
+  .rc-day {
+    width: 2.75rem;
+    height: 2.75rem;
+    font-size: 0.9375rem;
+  }
 }

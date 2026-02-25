@@ -106,6 +106,17 @@ export class CalendarDate {
     return !this.isBefore(start) && !this.isAfter(end)
   }
 
+  /**
+   * Number of days from this date to another.
+   * Positive when `other` is after `this`, negative when before.
+   * Uses UTC to avoid DST issues.
+   */
+  diffDays(other: CalendarDate): number {
+    const a = Date.UTC(this.year, this.month - 1, this.day)
+    const b = Date.UTC(other.year, other.month - 1, other.day)
+    return Math.round((b - a) / 86_400_000)
+  }
+
   // ---------------------------------------------------------------------------
   // Arithmetic (returns new CalendarDate — immutable)
   // ---------------------------------------------------------------------------

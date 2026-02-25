@@ -359,6 +359,67 @@ describe('CalendarDate', () => {
   })
 
   // ---------------------------------------------------------------------------
+  // diffDays
+  // ---------------------------------------------------------------------------
+
+  describe('diffDays()', () => {
+    it('returns 0 for the same date', () => {
+      const d = new CalendarDate(2025, 6, 15)
+      expect(d.diffDays(new CalendarDate(2025, 6, 15))).toBe(0)
+    })
+
+    it('returns positive number when other is after this', () => {
+      const a = new CalendarDate(2025, 6, 10)
+      const b = new CalendarDate(2025, 6, 15)
+      expect(a.diffDays(b)).toBe(5)
+    })
+
+    it('returns negative number when other is before this', () => {
+      const a = new CalendarDate(2025, 6, 15)
+      const b = new CalendarDate(2025, 6, 10)
+      expect(a.diffDays(b)).toBe(-5)
+    })
+
+    it('handles month boundaries', () => {
+      const a = new CalendarDate(2025, 1, 30)
+      const b = new CalendarDate(2025, 2, 2)
+      expect(a.diffDays(b)).toBe(3)
+    })
+
+    it('handles year boundaries', () => {
+      const a = new CalendarDate(2025, 12, 30)
+      const b = new CalendarDate(2026, 1, 2)
+      expect(a.diffDays(b)).toBe(3)
+    })
+
+    it('handles leap year February', () => {
+      const a = new CalendarDate(2024, 2, 28)
+      const b = new CalendarDate(2024, 3, 1)
+      expect(a.diffDays(b)).toBe(2) // Feb has 29 days in 2024
+    })
+
+    it('handles non-leap year February', () => {
+      const a = new CalendarDate(2025, 2, 28)
+      const b = new CalendarDate(2025, 3, 1)
+      expect(a.diffDays(b)).toBe(1) // Feb has 28 days in 2025
+    })
+
+    it('is not affected by DST transitions', () => {
+      // US DST spring forward: March 9, 2025 (clocks skip an hour)
+      const a = new CalendarDate(2025, 3, 8)
+      const b = new CalendarDate(2025, 3, 10)
+      expect(a.diffDays(b)).toBe(2) // still 2 days, not 1.958...
+    })
+
+    it('handles large spans', () => {
+      const a = new CalendarDate(2020, 1, 1)
+      const b = new CalendarDate(2025, 1, 1)
+      // 2020 and 2024 are leap years: 366 + 365 + 365 + 365 + 366 = 1827
+      expect(a.diffDays(b)).toBe(1827)
+    })
+  })
+
+  // ---------------------------------------------------------------------------
   // Immutability
   // ---------------------------------------------------------------------------
 

@@ -280,23 +280,50 @@ The foundation — a pure JS date utility layer with zero UI. Everything else bu
 - [x] Unit tests for DST edge cases (e.g., March 31 + 1 month = April 30, midnight UTC vs UTC+2)
 
 ### 1.2 Calendar Grid Generator
-- [ ] `generateMonth(year, month, firstDayOfWeek)` → returns a 2D array of `CalendarDate` (6 rows × 7 cols), including leading/trailing days from adjacent months
-- [ ] `generateMonths(year, month, count, firstDayOfWeek)` → generates `count` consecutive months (for 1- or 2-month view)
-- [ ] Support configurable `firstDayOfWeek` (0 = Sunday, 1 = Monday, etc.)
-- [ ] Mark each cell with metadata: `{ date, isCurrentMonth, isToday, isDisabled }`
+- [x] `generateMonth(year, month, firstDayOfWeek)` → returns a 2D array of `CalendarDate` (6 rows × 7 cols), including leading/trailing days from adjacent months
+- [x] `generateMonths(year, month, count, firstDayOfWeek)` → generates `count` consecutive months (for 1- or 2-month view)
+- [x] Support configurable `firstDayOfWeek` (0 = Sunday, 1 = Monday, etc.)
+- [x] Mark each cell with metadata: `{ date, isCurrentMonth, isToday, isDisabled }`
 
 ### 1.3 Selection Models
-- [ ] `SingleSelection` — stores one `CalendarDate | null`
-- [ ] `MultipleSelection` — stores a `Set<string>` of date keys (YYYY-MM-DD)
-- [ ] `RangeSelection` — stores `{ start, end }`, handles partial state (only start selected)
-- [ ] Each model exposes: `isSelected(date)`, `toggle(date)`, `clear()`, `toArray()`, `toValue()` (serialized string)
-- [ ] `RangeSelection` hover preview: `isInRange(date, hoverDate?)` for visual feedback
+- [x] `SingleSelection` — stores one `CalendarDate | null`
+- [x] `MultipleSelection` — stores a `Set<string>` of date keys (YYYY-MM-DD)
+- [x] `RangeSelection` — stores `{ start, end }`, handles partial state (only start selected)
+- [x] Each model exposes: `isSelected(date)`, `toggle(date)`, `clear()`, `toArray()`, `toValue()` (serialized string)
+- [x] `RangeSelection` hover preview: `isInRange(date, hoverDate?)` for visual feedback
 
 ### 1.4 Date Constraints
-- [ ] `minDate` / `maxDate` boundaries
-- [ ] `disabledDates: CalendarDate[]` — specific disabled dates
-- [ ] `disabledDaysOfWeek: number[]` — e.g., `[0, 6]` to disable weekends
-- [ ] `isDateDisabled(date)` — single function that checks all constraints
+- [x] `minDate` / `maxDate` boundaries
+- [x] `disabledDates: CalendarDate[]` — specific disabled dates
+- [x] `disabledDaysOfWeek: number[]` — e.g., `[0, 6]` to disable weekends
+- [x] `isDateDisabled(date)` — single function that checks all constraints
+
+### 1.5 Advanced Date Constraints
+- [x] `CalendarDate.diffDays(other)` — timezone-safe day difference calculation using UTC
+- [x] `enabledDates: CalendarDate[]` — force-enable specific dates (overrides disabledDates/disabledDaysOfWeek but NOT minDate/maxDate)
+- [x] `enabledDaysOfWeek: number[]` — weekday whitelist (only these days are selectable; all others disabled)
+- [x] `enabledDates` + `enabledDaysOfWeek` interaction: enabledDates can override enabledDaysOfWeek for specific dates
+- [x] `disabledDates` still applies on top of enabledDaysOfWeek (further blacklisting whitelisted days)
+- [x] `minRange: number` — minimum range length in days (inclusive count); rejects range completion if too short
+- [x] `maxRange: number` — maximum range length in days (inclusive count); rejects range completion if too long
+- [x] `createRangeValidator(options)` — factory that returns `(start, end) => boolean` for range validation
+- [x] Range validation integrated into `selectDate()` — when completing a range, validates before toggling
+- [x] Range validation handles start/end swap correctly (when user clicks before start)
+- [x] Clicking start to deselect bypasses range validation (intentional: deselection always works)
+
+### 1.6 Period-Specific Constraint Rules
+- [x] `DateConstraintRule` interface — extends `DateConstraintProperties` with `from`/`to` period
+- [x] `DateConstraintOptions.rules: DateConstraintRule[]` — array of period-specific overrides
+- [x] First matching rule wins when a date falls in `[rule.from, rule.to]`
+- [x] Rule properties override global defaults; unset properties inherit from global
+- [x] Rules support all constraint properties: minDate, maxDate, disabledDates, disabledDaysOfWeek, enabledDates, enabledDaysOfWeek, minRange, maxRange
+- [x] Range validation uses start date to determine applicable rule
+- [x] `CalendarConfig.rules` accepts string-based rules (ISO dates) for Alpine/HTML compatibility
+- [x] Invalid rule dates (unparseable ISO strings) are silently skipped
+- [x] Pre-computed Sets per rule for O(1) lookups (disabledKeys, disabledDays, enabledKeys, enabledDays)
+- [x] Fast path: when no rules are configured, constraint checking skips rule resolution
+- [x] All new types exported from index.ts: `DateConstraintProperties`, `DateConstraintRule`, `CalendarConfigRule`, `createRangeValidator`
+- [x] Comprehensive test coverage: 570 total tests passing (61 constraint tests, 151 component tests, 21 popup tests)
 
 ---
 
@@ -305,26 +332,26 @@ The foundation — a pure JS date utility layer with zero UI. Everything else bu
 Handle user-typed dates and enforce format via masking.
 
 ### 2.1 Date Parser
-- [ ] Define supported format tokens: `DD`, `MM`, `YYYY`, `D`, `M`, `YY`
-- [ ] Build `parseDate(input, format)` → `CalendarDate | null` with lenient parsing (e.g., `1/3/2025` matches `DD/MM/YYYY`)
-- [ ] Support common separators: `/`, `-`, `.`
-- [ ] Validate parsed result (reject Feb 30, etc.)
-- [ ] For range mode, parse two dates from one input (e.g., `01/01/2025 - 07/01/2025`)
-- [ ] For multiple mode, parse comma-separated dates
+- [x] Define supported format tokens: `DD`, `MM`, `YYYY`, `D`, `M`, `YY`
+- [x] Build `parseDate(input, format)` → `CalendarDate | null` with lenient parsing (e.g., `1/3/2025` matches `DD/MM/YYYY`)
+- [x] Support common separators: `/`, `-`, `.`
+- [x] Validate parsed result (reject Feb 30, etc.)
+- [x] For range mode, parse two dates from one input (e.g., `01/01/2025 - 07/01/2025`)
+- [x] For multiple mode, parse comma-separated dates
 
 ### 2.2 Input Mask
-- [ ] Implement a lightweight input mask engine (no dependencies)
-- [ ] Map format string to mask pattern: `DD/MM/YYYY` → `99/99/9999` (where `9` = digit)
-- [ ] Handle cursor position correctly on insert, delete, and backspace
-- [ ] Auto-insert separator characters as user types
-- [ ] Prevent invalid characters (non-digits in date slots)
-- [ ] Expose as a standalone function `createMask(format)` → returns handlers for `input`, `keydown`, `paste` events
-- [ ] Optional: allow mask to be disabled (free-text mode with parse-on-blur)
+- [x] Implement a lightweight input mask engine (no dependencies)
+- [x] Map format string to mask pattern: `DD/MM/YYYY` → `99/99/9999` (where `9` = digit)
+- [x] Handle cursor position correctly on insert, delete, and backspace
+- [x] Auto-insert separator characters as user types
+- [x] Prevent invalid characters (non-digits in date slots)
+- [x] Expose as a standalone function `createMask(format)` → returns handlers for `input`, `keydown`, `paste` events
+- [x] Optional: allow mask to be disabled (free-text mode with parse-on-blur — consumer simply doesn't call `attachMask`)
 
 ### 2.3 Format & Display
-- [ ] `formatDate(date, format, locale?)` — format a `CalendarDate` to display string
-- [ ] `formatRange(start, end, format)` — smart range formatting (e.g., `Jan 1 – 7, 2025` when same month)
-- [ ] `formatMultiple(dates, format)` — comma-separated or count-based (`3 dates selected`)
+- [x] `formatDate(date, format, locale?)` — format a `CalendarDate` to display string
+- [x] `formatRange(start, end, format)` — smart range formatting (e.g., `Jan 1 – 7, 2025` when same month)
+- [x] `formatMultiple(dates, format)` — comma-separated or count-based (`3 dates selected`)
 
 ---
 
@@ -333,9 +360,9 @@ Handle user-typed dates and enforce format via masking.
 Wire everything into Alpine as a reusable plugin/component.
 
 ### 3.1 Plugin Architecture
-- [ ] Create `alpine-calendar.js` as an Alpine plugin: `Alpine.plugin(calendarPlugin)`
-- [ ] Register `x-data` component via `Alpine.data('calendar', (config) => { ... })`
-- [ ] Decide config surface — everything via `x-data` props:
+- [x] Create `alpine-calendar.js` as an Alpine plugin: `Alpine.plugin(calendarPlugin)`
+- [x] Register `x-data` component via `Alpine.data('calendar', (config) => { ... })`
+- [x] Decide config surface — everything via `x-data` props:
   ```html
   <div x-data="calendar({
     mode: 'single',        // 'single' | 'multiple' | 'range'
@@ -351,12 +378,12 @@ Wire everything into Alpine as a reusable plugin/component.
     locale: 'el',
   })">
   ```
-- [ ] Expose reactive state: `month`, `year`, `grid`, `selection`, `view` (days/months/years)
-- [ ] Expose methods: `prev()`, `next()`, `selectDate(date)`, `goToToday()`, `open()`, `close()`, `toggle()`
-- [ ] Dispatch custom events: `x-on:calendar:change`, `x-on:calendar:open`, `x-on:calendar:close`
+- [x] Expose reactive state: `month`, `year`, `grid`, `selection`, `view` (days/months/years)
+- [x] Expose methods: `prev()`, `next()`, `selectDate(date)`, `goToToday()`, `open()`, `close()`, `toggle()`
+- [x] Dispatch custom events: `x-on:calendar:change`, `x-on:calendar:open`, `x-on:calendar:close`
 
 ### 3.1b Auto-Registration for CDN / No-Build Environments
-- [ ] Create a separate entry point `src/cdn.ts` that auto-registers the plugin:
+- [x] Create a separate entry point `src/cdn.ts` that auto-registers the plugin:
   ```ts
   import calendarPlugin from './plugin'
 
@@ -371,60 +398,81 @@ Wire everything into Alpine as a reusable plugin/component.
     window.Alpine.plugin(calendarPlugin)
   })
   ```
-- [ ] The CDN build must be a self-contained IIFE — Alpine is NOT bundled in, it reads `window.Alpine`
-- [ ] Ensure the plugin is idempotent (safe to register twice if both paths fire)
-- [ ] CSS must also work standalone — either inline or via separate CDN link:
+- [x] The CDN build must be a self-contained IIFE — Alpine is NOT bundled in, it reads `window.Alpine`
+- [x] Ensure the plugin is idempotent (safe to register twice if both paths fire)
+- [x] CSS must also work standalone — either inline or via separate CDN link:
   ```html
   <!-- Livewire / no-build usage -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@reachgr/alpine-calendar/dist/alpine-calendar.css">
   <script src="https://cdn.jsdelivr.net/npm/@reachgr/alpine-calendar/dist/alpine-calendar.cdn.js"></script>
   <!-- That's it. No import, no init, no bundler. -->
   ```
-- [ ] Test the full lifecycle order: script loads → `alpine:init` fires → plugin registers → `Alpine.start()` → components work
+- [x] Test the full lifecycle order: script loads → `alpine:init` fires → plugin registers → `Alpine.start()` → components work
 
 ### 3.2 Input Binding
-- [ ] Bind to an `<input>` via `x-model` or a custom `x-ref="input"` approach
-- [ ] On input focus (popup mode): open calendar, position it
-- [ ] On input blur: parse typed value → update selection → reformat input
-- [ ] On selection change in calendar: update input value
-- [ ] Two-way sync: external `x-model` changes update the calendar, calendar changes update `x-model`
-- [ ] Support `name` attribute pass-through for form submission
-- [ ] Hidden input fallback for range/multiple (serialize to ISO strings)
+- [x] Bind to an `<input>` via `x-ref="input"` approach — auto-binds during `init()` via `$nextTick`
+- [x] On input focus (popup mode): open calendar via `handleFocus()`
+- [x] On input blur: parse typed value → update selection → reformat input via `handleBlur()`
+- [x] On selection change in calendar: update input value via `_syncInputFromSelection()`
+- [x] Two-way sync: `inputValue` reactive property stays in sync with selection; `bindInput()` syncs DOM input
+- [x] Support `name` attribute pass-through for form submission via `inputName` config
+- [x] Hidden input fallback for range/multiple via `hiddenInputValues` getter (ISO strings)
+- [x] `bindInput(el)` — attaches mask (if enabled), syncs value, sets placeholder, adds input listener
+- [x] `handleInput(e)` — for unbound inputs using `:value` + `@input`
+- [x] `destroy()` — cleans up mask listeners and input reference
+- [x] `_emitChange()` — centralized `calendar:change` event dispatch with `{ value, dates, formatted }`
+- [x] Comprehensive test coverage: 539 total tests passing (54 input binding tests)
 
 ### 3.3 Popup Positioning
-- [ ] Implement lightweight popup positioning (no Floating UI dependency)
-- [ ] Default: below-start, flip to above if no space
-- [ ] Use `position: fixed` + manual coordinate calc from `getBoundingClientRect()`
-- [ ] Close on outside click (`@click.outside`), Escape key, and tab-away
-- [ ] Handle scroll/resize repositioning (throttled)
-- [ ] Optional: allow attaching popup to a portal/body to escape overflow parents
+- [x] Implement lightweight popup positioning in `src/positioning/popup.ts` (no Floating UI dependency)
+- [x] Default: below-start, flip to above if no space
+- [x] Use `position: fixed` + manual coordinate calc from `getBoundingClientRect()`
+- [x] Close on Escape key via `handleKeydown()` — returns focus to input element
+- [x] Close on outside click: documented via Alpine's `@click.outside` directive (template-level)
+- [x] Handle scroll/resize repositioning via `autoUpdate()` with rAF throttling
+- [x] `computePosition(reference, floating, options)` — calculates x/y/placement with flip logic
+- [x] `autoUpdate(reference, update, throttleMs)` — subscribes to scroll/resize on all scrollable ancestors, returns cleanup fn
+- [x] Horizontal clamping to viewport boundaries
+- [x] `popupStyle` reactive property for inline CSS (`position:fixed;left:Xpx;top:Ypx;z-index:50;`)
+- [x] Config: `placement` (bottom-start/bottom-end/top-start/top-end), `popupOffset` (px gap)
+- [x] `_startPositioning()` / `_stopPositioning()` internal lifecycle methods
+- [x] Auto-bind to `x-ref="popup"` for popup element discovery
+- [x] Proper cleanup in `destroy()` and `close()`
+- [x] All types exported from index.ts: `Placement`, `PositionOptions`, `PositionResult`
+- [x] Comprehensive test coverage: 570 total tests (21 popup positioning, 10 component popup integration)
 
 ### 3.4 Keyboard Navigation
-- [ ] Arrow keys: move focus between days
-- [ ] Enter/Space: select focused day
-- [ ] Page Up/Down: prev/next month
-- [ ] Home/End: first/last day of current month view
-- [ ] Escape: close popup (if popup mode) or return to day view (if in month/year picker)
-- [ ] Tab: move between calendar controls, then out of calendar
-- [ ] Manage `aria-activedescendant` or roving `tabindex`
+- [x] Arrow keys: move focus between days (±1 day horizontal, ±7 days vertical), auto-navigates months at boundaries, skips disabled dates
+- [x] Enter/Space: select focused day (only when focus is established; no-op when focusedDate is null)
+- [x] Page Up/Down: prev/next month; Shift+Page Up/Down: prev/next year; clamps day to valid range
+- [x] Home/End: first/last day of current month view
+- [x] Escape: return to day view from month/year picker; close popup (if popup mode) and return focus to input
+- [x] Tab: natural tab order — calendar grid uses `aria-activedescendant` pattern (container holds focus)
+- [x] Manage `aria-activedescendant`: `focusedDateISO` getter drives `aria-activedescendant` attribute; day cells use `id="day-{ISO}"`
+- [x] Comprehensive test coverage: 610 total tests passing (40 keyboard navigation tests)
 
 ---
 
 ## Phase 4: Views & Navigation
 
 ### 4.1 Day View (Default)
-- [ ] Render month grid(s) with day cells
-- [ ] Highlight: today, selected, range-start, range-end, in-range, disabled, other-month
-- [ ] Navigation: prev/next month, click month/year label to switch view
-- [ ] 2-month layout: side-by-side on desktop, stacked on mobile
-- [ ] Animate month transition (CSS-only, `translate` left/right based on direction)
+- [x] Render month grid(s) with day cells
+- [x] Highlight: today, selected, range-start, range-end, in-range, disabled, other-month
+- [x] Navigation: prev/next month, click month/year label to switch view
+- [x] 2-month layout: side-by-side on desktop, stacked on mobile
+- [x] Animate month transition (CSS-only, `translate` left/right based on direction)
 
 ### 4.2 Month View
-- [ ] Show 12-month grid for the current year
-- [ ] Clicking a month enters day view for that month
-- [ ] Can also be used as standalone month picker (`mode: 'month'`?)
-- [ ] Highlight current month, disable months outside min/max range
-- [ ] Navigation: prev/next year
+- [x] Show 12-month grid for the current year (4×3 `MonthCell` grid via `generateMonthGrid()`)
+- [x] Clicking a month enters day view for that month (`selectMonth()`)
+- [ ] Can also be used as standalone month picker (`mode: 'month'`?) (deferred to post-MVP)
+- [x] Highlight current month, disable months outside min/max range (`monthClasses()`, `isMonthDisabled()`)
+- [x] Navigation: prev/next year (`prev()`/`next()` in months view navigate years)
+- [x] `MonthCell` interface and `generateMonthGrid()` in `src/core/grid.ts`
+- [x] `monthGrid` reactive state, `_rebuildMonthGrid()`, `monthClasses()`, `yearLabel` getter in component
+- [x] CSS styles: `.rc-month-grid`, `.rc-month`, `.rc-month--current`, `.rc-month--selected`, `.rc-month--disabled`
+- [x] Demo page updated with month view template (x-if="view === 'months'")
+- [x] Comprehensive test coverage: 681 total tests passing (33 month view tests)
 
 ### 4.3 Year View
 - [ ] Show a grid/list of years (e.g., 12 years at a time)
@@ -545,7 +593,7 @@ Wire everything into Alpine as a reusable plugin/component.
 
 Each integration must work **without requiring the user to set up a JS bundler**.
 
-#### Livewire v3 (+ Filament)
+#### Livewire v4 (+ Filament)
 - [ ] Document the "just add two tags" approach:
   ```php
   // In a Blade layout or Livewire component
@@ -560,19 +608,6 @@ Each integration must work **without requiring the user to set up a JS bundler**
 - [ ] Test `wire:model` ↔ calendar two-way binding via Alpine's `$wire` or by dispatching `input` events on the bound `<input>`
 - [ ] Test Livewire DOM morphing: ensure calendar survives Livewire re-renders (use `wire:ignore` on calendar container if needed, document this)
 - [ ] Handle Livewire navigation (SPA mode): verify calendar initializes correctly on page transitions
-
-#### Filament v4
-- [ ] Create a simple Filament form component wrapper (optional package or documented recipe):
-  ```php
-  // Concept: thin PHP wrapper that renders the Blade + passes config
-  CalendarField::make('date')
-      ->mode('single')
-      ->format('DD/MM/YYYY')
-      ->minDate('2020-01-01')
-  ```
-- [ ] Alternatively, document how to use as a custom Filament field with `Alpine.data` directly
-- [ ] Ensure calendar CSS doesn't conflict with Filament's Tailwind styles (use scoped `--color-calendar-*` vars)
-- [ ] Test inside Filament modals and slide-overs (popup positioning within `overflow: hidden` containers)
 
 #### Statamic
 - [ ] Document usage in Antlers templates:
@@ -626,10 +661,9 @@ Each integration must work **without requiring the user to set up a JS bundler**
 - [ ] jsDelivr URL works after npm publish
 
 ### 7.4 Framework Smoke Tests
-- [ ] **Livewire v3**: fresh Laravel + Livewire app, add CDN tags, verify calendar renders and `wire:model` syncs
+- [ ] **Livewire v4**: fresh Laravel + Livewire app, add CDN tags, verify calendar renders and `wire:model` syncs
 - [ ] **Livewire DOM morphing**: change server state → Livewire re-renders → calendar inside `wire:ignore` survives
 - [ ] **Livewire SPA navigation**: `wire:navigate` between pages with calendars → each initializes correctly
-- [ ] **Filament v4**: render calendar inside a Filament form panel, test in modal/slide-over
 - [ ] **Statamic CP**: load in a custom fieldtype view, verify no Alpine conflicts
 - [ ] **Plain HTML**: single HTML file with only CDN links, no bundler — full functionality
 
@@ -649,7 +683,19 @@ Each integration must work **without requiring the user to set up a JS bundler**
 
 ---
 
-## Phase 8: Extras (Post-MVP)
+## Phase 8: Advanced Constraint Enhancements (Post-MVP)
+
+Future enhancements to the constraint/rule system.
+
+- [ ] Recurring rules: `{ months: [1,2,3,4] }` to apply rules to specific months every year without specifying exact date ranges
+- [ ] Hover preview constraint feedback: visually indicate when a hovered date would result in an invalid range (e.g., dim dates outside valid minRange/maxRange from the start date)
+- [ ] `isDateSelectableForRange(date)` method: given a start date, return whether clicking a candidate end date would produce a valid range
+- [ ] Per-date constraint tooltips: API to provide reasons why a date is disabled (e.g., "Weekends are not available" or "Minimum 5-day booking required in summer")
+- [ ] Rule priority/weight system: instead of first-match-wins, support explicit priority ordering
+- [ ] Constraint-aware month/year navigation: disable prev/next when all dates in adjacent months are disabled
+- [ ] `beforeSelect` callback: allow consumers to run custom validation logic before a date is selected
+
+## Phase 9: Extras (Post-MVP)
 
 These are explicitly **out of scope** for v1 but documented for future planning.
 
@@ -673,11 +719,11 @@ These are explicitly **out of scope** for v1 but documented for future planning.
 | Sprint | Phases | Milestone |
 |--------|--------|-----------|
 | 0 | 0.1 – 0.11 | Repo ready: builds, lints, tests, hot-reloads |
-| 1 | 1.1 – 1.4 | Core engine works, fully tested in isolation |
+| 1 | 1.1 – 1.6 | Core engine works with advanced constraints, fully tested |
 | 2 | 2.1 – 2.3 | Input parsing & masking work standalone |
-| 3 | 3.1 – 3.2, 4.1 | Basic Alpine calendar renders, input binding works |
+| 3 | 3.1 – 3.2, 4.1 | Basic Alpine calendar renders, input binding works ✅ 3.2 done |
 | 4 | 4.2 – 4.4 | Month/year views, wizard mode |
-| 5 | 3.3 – 3.4, 5.1 – 5.3 | Popup, keyboard nav, full styling |
+| 5 | 3.3 – 3.4, 5.1 – 5.3 | Popup, keyboard nav, full styling ✅ 3.3 done |
 | 6 | 6.1 – 6.4 | Packaged, published, documented |
 | 7 | 7.1 – 7.4 | Tested and documented |
 
@@ -695,3 +741,11 @@ Document key decisions here as they're made:
 | Styling approach | Tailwind utilities + CSS `@theme` vars | Easy to customize without touching component code |
 | Build tool | Vite library mode | Fast, produces clean ESM + UMD bundles |
 | State management | Alpine reactive `$data` | Native to Alpine, no external store needed |
+| Constraint rules | First-match-wins, rule overrides global | Simple, predictable; consumer controls rule order |
+| Range validation | Start date determines rule | User selects start first; consistent behavior |
+| enabledDates | Force-enable (overrides DOW/blacklist) | Most useful as "exceptions" to general rules |
+| enabledDaysOfWeek | Whitelist (inverse of disabledDaysOfWeek) | Cleaner API when most days should be disabled |
+| Range length | Inclusive day count (start to end) | Intuitive: "3-day range" = 3 calendar days |
+| Popup positioning | Custom `position:fixed` + `getBoundingClientRect` | Zero dependencies; simple flip logic covers 95% of cases |
+| Popup auto-update | rAF-throttled scroll/resize listeners on ancestors | Performance-safe; passive listeners, single rAF per event burst |
+| Input binding | `x-ref="input"` auto-bind + `bindInput()` API | Works with Alpine's ref system; explicit binding also supported |
