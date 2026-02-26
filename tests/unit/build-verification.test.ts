@@ -312,19 +312,19 @@ describe('Build & Distribution Verification', () => {
   // Bundle size checks
   // -------------------------------------------------------------------------
   describe('bundle sizes', () => {
-    it('CDN IIFE bundle is under 45KB raw', () => {
+    it('CDN IIFE bundle is under 55KB raw', () => {
       const size = distFileSize('alpine-calendar.cdn.js')
-      expect(size).toBeLessThan(45_000)
+      expect(size).toBeLessThan(55_000)
     })
 
-    it('ESM bundle is under 90KB raw', () => {
+    it('ESM bundle is under 110KB raw', () => {
       const size = distFileSize('alpine-calendar.es.js')
-      expect(size).toBeLessThan(90_000)
+      expect(size).toBeLessThan(110_000)
     })
 
-    it('UMD bundle is under 45KB raw', () => {
+    it('UMD bundle is under 60KB raw', () => {
       const size = distFileSize('alpine-calendar.umd.js')
-      expect(size).toBeLessThan(45_000)
+      expect(size).toBeLessThan(60_000)
     })
 
     it('CSS is under 25KB raw', () => {

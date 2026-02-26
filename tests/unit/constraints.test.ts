@@ -1574,3 +1574,305 @@ describe('recurring month rules', () => {
     })
   })
 })
+
+// ---------------------------------------------------------------------------
+// Rule priority/weight system
+// ---------------------------------------------------------------------------
+
+describe('rule priority', () => {
+  describe('createDateConstraint with priority', () => {
+    it('higher priority rule wins over lower priority', () => {
+      const check = createDateConstraint({
+        rules: [
+          {
+            from: new CalendarDate(2025, 6, 1),
+            to: new CalendarDate(2025, 6, 30),
+            disabledDaysOfWeek: [0, 6], // disable weekends
+            priority: 1,
+          },
+          {
+            from: new CalendarDate(2025, 6, 10),
+            to: new CalendarDate(2025, 6, 20),
+            disabledDaysOfWeek: [], // allow all days
+            priority: 10, // higher priority
+          },
+        ],
+      })
+      // June 14 (Saturday) — both rules match, priority 10 wins → allowed
+      expect(check(new CalendarDate(2025, 6, 14))).toBe(false)
+      // June 7 (Saturday) — only priority 1 rule matches → disabled
+      expect(check(new CalendarDate(2025, 6, 7))).toBe(true)
+    })
+
+    it('without priority, first-match-wins (backward compatibility)', () => {
+      const check = createDateConstraint({
+        rules: [
+          {
+            from: new CalendarDate(2025, 6, 1),
+            to: new CalendarDate(2025, 6, 30),
+            disabledDaysOfWeek: [0, 6, 5], // disable Fri+weekends
+          },
+          {
+            from: new CalendarDate(2025, 6, 10),
+            to: new CalendarDate(2025, 6, 20),
+            disabledDaysOfWeek: [], // allow all
+          },
+        ],
+      })
+      // June 13 (Friday) — both rules match, both priority 0, first wins → disabled
+      expect(check(new CalendarDate(2025, 6, 13))).toBe(true)
+    })
+
+    it('equal priority preserves array order (first match wins)', () => {
+      const check = createDateConstraint({
+        rules: [
+          {
+            from: new CalendarDate(2025, 6, 1),
+            to: new CalendarDate(2025, 6, 30),
+            disabledDaysOfWeek: [0, 6, 5], // more restrictive
+            priority: 5,
+          },
+          {
+            from: new CalendarDate(2025, 6, 10),
+            to: new CalendarDate(2025, 6, 20),
+            disabledDaysOfWeek: [], // less restrictive
+            priority: 5, // same priority
+          },
+        ],
+      })
+      // June 13 (Friday) — both match, same priority, first wins → disabled
+      expect(check(new CalendarDate(2025, 6, 13))).toBe(true)
+    })
+
+    it('later array position with higher priority wins', () => {
+      const check = createDateConstraint({
+        rules: [
+          {
+            from: new CalendarDate(2025, 6, 1),
+            to: new CalendarDate(2025, 6, 30),
+            disabledDaysOfWeek: [0, 6, 5], // more restrictive, lower priority
+            priority: 1,
+          },
+          {
+            from: new CalendarDate(2025, 6, 10),
+            to: new CalendarDate(2025, 6, 20),
+            disabledDaysOfWeek: [], // less restrictive, higher priority
+            priority: 2,
+          },
+        ],
+      })
+      // June 13 (Friday) in overlapping range — priority 2 wins → allowed
+      expect(check(new CalendarDate(2025, 6, 13))).toBe(false)
+      // June 6 (Friday) only first rule matches → disabled
+      expect(check(new CalendarDate(2025, 6, 6))).toBe(true)
+    })
+
+    it('negative priority is lower than default 0', () => {
+      const check = createDateConstraint({
+        rules: [
+          {
+            from: new CalendarDate(2025, 6, 1),
+            to: new CalendarDate(2025, 6, 30),
+            disabledDaysOfWeek: [], // allow all
+            priority: -1,
+          },
+          {
+            from: new CalendarDate(2025, 6, 1),
+            to: new CalendarDate(2025, 6, 30),
+            disabledDaysOfWeek: [0, 6], // disable weekends
+            // priority defaults to 0
+          },
+        ],
+      })
+      // Saturday — default priority (0) > -1, second rule wins → disabled
+      expect(check(new CalendarDate(2025, 6, 7))).toBe(true)
+    })
+
+    it('priority with recurring month rules', () => {
+      const check = createDateConstraint({
+        rules: [
+          {
+            months: [6], // June every year — low priority
+            disabledDaysOfWeek: [0, 6],
+            priority: 1,
+          },
+          {
+            from: new CalendarDate(2025, 6, 1),
+            to: new CalendarDate(2025, 6, 30),
+            disabledDaysOfWeek: [], // June 2025 specifically — high priority
+            priority: 10,
+          },
+        ],
+      })
+      // Saturday June 2025 — date-range rule (priority 10) wins → allowed
+      expect(check(new CalendarDate(2025, 6, 7))).toBe(false)
+      // Saturday June 2026 — only recurring rule matches → disabled
+      expect(check(new CalendarDate(2026, 6, 6))).toBe(true)
+    })
+
+    it('priority with three overlapping rules', () => {
+      const check = createDateConstraint({
+        rules: [
+          {
+            months: [6], // June recurring — base rule
+            disabledDaysOfWeek: [0],
+            priority: 1,
+          },
+          {
+            from: new CalendarDate(2025, 6, 1),
+            to: new CalendarDate(2025, 6, 30),
+            disabledDaysOfWeek: [0, 6], // June 2025 — more restrictive
+            priority: 5,
+          },
+          {
+            from: new CalendarDate(2025, 6, 15),
+            to: new CalendarDate(2025, 6, 20),
+            disabledDaysOfWeek: [], // mid-June 2025 — allow everything
+            priority: 10,
+          },
+        ],
+      })
+      // Sunday June 8 2025 — rules 1 & 2 match, priority 5 wins → disabled (Sunday in [0,6])
+      expect(check(new CalendarDate(2025, 6, 8))).toBe(true)
+      // Saturday June 14 2025 — rules 1 & 2 match, priority 5 wins → disabled (Saturday in [0,6])
+      expect(check(new CalendarDate(2025, 6, 14))).toBe(true)
+      // Sunday June 15 2025 — all 3 match, priority 10 wins → allowed
+      expect(check(new CalendarDate(2025, 6, 15))).toBe(false)
+    })
+
+    it('priority rule properties override global where explicitly set', () => {
+      const check = createDateConstraint({
+        disabledDaysOfWeek: [0, 6], // global: no weekends
+        rules: [
+          {
+            from: new CalendarDate(2025, 6, 1),
+            to: new CalendarDate(2025, 6, 30),
+            // no disabledDaysOfWeek → inherits global
+            priority: 1,
+          },
+          {
+            from: new CalendarDate(2025, 6, 10),
+            to: new CalendarDate(2025, 6, 20),
+            disabledDaysOfWeek: [], // explicitly empty → overrides global
+            priority: 10,
+          },
+        ],
+      })
+      // Saturday June 7 — only rule 1 matches, inherits global weekends → disabled
+      expect(check(new CalendarDate(2025, 6, 7))).toBe(true)
+      // Saturday June 14 — both match, rule 2 wins (priority 10), explicit empty → allowed
+      expect(check(new CalendarDate(2025, 6, 14))).toBe(false)
+    })
+
+    it('priority with minDate/maxDate override', () => {
+      const check = createDateConstraint({
+        minDate: new CalendarDate(2025, 1, 1),
+        rules: [
+          {
+            from: new CalendarDate(2025, 1, 1),
+            to: new CalendarDate(2025, 12, 31),
+            minDate: new CalendarDate(2025, 6, 1), // restrict further
+            priority: 1,
+          },
+          {
+            from: new CalendarDate(2025, 3, 1),
+            to: new CalendarDate(2025, 4, 30),
+            minDate: new CalendarDate(2025, 2, 1), // relax within this period
+            priority: 10,
+          },
+        ],
+      })
+      // March 1 — both match, priority 10 wins, minDate = Feb 1 → allowed
+      expect(check(new CalendarDate(2025, 3, 1))).toBe(false)
+      // May 15 — only rule 1 matches, minDate = June 1 → disabled
+      expect(check(new CalendarDate(2025, 5, 15))).toBe(true)
+    })
+  })
+
+  describe('createRangeValidator with priority', () => {
+    it('higher priority rule determines range constraints', () => {
+      const validate = createRangeValidator({
+        minRange: 3,
+        rules: [
+          {
+            from: new CalendarDate(2025, 6, 1),
+            to: new CalendarDate(2025, 6, 30),
+            minRange: 7, // strict
+            priority: 1,
+          },
+          {
+            from: new CalendarDate(2025, 6, 10),
+            to: new CalendarDate(2025, 6, 20),
+            minRange: 2, // lenient
+            priority: 10,
+          },
+        ],
+      })
+      // Start June 15 — both match, priority 10 wins → minRange 2
+      expect(validate(
+        new CalendarDate(2025, 6, 15),
+        new CalendarDate(2025, 6, 16),
+      )).toBe(true) // 2 >= 2
+
+      // Start June 5 — only rule 1 matches → minRange 7
+      expect(validate(
+        new CalendarDate(2025, 6, 5),
+        new CalendarDate(2025, 6, 8),
+      )).toBe(false) // 4 < 7
+    })
+
+    it('equal priority preserves first-match for range validation', () => {
+      const validate = createRangeValidator({
+        rules: [
+          {
+            from: new CalendarDate(2025, 6, 1),
+            to: new CalendarDate(2025, 6, 30),
+            minRange: 7,
+            priority: 5,
+          },
+          {
+            from: new CalendarDate(2025, 6, 10),
+            to: new CalendarDate(2025, 6, 20),
+            minRange: 2,
+            priority: 5,
+          },
+        ],
+      })
+      // Start June 15 — both match, same priority, first wins → minRange 7
+      expect(validate(
+        new CalendarDate(2025, 6, 15),
+        new CalendarDate(2025, 6, 18),
+      )).toBe(false) // 4 < 7
+    })
+
+    it('priority with recurring months for range validation', () => {
+      const validate = createRangeValidator({
+        minRange: 3,
+        rules: [
+          {
+            months: [6],
+            minRange: 10,
+            priority: 1,
+          },
+          {
+            from: new CalendarDate(2025, 6, 1),
+            to: new CalendarDate(2025, 6, 30),
+            minRange: 2,
+            priority: 5,
+          },
+        ],
+      })
+      // Start June 15, 2025 — both match, priority 5 wins → minRange 2
+      expect(validate(
+        new CalendarDate(2025, 6, 15),
+        new CalendarDate(2025, 6, 16),
+      )).toBe(true) // 2 >= 2
+
+      // Start June 15, 2026 — only recurring matches → minRange 10
+      expect(validate(
+        new CalendarDate(2026, 6, 15),
+        new CalendarDate(2026, 6, 20),
+      )).toBe(false) // 6 < 10
+    })
+  })
+})

@@ -324,6 +324,13 @@ describe('parseDateRange', () => {
     expect(result![0].toISO()).toBe('2025-06-01')
     expect(result![1].toISO()).toBe('2025-06-30')
   })
+
+  it('falls back to ISO parsing when format does not match', () => {
+    const result = parseDateRange('2025-06-01 - 2025-06-30', fmt)
+    expect(result).not.toBeNull()
+    expect(result![0].toISO()).toBe('2025-06-01')
+    expect(result![1].toISO()).toBe('2025-06-30')
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -384,5 +391,13 @@ describe('parseDateMultiple', () => {
   it('trims whitespace around the full string', () => {
     const result = parseDateMultiple('  01/06/2025, 15/06/2025  ', fmt)
     expect(result).toHaveLength(2)
+  })
+
+  it('falls back to ISO parsing when format does not match', () => {
+    const result = parseDateMultiple('2025-06-01, 2025-06-15, 2025-06-20', fmt)
+    expect(result).toHaveLength(3)
+    expect(result[0]!.toISO()).toBe('2025-06-01')
+    expect(result[1]!.toISO()).toBe('2025-06-15')
+    expect(result[2]!.toISO()).toBe('2025-06-20')
   })
 })

@@ -8,13 +8,13 @@ import {
 } from '../core/constraints'
 import type { DateConstraintOptions, DateConstraintRule, ConstraintMessages } from '../core/constraints'
 import { generateMonths, generateMonthGrid, generateYearGrid } from '../core/grid'
-import type { MonthGrid, MonthCell, YearCell } from '../core/grid'
+import type { DayCell, MonthGrid, MonthCell, YearCell } from '../core/grid'
 import { SingleSelection, MultipleSelection, RangeSelection } from '../core/selection'
 import type { Selection } from '../core/selection'
 import { formatDate, formatRange, formatMultiple } from '../input/formatter'
 import { parseDate, parseDateRange, parseDateMultiple } from '../input/parser'
 import { attachMask } from '../input/mask'
-import { computePosition, autoUpdate } from '../positioning/popup'
+import type { RangePreset } from '../core/presets'
 import type { Placement } from '../positioning/popup'
 import { generateCalendarTemplate } from './template'
 
@@ -30,6 +30,8 @@ export interface CalendarConfigRule {
   to?: string
   /** Recurring months this rule applies to (1=Jan, …, 12=Dec). Matches every year. */
   months?: number[]
+  /** Priority for conflict resolution. Higher values win. Default: 0. */
+  priority?: number
   /** Minimum selectable date within this period (ISO string). */
   minDate?: string
   /** Maximum selectable date within this period (ISO string). */
@@ -56,6 +58,8 @@ export interface CalendarConfigRule {
   maxRange?: number
 }
 
+export type { RangePreset } from '../core/presets'
+
 export interface CalendarConfig {
   /** Selection mode. Default: 'single'. */
   mode?: 'single' | 'multiple' | 'range'
@@ -63,8 +67,10 @@ export interface CalendarConfig {
   display?: 'inline' | 'popup'
   /** Date format string (e.g. 'DD/MM/YYYY'). Default: 'DD/MM/YYYY'. */
   format?: string
-  /** Number of months to show (1 or 2). Default: 1. */
+  /** Number of months to show. 1 = single, 2 = side-by-side dual, 3+ = scrollable. Default: 1. */
   months?: number
+  /** Max height of the scrollable container in px (only used when months >= 3). Default: 400. */
+  scrollHeight?: number
   /** First day of the week (0=Sun, 1=Mon, …, 6=Sat). Default: 0. */
   firstDay?: number
   /** Minimum selectable date (ISO string). */
@@ -91,7 +97,7 @@ export interface CalendarConfig {
   minRange?: number
   /** Maximum range length in days (inclusive). Only used in range mode. */
   maxRange?: number
-  /** Period-specific constraint rules. First matching rule wins. */
+  /** Period-specific constraint rules. Highest priority matching rule wins; ties broken by array order. */
   rules?: CalendarConfigRule[]
   /** Enable birth-date wizard mode. Default: false. Use 'year-month' or 'month-day' for half-wizard. */
   wizard?: boolean | 'year-month' | 'month-day'
@@ -109,6 +115,13 @@ export interface CalendarConfig {
   placement?: Placement
   /** Offset in pixels between reference and popup. Default: 4. */
   popupOffset?: number
+  /** Show ISO 8601 week numbers on the left side of the day grid. Default: false. */
+  showWeekNumbers?: boolean
+  /**
+   * Predefined date range presets (e.g., "Today", "Last 7 Days", "This Month").
+   * Displayed as quick-select buttons alongside the calendar. Only meaningful in range or single mode.
+   */
+  presets?: RangePreset[]
   /** Close popup after a date is selected. Default: true. */
   closeOnSelect?: boolean
   /**
@@ -195,6 +208,9 @@ function parseConfigRule(rule: CalendarConfigRule): DateConstraintRule | null {
   if (hasMonths) {
     result.months = rule.months
   }
+  if (rule.priority !== undefined) {
+    result.priority = rule.priority
+  }
 
   if (rule.minDate) {
     const d = parseISODate(rule.minDate)
@@ -249,9 +265,14 @@ function parseConfigRule(rule: CalendarConfigRule): DateConstraintRule | null {
 function validateConfig(config: CalendarConfig): void {
   const warn = (msg: string) => console.warn(`[reach-calendar] ${msg}`)
 
-  // months must be 1 or 2
-  if (config.months !== undefined && config.months !== 1 && config.months !== 2) {
-    warn(`months must be 1 or 2, got: ${config.months}`)
+  // months must be a positive integer
+  if (config.months !== undefined && (config.months < 1 || !Number.isInteger(config.months))) {
+    warn(`months must be a positive integer, got: ${config.months}`)
+  }
+
+  // wizard + scrollable combo
+  if (config.wizard && config.months && config.months >= 3) {
+    warn('months >= 3 (scrollable) is not compatible with wizard mode; using months: 1')
   }
 
   // firstDay must be 0-6
@@ -387,10 +408,14 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
   const mode = config.mode ?? 'single'
   const display = config.display ?? 'inline'
   const format = config.format ?? 'DD/MM/YYYY'
-  const monthCount = config.months ?? 1
   const firstDay = config.firstDay ?? 0
   const timezone = config.timezone
   const wizardConfig = config.wizard ?? false
+  const rawMonthCount = config.months ?? 1
+  // Force months: 1 when wizard + scrollable
+  const monthCount = (wizardConfig && rawMonthCount >= 3) ? 1 : rawMonthCount
+  const isScrollable = monthCount >= 3
+  const scrollHeight = config.scrollHeight ?? 400
   const wizard = !!wizardConfig
   const wizardMode: 'none' | 'full' | 'year-month' | 'month-day' =
     wizardConfig === true ? 'full'
@@ -402,11 +427,11 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     : wizardMode === 'month-day' ? 'months'
     : 'days'
   const useMask = config.mask ?? true
+  const showWeekNumbers = config.showWeekNumbers ?? false
+  const presets: RangePreset[] = config.presets ?? []
   const inputName = config.name ?? ''
   const locale = config.locale
   const closeOnSelect = config.closeOnSelect ?? true
-  const placementConfig = config.placement ?? 'bottom-start'
-  const popupOffsetPx = config.popupOffset ?? 4
   const beforeSelectCb = config.beforeSelect ?? null
 
   // --- Build constraint functions ---
@@ -481,6 +506,8 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     wizard,
     wizardMode,
     wizardTotalSteps,
+    showWeekNumbers,
+    presets,
     inputName,
 
     // --- Reactive state ---
@@ -515,10 +542,21 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     _detachMask: null as (() => void) | null,
     _syncing: false,
     _popupEl: null as HTMLElement | null,
-    _autoUpdateCleanup: null as (() => void) | null,
-    _documentClickHandler: null as ((e: Event) => void) | null,
     _Alpine: (Alpine ?? null) as { initTree: (el: HTMLElement) => void } | null,
     _autoRendered: false,
+
+    // Scrollable multi-month state
+    isScrollable,
+    _scrollHeight: scrollHeight,
+    _scrollContainerEl: null as HTMLElement | null,
+    _scrollHandler: null as (() => void) | null,
+    /** Index into grid[] of the month currently visible at top of scroll viewport. */
+    _scrollVisibleIndex: 0,
+    /**
+     * Reactive counter bumped on selection changes. Read by dayClasses() so Alpine
+     * re-evaluates class bindings without needing a full grid rebuild.
+     */
+    _selectionRev: 0,
 
     // --- Getters ---
 
@@ -602,9 +640,13 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       if (!hasContent && config.template !== false && this._Alpine?.initTree) {
         el.innerHTML = generateCalendarTemplate({
           display: this.display,
-          isDualMonth: this.monthCount > 1,
+          isDualMonth: this.monthCount === 2,
           isWizard: this.wizardMode !== 'none',
           hasName: !!this.inputName,
+          showWeekNumbers: this.showWeekNumbers,
+          hasPresets: this.presets.length > 0,
+          isScrollable: this.isScrollable,
+          scrollHeight: this._scrollHeight,
         })
         for (const child of Array.from(el.children)) {
           this._Alpine.initTree(child as HTMLElement)
@@ -637,11 +679,20 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         if (refs && refs['input'] && refs['input'] instanceof HTMLInputElement) {
           this.bindInput(refs['input'])
         }
+        // Init scroll listener for scrollable multi-month
+        if (this.isScrollable) {
+          this._initScrollListener()
+        }
       })
     },
 
     destroy() {
       this._stopPositioning()
+      if (this._scrollHandler && this._scrollContainerEl) {
+        this._scrollContainerEl.removeEventListener('scroll', this._scrollHandler)
+        this._scrollHandler = null
+      }
+      this._scrollContainerEl = null
       if (this._detachMask) {
         this._detachMask()
         this._detachMask = null
@@ -677,6 +728,35 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       this.yearGrid = generateYearGrid(this.year, this._today, this._isYearDisabled)
     },
 
+    /**
+     * Build a flat array of grid items for template rendering, interleaving week number
+     * markers with day cells. Used by the auto-rendered template when `showWeekNumbers` is true.
+     */
+    dayGridItems(mg: MonthGrid): { isWeekNumber: boolean; weekNumber: number; cell: DayCell; key: string }[] {
+      const items: { isWeekNumber: boolean; weekNumber: number; cell: DayCell; key: string }[] = []
+      for (let ri = 0; ri < mg.rows.length; ri++) {
+        const row = mg.rows[ri]
+        if (!row || row.length === 0) continue
+        const firstCell = row[0] as DayCell
+        items.push({
+          isWeekNumber: true,
+          weekNumber: mg.weekNumbers[ri] ?? 0,
+          // Placeholder cell — template guards prevent access when isWeekNumber is true
+          cell: firstCell,
+          key: `wn-${ri}`,
+        })
+        for (const cell of row) {
+          items.push({
+            isWeekNumber: false,
+            weekNumber: 0,
+            cell,
+            key: cell.date.toISO(),
+          })
+        }
+      }
+      return items
+    },
+
     /** Year label for the month view header (e.g. "2026"). */
     get yearLabel(): string {
       return String(this.year)
@@ -702,6 +782,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
      */
     get canGoPrev(): boolean {
       if (this.view === 'days') {
+        if (this.isScrollable) return false
         const d = new CalendarDate(this.year, this.month, 1).addMonths(-1)
         return !this._isMonthDisabled(d.year, d.month)
       }
@@ -733,6 +814,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
      */
     get canGoNext(): boolean {
       if (this.view === 'days') {
+        if (this.isScrollable) return false
         const d = new CalendarDate(this.year, this.month, 1).addMonths(1)
         return !this._isMonthDisabled(d.year, d.month)
       }
@@ -794,6 +876,10 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     dayClasses(
       cell: { date: CalendarDate; isCurrentMonth: boolean; isToday: boolean; isDisabled: boolean },
     ): Record<string, boolean> {
+      // Read _selectionRev to register it as an Alpine dependency.
+      // This lets Alpine re-evaluate class bindings when selection changes
+      // without needing a full grid rebuild (important for large month counts).
+      void this._selectionRev
       const d = cell.date
       const selected = this.isSelected(d)
       const rangeStart = this.isRangeStart(d)
@@ -922,7 +1008,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       if (!value.trim()) {
         if (this._selection.toArray().length > 0) {
           this._selection.clear()
-          this._rebuildGrid()
+          this._selectionRev++
           this._emitChange()
         }
         this._syncInputFromSelection()
@@ -972,7 +1058,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       }
 
       if (changed) {
-        this._rebuildGrid()
+        this._selectionRev++
         this._emitChange()
       }
 
@@ -1026,6 +1112,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     prev() {
       this._navDirection = 'prev'
       if (this.view === 'days') {
+        if (this.isScrollable) return
         const d = new CalendarDate(this.year, this.month, 1).addMonths(-1)
         this.month = d.month
         this.year = d.year
@@ -1039,6 +1126,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     next() {
       this._navDirection = 'next'
       if (this.view === 'days') {
+        if (this.isScrollable) return
         const d = new CalendarDate(this.year, this.month, 1).addMonths(1)
         this.month = d.month
         this.year = d.year
@@ -1092,7 +1180,9 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
 
       this._selection.toggle(date)
       if (wizard) this._wizardDay = date.day
-      this._rebuildGrid()
+      // Bump reactive counter so Alpine re-evaluates dayClasses() bindings.
+      // No grid rebuild needed — grid structure doesn't change on selection.
+      this._selectionRev++
       this._emitChange()
       this._syncInputFromSelection()
 
@@ -1178,7 +1268,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
 
     clearSelection() {
       this._selection.clear()
-      this._rebuildGrid()
+      this._selectionRev++
       this._emitChange()
       this._syncInputFromSelection()
     },
@@ -1240,13 +1330,13 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         }
         if (!this._isRangeValid(start, end)) {
           // Invalid range — don't set anything
-          this._rebuildGrid()
+          this._selectionRev++
           this._emitChange()
           this._syncInputFromSelection()
           return
         }
-        this._selection.toggle(start)
-        this._selection.toggle(end)
+        // Use setRange() for direct assignment — avoids toggle() deselecting same-day ranges
+        ;(this._selection as RangeSelection).setRange(start, end)
       } else {
         for (const d of dates) {
           this._selection.toggle(d)
@@ -1261,7 +1351,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         this.year = first.year
       }
 
-      this._rebuildGrid()
+      this._selectionRev++
       this._emitChange()
       this._syncInputFromSelection()
     },
@@ -1288,6 +1378,10 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         this.month = month
       }
       this.view = 'days'
+      if (this.isScrollable) {
+        this._rebuildGrid()
+        alpine(this).$nextTick(() => { this._scrollToMonth(year, month ?? this.month) })
+      }
     },
 
     /**
@@ -1303,6 +1397,35 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
      */
     getSelection(): CalendarDate[] {
       return [...this._selection.toArray()]
+    },
+
+    /**
+     * Apply a predefined range preset by index.
+     *
+     * Evaluates the preset's `value()` function, sets the selection to the
+     * returned `[start, end]` range, navigates to the start date, and
+     * emits a change event. In popup mode with `closeOnSelect`, the popup closes.
+     *
+     * Usage in Alpine template:
+     * ```html
+     * <template x-for="(preset, pi) in presets" :key="pi">
+     *   <button @click="applyPreset(pi)" x-text="preset.label"></button>
+     * </template>
+     * ```
+     */
+    applyPreset(index: number) {
+      const preset = this.presets[index]
+      if (!preset) return
+
+      const [start, end] = preset.value()
+
+      // Use setValue which handles clearing, range validation, navigation, and events
+      this.setValue([start, end])
+
+      // Close popup if configured
+      if (this.display === 'popup' && closeOnSelect) {
+        this.close()
+      }
     },
 
     // --- Runtime config ---
@@ -1567,6 +1690,13 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
      */
     _setFocusedDate(date: CalendarDate) {
       this.focusedDate = date
+      if (this.isScrollable) {
+        // Scroll the focused date's month into view
+        alpine(this).$nextTick(() => {
+          this._scrollToMonth(date.year, date.month)
+        })
+        return
+      }
       // Navigate the calendar view to show the focused date's month
       if (date.month !== this.month || date.year !== this.year) {
         this.month = date.month
@@ -1574,86 +1704,68 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       }
     },
 
+    // --- Internal: scrollable multi-month ---
+
+    /** Label for the sticky header in scrollable mode — tracks the topmost visible month. */
+    get scrollHeaderLabel(): string {
+      if (!this.isScrollable) return ''
+      const mg = this.grid[this._scrollVisibleIndex]
+      if (!mg) return ''
+      const d = new CalendarDate(mg.year, mg.month, 1)
+      return d.format({ month: 'long', year: 'numeric' }, locale)
+    },
+
+    /** Attach a scroll listener that updates the sticky header as the user scrolls. */
+    _initScrollListener() {
+      const el = alpine(this).$el
+      const container = el.querySelector('.rc-months--scroll') as HTMLElement | null
+      if (!container) return
+      this._scrollContainerEl = container
+
+      const handler = () => {
+        const containerTop = container.getBoundingClientRect().top
+        const monthEls = container.querySelectorAll('[data-month-id]')
+        let visibleIndex = 0
+        for (let i = 0; i < monthEls.length; i++) {
+          const rect = monthEls[i]!.getBoundingClientRect()
+          // The last month whose top is at or above the container top
+          if (rect.top <= containerTop + 10) {
+            visibleIndex = i
+          }
+        }
+        if (this._scrollVisibleIndex !== visibleIndex) {
+          this._scrollVisibleIndex = visibleIndex
+        }
+      }
+
+      container.addEventListener('scroll', handler, { passive: true })
+      this._scrollHandler = handler
+    },
+
+    /** Smooth scroll a specific month into view inside the scroll container. */
+    _scrollToMonth(year: number, month: number) {
+      if (!this._scrollContainerEl) return
+      const el = this._scrollContainerEl.querySelector(
+        `[data-month-id="month-${year}-${month}"]`,
+      ) as HTMLElement | null
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    },
+
     // --- Internal: popup positioning ---
 
     /**
      * Start popup positioning.
-     *
-     * Mobile  (< 640px): CSS handles bottom-sheet layout via `.rc-popup-overlay`.
-     * Desktop (≥ 640px): uses `computePosition` to float the calendar below
-     *         the input element, with `autoUpdate` for scroll/resize tracking
-     *         and a document click listener for outside-click dismissal.
+     * CSS handles centered modal layout via `.rc-popup-overlay`.
+     * Click-outside dismissal is handled by `@click.self="close()"` on the overlay.
      */
     _startPositioning() {
       const refs = alpine(this).$refs
       const popupEl = refs['popup'] as HTMLElement | undefined
       if (popupEl) this._popupEl = popupEl
-
-      // Desktop floating mode: position via computePosition
-      const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 640
-      if (isDesktop && this._inputEl && popupEl) {
-        const calendarEl = popupEl.querySelector('.rc-calendar') as HTMLElement
-        if (!calendarEl) return
-
-        const updatePosition = () => {
-          if (!this._inputEl || !calendarEl) return
-          const result = computePosition(this._inputEl, calendarEl, {
-            placement: placementConfig,
-            offset: popupOffsetPx,
-          })
-          calendarEl.style.position = 'fixed'
-          calendarEl.style.left = `${result.x}px`
-          calendarEl.style.top = `${result.y}px`
-          calendarEl.style.zIndex = '51'
-        }
-
-        updatePosition()
-        this._autoUpdateCleanup = autoUpdate(this._inputEl, updatePosition)
-
-        // Desktop click-outside handler (deferred to avoid the opening click)
-        const handler = (e: Event) => {
-          const target = e.target as Node
-          if (
-            calendarEl &&
-            !calendarEl.contains(target) &&
-            !this._inputEl?.contains(target)
-          ) {
-            this.close()
-          }
-        }
-        this._documentClickHandler = handler
-        setTimeout(() => {
-          document.addEventListener('mousedown', handler)
-        }, 0)
-      }
-      // else: mobile — CSS handles bottom-sheet positioning
     },
 
-    /** Stop position tracking and clean up listeners. */
+    /** Stop positioning and clean up references. */
     _stopPositioning() {
-      // Clean up desktop auto-update
-      if (this._autoUpdateCleanup) {
-        this._autoUpdateCleanup()
-        this._autoUpdateCleanup = null
-      }
-
-      // Clean up desktop click-outside listener
-      if (this._documentClickHandler) {
-        document.removeEventListener('mousedown', this._documentClickHandler)
-        this._documentClickHandler = null
-      }
-
-      // Reset inline positioning styles on the calendar element
-      if (this._popupEl) {
-        const calendarEl = this._popupEl.querySelector('.rc-calendar') as HTMLElement
-        if (calendarEl) {
-          calendarEl.style.position = ''
-          calendarEl.style.left = ''
-          calendarEl.style.top = ''
-          calendarEl.style.zIndex = ''
-        }
-      }
-
       this._popupEl = null
     },
   }

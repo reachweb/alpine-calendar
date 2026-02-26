@@ -90,6 +90,42 @@
   }
 }
 
+/* Multi-month scrollable layout */
+.rc-months--scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-calendar-border) transparent;
+}
+
+.rc-months--scroll::-webkit-scrollbar { width: 6px; }
+.rc-months--scroll::-webkit-scrollbar-track { background: transparent; }
+.rc-months--scroll::-webkit-scrollbar-thumb {
+  background-color: var(--color-calendar-border);
+  border-radius: 3px;
+}
+
+/* Sticky header above scroll container — shows current visible month */
+.rc-header--scroll-sticky {
+  justify-content: center;
+}
+
+/* Inline month headers inside the scroll container */
+.rc-header--scroll {
+  justify-content: center;
+  padding: 0.5rem 0 0.25rem;
+  border-top: 1px solid var(--color-calendar-border);
+}
+
+.rc-header--scroll:first-child { border-top: none; padding-top: 0; }
+
+.rc-header__label--scroll { cursor: default; }
+.rc-header__label--scroll:hover { background-color: transparent; }
+
 /* ---------------------------------------------------------------------------
  * Month header (nav arrows + month/year label)
  * ------------------------------------------------------------------------- */
@@ -253,40 +289,25 @@
 }
 
 /* ---------------------------------------------------------------------------
- * Popup overlay — responsive
+ * Popup overlay — centered modal
  *
- * Mobile  (< 640px): full-screen backdrop with calendar as bottom sheet.
- * Desktop (≥ 640px): transparent overlay (click-outside catcher only);
- *                     calendar is floating-positioned by JS via computePosition.
+ * Full-screen backdrop with centered calendar on all screen sizes.
+ * Click-outside dismissal is handled by @click.self="close()" on the overlay.
  * ------------------------------------------------------------------------- */
 
 .rc-popup-overlay {
   display: flex;
-  align-items: flex-end; /* bottom sheet alignment (mobile default) */
+  align-items: center;
   justify-content: center;
   background: var(--color-calendar-overlay);
+  padding: 1rem;
 }
 
-/* Mobile bottom sheet: calendar stretches full-width at the bottom */
+/* Mobile: calendar stretches full-width */
 @media (max-width: 639px) {
   .rc-popup-overlay .rc-calendar {
     width: 100%;
     max-width: 100%;
-    border-radius: var(--radius-calendar) var(--radius-calendar) 0 0;
-    border-bottom: none;
-    box-shadow: 0 -4px 16px oklch(0 0 0 / 0.12);
-  }
-}
-
-/* Desktop: transparent overlay, pointer-events disabled (click-outside via JS) */
-@media (min-width: 640px) {
-  .rc-popup-overlay {
-    background: transparent;
-    pointer-events: none;
-  }
-
-  .rc-popup-overlay .rc-calendar {
-    pointer-events: auto;
   }
 }
 
@@ -427,6 +448,78 @@
 }
 
 /* ---------------------------------------------------------------------------
+ * Week numbers
+ * ------------------------------------------------------------------------- */
+
+/* Weekday header row with week number label column */
+.rc-weekdays--week-numbers {
+  grid-template-columns: 2rem repeat(7, 1fr);
+}
+
+/* Week label in the header row (empty — just occupies space) */
+.rc-week-label {
+  /* intentionally blank */
+}
+
+/* Day grid with week number column */
+.rc-grid--week-numbers {
+  grid-template-columns: 2rem repeat(7, 1fr);
+}
+
+/* Week number cell */
+.rc-week-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--color-calendar-weekday);
+  user-select: none;
+  -webkit-user-select: none;
+  opacity: 0.7;
+}
+
+/* ---------------------------------------------------------------------------
+ * Predefined range presets
+ * ------------------------------------------------------------------------- */
+
+.rc-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  padding-top: 0.625rem;
+  margin-top: 0.625rem;
+  border-top: 1px solid var(--color-calendar-border);
+}
+
+.rc-preset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3125rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-calendar-primary);
+  background: transparent;
+  border: 1px solid var(--color-calendar-border);
+  border-radius: var(--radius-calendar);
+  cursor: pointer;
+  transition: background-color 150ms, border-color 150ms;
+  user-select: none;
+  -webkit-user-select: none;
+  white-space: nowrap;
+}
+
+.rc-preset:hover {
+  background-color: var(--color-calendar-hover);
+  border-color: var(--color-calendar-primary);
+}
+
+.rc-preset:active {
+  background-color: var(--color-calendar-range);
+}
+
+/* ---------------------------------------------------------------------------
  * Month transition animation
  * ------------------------------------------------------------------------- */
 
@@ -467,18 +560,16 @@
 }
 
 /* ---------------------------------------------------------------------------
- * Mobile bottom sheet slide-up
+ * Popup enter animation (centered scale-in)
  * ------------------------------------------------------------------------- */
 
-@keyframes rc-slide-up {
-  from { transform: translateY(100%); }
-  to   { transform: translateY(0); }
+@keyframes rc-popup-enter {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
-@media (max-width: 639px) {
-  .rc-popup-overlay .rc-calendar {
-    animation: rc-slide-up 200ms ease-out;
-  }
+.rc-popup-overlay .rc-calendar {
+  animation: rc-popup-enter 200ms ease-out;
 }
 
 /* ---------------------------------------------------------------------------

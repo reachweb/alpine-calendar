@@ -933,6 +933,123 @@ describe('constraints — recurring month rules', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Constraints — rule priority/weight
+// ---------------------------------------------------------------------------
+
+describe('constraints — rule priority', () => {
+  it('higher priority rule wins with string-based config', () => {
+    const c = createCalendarData({
+      rules: [
+        {
+          from: '2025-06-01',
+          to: '2025-06-30',
+          disabledDaysOfWeek: [0, 6], // disable weekends
+          priority: 1,
+        },
+        {
+          from: '2025-06-10',
+          to: '2025-06-20',
+          disabledDaysOfWeek: [], // allow all
+          priority: 10,
+        },
+      ],
+    })
+    withAlpineMocks(c)
+    c.init()
+    // Saturday June 14 — in overlap, priority 10 → allowed
+    c.selectDate('2025-06-14')
+    expect(c.selectedDates).toHaveLength(1)
+    c.clearSelection()
+    // Saturday June 7 — only priority 1 → disabled
+    c.selectDate('2025-06-07')
+    expect(c.selectedDates).toHaveLength(0)
+  })
+
+  it('priority works with recurring months and date-range overlap', () => {
+    const c = createCalendarData({
+      rules: [
+        {
+          months: [6], // June every year
+          disabledDaysOfWeek: [0, 6],
+          priority: 1,
+        },
+        {
+          from: '2025-06-01',
+          to: '2025-06-30', // June 2025 specifically
+          disabledDaysOfWeek: [],
+          priority: 10,
+        },
+      ],
+    })
+    withAlpineMocks(c)
+    c.init()
+    // Saturday June 7, 2025 — both match, priority 10 → allowed
+    c.selectDate('2025-06-07')
+    expect(c.selectedDates).toHaveLength(1)
+  })
+
+  it('priority works with updateConstraints', () => {
+    const c = createCalendarData({
+      rules: [
+        {
+          from: '2025-06-01',
+          to: '2025-06-30',
+          disabledDaysOfWeek: [0, 6],
+          priority: 1,
+        },
+      ],
+    })
+    withAlpineMocks(c)
+    c.init()
+    // Saturday June 14 → disabled
+    c.selectDate('2025-06-14')
+    expect(c.selectedDates).toHaveLength(0)
+
+    // Update: add higher priority rule that allows it
+    c.updateConstraints({
+      rules: [
+        {
+          from: '2025-06-01',
+          to: '2025-06-30',
+          disabledDaysOfWeek: [0, 6],
+          priority: 1,
+        },
+        {
+          from: '2025-06-10',
+          to: '2025-06-20',
+          disabledDaysOfWeek: [],
+          priority: 10,
+        },
+      ],
+    })
+    c.selectDate('2025-06-14')
+    expect(c.selectedDates).toHaveLength(1)
+  })
+
+  it('backward compatible — no priority defaults to first-match-wins', () => {
+    const c = createCalendarData({
+      rules: [
+        {
+          from: '2025-06-01',
+          to: '2025-06-30',
+          disabledDaysOfWeek: [0, 6, 5], // more restrictive (first)
+        },
+        {
+          from: '2025-06-10',
+          to: '2025-06-20',
+          disabledDaysOfWeek: [], // less restrictive (second, but ignored)
+        },
+      ],
+    })
+    withAlpineMocks(c)
+    c.init()
+    // Friday June 13 — first rule matches (priority 0, first) → disabled
+    c.selectDate('2025-06-13')
+    expect(c.selectedDates).toHaveLength(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Initial value
 // ---------------------------------------------------------------------------
 

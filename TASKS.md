@@ -705,23 +705,16 @@ Future enhancements to the constraint/rule system.
 - [x] Hover preview constraint feedback: `rc-day--range-invalid` CSS class applied via `dayClasses()` when hovering during partial range selection and the date would form an invalid range; opacity dimming + not-allowed cursor; 10 hover preview tests in range-selectable.test.ts (1069 total)
 - [x] `isDateSelectableForRange(date)` method: given a start date, return whether clicking a candidate end date would produce a valid range — checks disabled state, handles backward selection, respects minRange/maxRange/rules, works with updateConstraints(); 20 tests in range-selectable.test.ts (1059 total)
 - [x] Per-date constraint tooltips: `createDisabledReasons()` factory in core returns `(date) => string[]` with human-readable reasons; `ConstraintMessages` interface for custom text (beforeMinDate, afterMaxDate, disabledDate, disabledDayOfWeek, etc.); `getDisabledReason(date)` component method accepts ISO string or CalendarDate; `dayTitle(cell)` helper returns tooltip string for templates (`:title="dayTitle(cell)"`); `constraintMessages` config option; works with rules, recurring months, and updateConstraints(); 30 tests in disabled-reasons.test.ts (1121 total)
-- [ ] Rule priority/weight system: instead of first-match-wins, support explicit priority ordering
+- [x] Rule priority/weight system: `priority` field on `DateConstraintRule` / `CalendarConfigRule` (number, default 0, higher wins); among equal priorities first-match-wins preserves backward compatibility; `findBestRule()` helper selects highest-priority matching rule across all 3 constraint factories (`createDateConstraint`, `createRangeValidator`, `createDisabledReasons`); 12 core tests in constraints.test.ts + 4 component integration tests in calendar-component.test.ts (1137 total)
 - [x] Constraint-aware month/year navigation: `canGoPrev`/`canGoNext` getters check adjacent month (days view), year (months view), or 12-year block (years view) against constraints; works with minDate/maxDate, disabledMonths, disabledYears, updateConstraints(); 21 tests in nav-constraints.test.ts (979 total)
 - [x] `beforeSelect` callback: allow consumers to run custom validation logic before a date is selected — receives `(date, { mode, selectedDates, action })`, return `false` to block; runs after built-in constraint checks; 19 tests in before-select.test.ts (958 total)
 
-## Phase 9: Extras (Post-MVP)
+## Phase 9: Extras
 
-These are explicitly **out of scope** for v1 but documented for future planning.
-
-- [ ] Time picker support (hour/minute selection)
-- [ ] Week number display
-- [ ] Inline multi-month (3+ months, scrollable)
-- [ ] Predefined ranges (Today, Last 7 days, This month, etc.)
-- [ ] RTL full support
-- [ ] SSR compatibility (Nuxt, etc.)
+- [x] Week number display — `getISOWeekNumber()` utility in calendar-date.ts; `weekNumbers: number[]` on MonthGrid (one per row); `showWeekNumbers` config option (default false); `dayGridItems()` component method for template rendering with interleaved week numbers; `.rc-weekdays--week-numbers`, `.rc-grid--week-numbers`, `.rc-week-number` CSS classes; auto-rendered template support; 35 tests in week-numbers.test.ts (1165 total across 25 files)
+- [x] Predefined ranges (Today, Last 7 days, This month, etc.) — `RangePreset` interface in `src/core/presets.ts`; 9 built-in preset factories (`presetToday`, `presetYesterday`, `presetLastNDays`, `presetThisWeek`, `presetLastWeek`, `presetThisMonth`, `presetLastMonth`, `presetThisYear`, `presetLastYear`); `presets` config option on `CalendarConfig`; `applyPreset(index)` component method; auto-rendered template with `.rc-presets` / `.rc-preset` CSS; `RangeSelection.setRange()` for same-day ranges; all presets accept custom labels and timezone; 38 tests in presets.test.ts (1203 total across 26 files)
+- [x] Inline multi-month (3+ months, scrollable) — `months >= 3` enables scrollable mode with virtual windowing; `scrollHeight` config option (default 400px); `_scrollPrepend()`/`_scrollAppend()` shift anchor and rebuild grid with IntersectionObserver; `_scrollByMonths()` for nav; boundary clamping to `minDate`/`maxDate`; `scrollableDayView()` template with `.rc-months--scroll`, `.rc-header--scroll`, `.rc-scroll-sentinel` CSS; wizard mode incompatibility warning; 46 tests in multi-month-scroll.test.ts (1249 total across 27 files)
 - [ ] Accessibility audit (WCAG 2.1 AA)
-- [ ] Filament form field package (`@reachgr/filament-alpine-calendar`)
-- [ ] Statamic fieldtype addon package
 - [ ] i18n: bundled locale packs vs `Intl` only
 - [ ] Virtual scrolling for year picker (performance)
 - [ ] Animations via View Transitions API

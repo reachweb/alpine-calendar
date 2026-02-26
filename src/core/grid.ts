@@ -1,4 +1,4 @@
-import { CalendarDate } from './calendar-date'
+import { CalendarDate, getISOWeekNumber } from './calendar-date'
 
 /** Metadata for a single day cell in the calendar grid. */
 export interface DayCell {
@@ -13,6 +13,8 @@ export interface MonthGrid {
   year: number
   month: number
   rows: DayCell[][]
+  /** ISO 8601 week numbers — one per row (6 entries). */
+  weekNumbers: number[]
 }
 
 /**
@@ -47,6 +49,7 @@ export function generateMonth(
   const gridStart = firstOfMonth.addDays(-offset)
 
   const rows: DayCell[][] = []
+  const weekNumbers: number[] = []
 
   for (let row = 0; row < 6; row++) {
     const cells: DayCell[] = []
@@ -60,10 +63,13 @@ export function generateMonth(
         isDisabled: disabledFn(date),
       })
     }
+    // Week number from the first date in the row
+    const firstCell = cells[0]
+    if (firstCell) weekNumbers.push(getISOWeekNumber(firstCell.date))
     rows.push(cells)
   }
 
-  return { year, month, rows }
+  return { year, month, rows, weekNumbers }
 }
 
 // ---------------------------------------------------------------------------

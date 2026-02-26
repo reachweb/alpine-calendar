@@ -17,8 +17,12 @@
     h2 { margin-top: 2rem; color: #555; }
     .example { border: 1px solid #e5e7eb; border-radius: 8px; padding: 1.5rem; margin: 1rem 0; background: white; }
     .status { font-size: 0.85rem; color: #666; margin-bottom: 0.75rem; }
-    details { margin-top: 3rem; border-top: 2px solid #e5e7eb; padding-top: 1rem; }
-    summary { cursor: pointer; font-weight: 600; color: #888; }
+    details.custom-template { margin-top: 3rem; border-top: 2px solid #e5e7eb; padding-top: 1rem; }
+    details.custom-template > summary { cursor: pointer; font-weight: 600; color: #888; }
+    .example details { margin-top: 0.75rem; border-top: 1px solid #e5e7eb; padding-top: 0; }
+    .example summary { cursor: pointer; font-size: 0.8rem; color: #888; padding: 0.5rem 0; }
+    .example pre { margin: 0; padding: 0.75rem; background: #f1f5f9; border-radius: 6px; overflow-x: auto; font-size: 0.8rem; line-height: 1.5; }
+    .example code { font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; }
   </style>
 </head>
 <body>
@@ -31,6 +35,10 @@
   <h2>Inline — Single Date</h2>
   <div class="example">
     <div x-data="calendar({ mode: 'single', firstDay: 1 })"></div>
+    <details>
+      <summary>View Code</summary>
+      <pre><code>&lt;div x-data="calendar({ mode: 'single', firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
+    </details>
   </div>
 
   <!-- ===================================================================
@@ -39,6 +47,10 @@
   <h2>Inline — Range Selection</h2>
   <div class="example">
     <div x-data="calendar({ mode: 'range', firstDay: 1 })"></div>
+    <details>
+      <summary>View Code</summary>
+      <pre><code>&lt;div x-data="calendar({ mode: 'range', firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
+    </details>
   </div>
 
   <!-- ===================================================================
@@ -47,6 +59,10 @@
   <h2>Inline — 2-Month Range</h2>
   <div class="example">
     <div x-data="calendar({ mode: 'range', months: 2, firstDay: 1 })"></div>
+    <details>
+      <summary>View Code</summary>
+      <pre><code>&lt;div x-data="calendar({ mode: 'range', months: 2, firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
+    </details>
   </div>
 
   <!-- ===================================================================
@@ -55,6 +71,10 @@
   <h2>Popup — Single Date</h2>
   <div class="example">
     <div x-data="calendar({ mode: 'single', display: 'popup', firstDay: 1 })"></div>
+    <details>
+      <summary>View Code</summary>
+      <pre><code>&lt;div x-data="calendar({ mode: 'single', display: 'popup', firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
+    </details>
   </div>
 
   <!-- ===================================================================
@@ -63,6 +83,81 @@
   <h2>Inline — Multiple Selection</h2>
   <div class="example">
     <div x-data="calendar({ mode: 'multiple', firstDay: 1 })"></div>
+    <details>
+      <summary>View Code</summary>
+      <pre><code>&lt;div x-data="calendar({ mode: 'multiple', firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
+    </details>
+  </div>
+
+  <!-- ===================================================================
+       Preset — Single Date
+       =================================================================== -->
+  <h2>Preset — Single Date</h2>
+  <div class="example">
+    <div class="status">
+      Pre-selected: 2026-03-15
+    </div>
+    <div x-data="calendar({ mode: 'single', firstDay: 1, value: '2026-03-15' })"></div>
+    <details>
+      <summary>View Code</summary>
+      <pre><code>&lt;div x-data="calendar({ mode: 'single', firstDay: 1, value: '2026-03-15' })"&gt;&lt;/div&gt;</code></pre>
+    </details>
+  </div>
+
+  <!-- ===================================================================
+       Preset — Range
+       =================================================================== -->
+  <h2>Preset — Range</h2>
+  <div class="example">
+    <div class="status">
+      Pre-selected range: 2026-03-10 to 2026-03-20
+    </div>
+    <div x-data="calendar({ mode: 'range', firstDay: 1, value: '2026-03-10 - 2026-03-20' })"></div>
+    <details>
+      <summary>View Code</summary>
+      <pre><code>&lt;div x-data="calendar({ mode: 'range', firstDay: 1, value: '2026-03-10 - 2026-03-20' })"&gt;&lt;/div&gt;</code></pre>
+    </details>
+  </div>
+
+  <!-- ===================================================================
+       Preset — Multiple Dates
+       =================================================================== -->
+  <h2>Preset — Multiple Dates</h2>
+  <div class="example">
+    <div class="status">
+      Pre-selected: 2026-03-10, 2026-03-15, 2026-03-20
+    </div>
+    <div x-data="calendar({ mode: 'multiple', firstDay: 1, value: '2026-03-10, 2026-03-15, 2026-03-20' })"></div>
+    <details>
+      <summary>View Code</summary>
+      <pre><code>&lt;div x-data="calendar({ mode: 'multiple', firstDay: 1, value: '2026-03-10, 2026-03-15, 2026-03-20' })"&gt;&lt;/div&gt;</code></pre>
+    </details>
+  </div>
+
+  <!-- ===================================================================
+       Preset — Dynamic setValue()
+       =================================================================== -->
+  <h2>Preset — Dynamic setValue()</h2>
+  <div class="example">
+    <div class="status">
+      Use buttons below to set or clear the selected date programmatically.
+    </div>
+    <div x-data="calendar({ mode: 'single', firstDay: 1 })" id="dynamic-demo"></div>
+    <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+      <button onclick="document.getElementById('dynamic-demo')._x_dataStack[0].setValue('2026-06-15')" style="padding: 0.4rem 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Set June 15</button>
+      <button onclick="document.getElementById('dynamic-demo')._x_dataStack[0].setValue('2026-12-25')" style="padding: 0.4rem 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Set Dec 25</button>
+      <button onclick="document.getElementById('dynamic-demo')._x_dataStack[0].clear()" style="padding: 0.4rem 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Clear</button>
+    </div>
+    <details>
+      <summary>View Code</summary>
+      <pre><code>&lt;!-- With x-ref (inside a custom template or parent scope) --&gt;
+&lt;div x-data="calendar({ mode: 'single' })" x-ref="cal"&gt;
+  &lt;!-- custom template here --&gt;
+&lt;/div&gt;
+&lt;button @click="$refs.cal.setValue('2026-06-15')"&gt;Set June 15&lt;/button&gt;
+&lt;button @click="$refs.cal.setValue('2026-12-25')"&gt;Set Dec 25&lt;/button&gt;
+&lt;button @click="$refs.cal.clear()"&gt;Clear&lt;/button&gt;</code></pre>
+    </details>
   </div>
 
   <!-- ===================================================================
@@ -71,6 +166,10 @@
   <h2>Wizard — Birth Date</h2>
   <div class="example">
     <div x-data="calendar({ mode: 'single', wizard: true, firstDay: 1 })"></div>
+    <details>
+      <summary>View Code</summary>
+      <pre><code>&lt;div x-data="calendar({ mode: 'single', wizard: true, firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
+    </details>
   </div>
 
   <!-- ===================================================================
@@ -79,6 +178,10 @@
   <h2>Wizard — Year-Month</h2>
   <div class="example">
     <div x-data="calendar({ mode: 'single', wizard: 'year-month', firstDay: 1 })"></div>
+    <details>
+      <summary>View Code</summary>
+      <pre><code>&lt;div x-data="calendar({ mode: 'single', wizard: 'year-month', firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
+    </details>
   </div>
 
   <!-- ===================================================================
@@ -87,6 +190,10 @@
   <h2>Wizard — Month-Day</h2>
   <div class="example">
     <div x-data="calendar({ mode: 'single', wizard: 'month-day', firstDay: 1 })"></div>
+    <details>
+      <summary>View Code</summary>
+      <pre><code>&lt;div x-data="calendar({ mode: 'single', wizard: 'month-day', firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
+    </details>
   </div>
 
   <!-- ===================================================================
@@ -95,6 +202,10 @@
   <h2>Popup — Full Wizard</h2>
   <div class="example">
     <div x-data="calendar({ mode: 'single', wizard: true, display: 'popup', firstDay: 1 })"></div>
+    <details>
+      <summary>View Code</summary>
+      <pre><code>&lt;div x-data="calendar({ mode: 'single', wizard: true, display: 'popup', firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
+    </details>
   </div>
 
   <!-- ===================================================================
@@ -103,6 +214,10 @@
   <h2>Popup — Year-Month Wizard</h2>
   <div class="example">
     <div x-data="calendar({ mode: 'single', wizard: 'year-month', display: 'popup', firstDay: 1 })"></div>
+    <details>
+      <summary>View Code</summary>
+      <pre><code>&lt;div x-data="calendar({ mode: 'single', wizard: 'year-month', display: 'popup', firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
+    </details>
   </div>
 
   <!-- ===================================================================
@@ -111,6 +226,10 @@
   <h2>Popup — Month-Day Wizard</h2>
   <div class="example">
     <div x-data="calendar({ mode: 'single', wizard: 'month-day', display: 'popup', firstDay: 1 })"></div>
+    <details>
+      <summary>View Code</summary>
+      <pre><code>&lt;div x-data="calendar({ mode: 'single', wizard: 'month-day', display: 'popup', firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
+    </details>
   </div>
 
   <!-- ===================================================================
@@ -128,6 +247,16 @@
       maxDate: '2026-04-30',
       disabledDaysOfWeek: [0, 6],
     })"></div>
+    <details>
+      <summary>View Code</summary>
+      <pre><code>&lt;div x-data="calendar({
+  mode: 'single',
+  firstDay: 1,
+  minDate: '2026-02-01',
+  maxDate: '2026-04-30',
+  disabledDaysOfWeek: [0, 6],
+})"&gt;&lt;/div&gt;</code></pre>
+    </details>
   </div>
 
   <!-- ===================================================================
@@ -146,6 +275,16 @@
       enabledDates: ['2026-03-07', '2026-03-08'],
       disabledDates: ['2026-03-09', '2026-03-10', '2026-03-11'],
     })"></div>
+    <details>
+      <summary>View Code</summary>
+      <pre><code>&lt;div x-data="calendar({
+  mode: 'single',
+  firstDay: 1,
+  disabledDaysOfWeek: [0, 6],
+  enabledDates: ['2026-03-07', '2026-03-08'],
+  disabledDates: ['2026-03-09', '2026-03-10', '2026-03-11'],
+})"&gt;&lt;/div&gt;</code></pre>
+    </details>
   </div>
 
   <!-- ===================================================================
@@ -165,6 +304,15 @@
       minRange: 3,
       maxRange: 10,
     })"></div>
+    <details>
+      <summary>View Code</summary>
+      <pre><code>&lt;div x-data="calendar({
+  mode: 'range',
+  firstDay: 1,
+  minRange: 3,
+  maxRange: 10,
+})"&gt;&lt;/div&gt;</code></pre>
+    </details>
   </div>
 
   <!-- ===================================================================
@@ -201,6 +349,33 @@
         }
       ],
     })"></div>
+    <details>
+      <summary>View Code</summary>
+      <pre><code>&lt;div x-data="calendar({
+  mode: 'range',
+  months: 2,
+  firstDay: 1,
+  minRange: 2,
+  maxRange: 14,
+  disabledDaysOfWeek: [0],
+  rules: [
+    {
+      from: '2026-06-01',
+      to: '2026-08-31',
+      minRange: 7,
+      maxRange: 21,
+      disabledDaysOfWeek: [],
+    },
+    {
+      from: '2026-12-20',
+      to: '2027-01-05',
+      minRange: 3,
+      maxRange: 7,
+      enabledDaysOfWeek: [1, 2, 3, 4, 5, 6, 0],
+    }
+  ],
+})"&gt;&lt;/div&gt;</code></pre>
+    </details>
   </div>
 
   <!-- ===================================================================
@@ -212,12 +387,52 @@
       <div x-data="calendar({ mode: 'single', firstDay: 1, name: 'appointment' })"></div>
       <button type="submit" style="margin-top: 0.5rem; padding: 0.4rem 1rem; border: 1px solid #d1d5db; border-radius: 6px; cursor: pointer;">Submit</button>
     </form>
+    <details>
+      <summary>View Code</summary>
+      <pre><code>&lt;form @submit.prevent="alert('Submitted: ' + new FormData($el).getAll('appointment'))"&gt;
+  &lt;div x-data="calendar({ mode: 'single', firstDay: 1, name: 'appointment' })"&gt;&lt;/div&gt;
+  &lt;button type="submit"&gt;Submit&lt;/button&gt;
+&lt;/form&gt;</code></pre>
+    </details>
+  </div>
+
+  <!-- ===================================================================
+       Multi-Month Scrollable (3+ months)
+       =================================================================== -->
+  <h2>Scrollable — 3 Months (Single)</h2>
+  <div class="example">
+    <div class="status">Inline 3-month scrollable calendar with single selection.</div>
+    <div x-data="calendar({ mode: 'single', months: 3, firstDay: 1 })"></div>
+    <details>
+      <summary>View Code</summary>
+      <pre><code>&lt;div x-data="calendar({ mode: 'single', months: 3, firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
+    </details>
+  </div>
+
+  <h2>Scrollable — 36 Months Range (3 Years)</h2>
+  <div class="example">
+    <div class="status">36-month scrollable range picker — tests performance with many months.</div>
+    <div x-data="calendar({ mode: 'range', months: 36, firstDay: 1, scrollHeight: 500 })"></div>
+    <details>
+      <summary>View Code</summary>
+      <pre><code>&lt;div x-data="calendar({ mode: 'range', months: 36, firstDay: 1, scrollHeight: 500 })"&gt;&lt;/div&gt;</code></pre>
+    </details>
+  </div>
+
+  <h2>Scrollable — Popup 3 Months (Range)</h2>
+  <div class="example">
+    <div class="status">Popup with 3-month scrollable range selection.</div>
+    <div x-data="calendar({ mode: 'range', months: 3, display: 'popup', firstDay: 1 })"></div>
+    <details>
+      <summary>View Code</summary>
+      <pre><code>&lt;div x-data="calendar({ mode: 'range', months: 3, display: 'popup', firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
+    </details>
   </div>
 
   <!-- ===================================================================
        Custom Template (manual, auto-rendering skipped)
        =================================================================== -->
-  <details>
+  <details class="custom-template">
     <summary>Advanced: Custom Template (manual)</summary>
     <p style="font-size: 0.85rem; color: #666; margin: 0.5rem 0;">
       When the element has children, auto-rendering is skipped. Full template control.

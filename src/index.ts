@@ -64,7 +64,7 @@ export default calendarPlugin
 // Re-export types and utilities for bundler consumers
 export { createCalendarData } from './plugin/calendar-component'
 export type { CalendarConfig } from './plugin/calendar-component'
-export { CalendarDate, daysInMonth } from './core/calendar-date'
+export { CalendarDate, daysInMonth, getISOWeekNumber } from './core/calendar-date'
 export { generateMonth, generateMonths, generateMonthGrid, generateYearGrid } from './core/grid'
 export type { DayCell, MonthGrid, MonthCell, YearCell } from './core/grid'
 export { SingleSelection, MultipleSelection, RangeSelection } from './core/selection'
@@ -81,7 +81,18 @@ export type {
   DateConstraintRule,
   ConstraintMessages,
 } from './core/constraints'
-export type { CalendarConfigRule } from './plugin/calendar-component'
+export type { CalendarConfigRule, RangePreset } from './plugin/calendar-component'
+export {
+  presetToday,
+  presetYesterday,
+  presetLastNDays,
+  presetThisWeek,
+  presetLastWeek,
+  presetThisMonth,
+  presetLastMonth,
+  presetThisYear,
+  presetLastYear,
+} from './core/presets'
 export { parseDate, parseDateRange, parseDateMultiple } from './input/parser'
 export { formatDate, formatRange, formatMultiple } from './input/formatter'
 export { createMask, createMaskHandlers, attachMask, parseFormatToSlots } from './input/mask'

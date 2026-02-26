@@ -49,10 +49,10 @@ describe('config validation', () => {
     warnSpy.mockRestore()
   })
 
-  it('warns when months is not 1 or 2', () => {
-    createCalendarData({ months: 3 as never })
+  it('warns when months is not a positive integer', () => {
+    createCalendarData({ months: 0 })
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('months must be 1 or 2'),
+      expect.stringContaining('months must be a positive integer'),
     )
   })
 

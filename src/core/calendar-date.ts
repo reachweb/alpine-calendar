@@ -176,3 +176,20 @@ export function daysInMonth(year: number, month: number): number {
   // Day 0 of the next month = last day of this month
   return new Date(year, month, 0).getDate()
 }
+
+/**
+ * Return the ISO 8601 week number for a given date.
+ *
+ * ISO weeks start on Monday. Week 1 is the week containing the year's first Thursday.
+ * Returns a number between 1 and 53.
+ */
+export function getISOWeekNumber(date: CalendarDate): number {
+  const d = new Date(Date.UTC(date.year, date.month - 1, date.day))
+  // ISO day: Monday=1, Sunday=7
+  const dayNum = d.getUTCDay() || 7
+  // Set to the Thursday of this ISO week
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+  // January 1st of that Thursday's year
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7)
+}

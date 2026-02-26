@@ -7,6 +7,10 @@ export interface TemplateOptions {
   isDualMonth: boolean
   isWizard: boolean
   hasName: boolean
+  showWeekNumbers: boolean
+  hasPresets: boolean
+  isScrollable: boolean
+  scrollHeight: number
 }
 
 // Close icon SVG (inline, no external deps)
@@ -50,11 +54,41 @@ function monthPickerView(): string {
 </template>`
 }
 
-function dayView(isDual: boolean): string {
+function dayView(isDual: boolean, showWeekNumbers: boolean): string {
   // For dual-month: hide prev on 2nd month, next on 1st
   const prevStyle = isDual ? ' :style="gi > 0 ? \'visibility:hidden\' : \'\'"' : ''
   const nextStyle = isDual ? ' :style="gi < grid.length - 1 ? \'visibility:hidden\' : \'\'"' : ''
   const monthsClass = isDual ? ' :class="{ \'rc-months--dual\': monthCount === 2 }"' : ''
+
+  // Weekday headers: optional week number label column
+  const weekdayBlock = showWeekNumbers
+    ? `<div class="rc-weekdays rc-weekdays--week-numbers">
+          <span class="rc-weekday rc-week-label"></span>
+          <template x-for="wd in weekdayHeaders" :key="wd">
+            <span class="rc-weekday" x-text="wd"></span>
+          </template>
+        </div>`
+    : `<div class="rc-weekdays">
+          <template x-for="wd in weekdayHeaders" :key="wd">
+            <span class="rc-weekday" x-text="wd"></span>
+          </template>
+        </div>`
+
+  // Grid: use dayGridItems() helper when week numbers are enabled
+  const gridClass = showWeekNumbers
+    ? `"rc-grid rc-grid--week-numbers"`
+    : `"rc-grid"`
+  const gridClassBinding = showWeekNumbers
+    ? `:class="{ 'rc-grid--slide-next': _navDirection === 'next', 'rc-grid--slide-prev': _navDirection === 'prev' }"`
+    : `:class="{ 'rc-grid--slide-next': _navDirection === 'next', 'rc-grid--slide-prev': _navDirection === 'prev' }"`
+
+  const cellsBlock = showWeekNumbers
+    ? `<template x-for="item in dayGridItems(mg)" :key="item.key">
+              <div :class="item.isWeekNumber ? 'rc-week-number' : dayClasses(item.cell)" :id="!item.isWeekNumber ? ('day-' + item.cell.date.toISO()) : undefined" :aria-selected="!item.isWeekNumber ? isSelected(item.cell.date) : undefined" :aria-disabled="!item.isWeekNumber ? item.cell.isDisabled : undefined" :title="!item.isWeekNumber ? dayTitle(item.cell) : undefined" :role="!item.isWeekNumber ? 'gridcell' : undefined" @click="!item.isWeekNumber && !item.cell.isDisabled && selectDate(item.cell.date)" @mouseenter="!item.isWeekNumber && (hoverDate = item.cell.date)" @mouseleave="!item.isWeekNumber && (hoverDate = null)" x-text="item.isWeekNumber ? item.weekNumber : item.cell.date.day"></div>
+            </template>`
+    : `<template x-for="cell in mg.rows.flat()" :key="cell.date.toISO()">
+              <div :class="dayClasses(cell)" :id="'day-' + cell.date.toISO()" :aria-selected="isSelected(cell.date)" :aria-disabled="cell.isDisabled" :title="dayTitle(cell)" role="gridcell" @click="!cell.isDisabled && selectDate(cell.date)" @mouseenter="hoverDate = cell.date" @mouseleave="hoverDate = null" x-text="cell.date.day"></div>
+            </template>`
 
   return `<template x-if="view === 'days'">
   <div class="rc-months${isDual ? '' : ' rc-view-enter'}"${monthsClass}${isDual ? '' : ''}>
@@ -65,20 +99,60 @@ function dayView(isDual: boolean): string {
           <span class="rc-header__label" @click="setView('months')" x-text="monthYearLabel(gi)"></span>
           <button class="rc-header__nav" @click="next()" :disabled="!canGoNext" aria-label="Next month"${nextStyle}>&#8250;</button>
         </div>
-        <div class="rc-weekdays">
-          <template x-for="wd in weekdayHeaders" :key="wd">
-            <span class="rc-weekday" x-text="wd"></span>
-          </template>
-        </div>
+        ${weekdayBlock}
         <div class="rc-grid-wrapper">
-          <div class="rc-grid" :class="{ 'rc-grid--slide-next': _navDirection === 'next', 'rc-grid--slide-prev': _navDirection === 'prev' }" @animationend="_navDirection = ''" role="grid" :aria-label="monthYearLabel(gi)">
-            <template x-for="cell in mg.rows.flat()" :key="cell.date.toISO()">
-              <div :class="dayClasses(cell)" :id="'day-' + cell.date.toISO()" :aria-selected="isSelected(cell.date)" :aria-disabled="cell.isDisabled" :title="dayTitle(cell)" role="gridcell" @click="!cell.isDisabled && selectDate(cell.date)" @mouseenter="hoverDate = cell.date" @mouseleave="hoverDate = null" x-text="cell.date.day"></div>
-            </template>
+          <div class=${gridClass} ${gridClassBinding} @animationend="_navDirection = ''" role="grid" :aria-label="monthYearLabel(gi)">
+            ${cellsBlock}
           </div>
         </div>
       </div>
     </template>
+  </div>
+</template>`
+}
+
+function scrollableDayView(showWeekNumbers: boolean, scrollHeight: number): string {
+  const weekdayBlock = showWeekNumbers
+    ? `<div class="rc-weekdays rc-weekdays--week-numbers">
+          <span class="rc-weekday rc-week-label"></span>
+          <template x-for="wd in weekdayHeaders" :key="wd">
+            <span class="rc-weekday" x-text="wd"></span>
+          </template>
+        </div>`
+    : `<div class="rc-weekdays">
+          <template x-for="wd in weekdayHeaders" :key="wd">
+            <span class="rc-weekday" x-text="wd"></span>
+          </template>
+        </div>`
+
+  const gridClass = showWeekNumbers ? `"rc-grid rc-grid--week-numbers"` : `"rc-grid"`
+
+  const cellsBlock = showWeekNumbers
+    ? `<template x-for="item in dayGridItems(mg)" :key="item.key">
+              <div :class="item.isWeekNumber ? 'rc-week-number' : dayClasses(item.cell)" :id="!item.isWeekNumber ? ('day-' + item.cell.date.toISO()) : undefined" :aria-selected="!item.isWeekNumber ? isSelected(item.cell.date) : undefined" :aria-disabled="!item.isWeekNumber ? item.cell.isDisabled : undefined" :title="!item.isWeekNumber ? dayTitle(item.cell) : undefined" :role="!item.isWeekNumber ? 'gridcell' : undefined" @click="!item.isWeekNumber && !item.cell.isDisabled && selectDate(item.cell.date)" @mouseenter="!item.isWeekNumber && (hoverDate = item.cell.date)" @mouseleave="!item.isWeekNumber && (hoverDate = null)" x-text="item.isWeekNumber ? item.weekNumber : item.cell.date.day"></div>
+            </template>`
+    : `<template x-for="cell in mg.rows.flat()" :key="cell.date.toISO()">
+              <div :class="dayClasses(cell)" :id="'day-' + cell.date.toISO()" :aria-selected="isSelected(cell.date)" :aria-disabled="cell.isDisabled" :title="dayTitle(cell)" role="gridcell" @click="!cell.isDisabled && selectDate(cell.date)" @mouseenter="hoverDate = cell.date" @mouseleave="hoverDate = null" x-text="cell.date.day"></div>
+            </template>`
+
+  return `<template x-if="view === 'days'">
+  <div>
+    <div class="rc-header rc-header--scroll-sticky">
+      <span class="rc-header__label rc-header__label--scroll" x-text="scrollHeaderLabel"></span>
+    </div>
+    ${weekdayBlock}
+    <div class="rc-months rc-months--scroll" style="max-height: ${scrollHeight}px">
+      <template x-for="(mg, gi) in grid" :key="mg.year + '-' + mg.month">
+        <div :data-month-id="'month-' + mg.year + '-' + mg.month">
+          <div class="rc-header rc-header--scroll" x-show="gi > 0">
+            <span class="rc-header__label rc-header__label--scroll" x-text="monthYearLabel(gi)"></span>
+          </div>
+          <div class=${gridClass} role="grid" :aria-label="monthYearLabel(gi)">
+            ${cellsBlock}
+          </div>
+        </div>
+      </template>
+    </div>
   </div>
 </template>`
 }
@@ -115,6 +189,14 @@ function popupHeader(isWizard: boolean): string {
 </div>`
 }
 
+function presetsBlock(): string {
+  return `<div class="rc-presets" role="list" aria-label="Quick select">
+  <template x-for="(preset, pi) in presets" :key="pi">
+    <button class="rc-preset" role="listitem" @click="applyPreset(pi)" x-text="preset.label"></button>
+  </template>
+</div>`
+}
+
 function hiddenInputs(): string {
   return `<template x-if="inputName">
   <template x-for="val in hiddenInputValues" :key="val">
@@ -128,7 +210,7 @@ function hiddenInputs(): string {
 // ---------------------------------------------------------------------------
 
 export function generateCalendarTemplate(options: TemplateOptions): string {
-  const { display, isDualMonth, isWizard, hasName } = options
+  const { display, isDualMonth, isWizard, hasName, showWeekNumbers, hasPresets, isScrollable, scrollHeight } = options
   const isPopup = display === 'popup'
 
   const calendarClass = isWizard ? 'rc-calendar rc-calendar--wizard' : 'rc-calendar'
@@ -150,7 +232,16 @@ export function generateCalendarTemplate(options: TemplateOptions): string {
   // Views — always include all three (guarded by x-if)
   parts.push(yearPickerView())
   parts.push(monthPickerView())
-  parts.push(dayView(isDualMonth))
+  if (isScrollable) {
+    parts.push(scrollableDayView(showWeekNumbers, scrollHeight))
+  } else {
+    parts.push(dayView(isDualMonth, showWeekNumbers))
+  }
+
+  // Range presets (below the calendar grid, above wizard summary)
+  if (hasPresets) {
+    parts.push(presetsBlock())
+  }
 
   // Wizard summary bar
   if (isWizard) {

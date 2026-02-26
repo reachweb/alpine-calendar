@@ -165,6 +165,16 @@ export class RangeSelection implements Selection {
     }
   }
 
+  /**
+   * Directly set both start and end of the range.
+   * Useful for programmatic assignment where `toggle()` semantics are undesirable
+   * (e.g., same-day ranges where toggling the same date would deselect).
+   */
+  setRange(start: CalendarDate, end: CalendarDate): void {
+    this.start = start
+    this.end = end
+  }
+
   clear(): void {
     this.start = null
     this.end = null

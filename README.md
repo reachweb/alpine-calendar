@@ -98,6 +98,48 @@ Set `template: false` to require a manual template, or simply add child elements
 <div x-data="calendar({ mode: 'single', template: false })"></div>
 ```
 
+## Presetting Values
+
+### Initial Value
+
+Set `value` in the config to pre-select dates on load:
+
+```html
+<!-- Single date -->
+<div x-data="calendar({ mode: 'single', value: '2026-03-15' })"></div>
+
+<!-- Range -->
+<div x-data="calendar({ mode: 'range', value: '2026-03-10 - 2026-03-20' })"></div>
+
+<!-- Multiple dates -->
+<div x-data="calendar({ mode: 'multiple', value: '2026-03-10, 2026-03-15, 2026-03-20' })"></div>
+```
+
+### Dynamic Updates
+
+Use `setValue()` to change the selection after initialization:
+
+```html
+<div x-data="calendar({ mode: 'single' })" x-ref="cal">
+  <button @click="$refs.cal.setValue('2026-06-15')">Set June 15</button>
+  <button @click="$refs.cal.clear()">Clear</button>
+</div>
+```
+
+### Server-Rendered / Livewire
+
+Pass backend variables directly into the config:
+
+```html
+<div x-data="calendar({ mode: 'single', value: '{{ $date }}' })"></div>
+```
+
+Or with Livewire's `@entangle`:
+
+```html
+<div x-data="calendar({ mode: 'single', value: @entangle('date') })"></div>
+```
+
 ## Configuration
 
 All options are passed via `x-data="calendar({ ... })"`.

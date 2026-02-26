@@ -39,9 +39,9 @@ export interface DateConstraintProperties {
 /**
  * A period-specific constraint rule that overrides global settings.
  *
- * When checking a date, if it falls within [from, to], the rule's
- * properties override the global defaults. Unset properties inherit
- * from the global configuration. First matching rule wins.
+ * When checking a date, matching rules are resolved by priority (highest wins).
+ * Among rules with equal priority, the first matching rule wins (array order).
+ * Unset properties inherit from the global configuration.
  *
  * Rules can match by date range (`from`/`to`) or by recurring months
  * (`months`). If `months` is set, the rule applies to those months
@@ -54,6 +54,8 @@ export interface DateConstraintRule extends DateConstraintProperties {
   to?: CalendarDate
   /** Recurring months this rule applies to (1=Jan, …, 12=Dec). Matches every year. */
   months?: number[]
+  /** Priority for conflict resolution. Higher values win. Default: 0. */
+  priority?: number
 }
 
 /**
@@ -63,7 +65,7 @@ export interface DateConstraintRule extends DateConstraintProperties {
  * disabledDates, disabledDaysOfWeek) continue to work as before.
  */
 export interface DateConstraintOptions extends DateConstraintProperties {
-  /** Period-specific constraint overrides. First matching rule wins. */
+  /** Period-specific constraint overrides. Highest priority matching rule wins; ties broken by array order. */
   rules?: DateConstraintRule[]
 }
 
@@ -93,6 +95,8 @@ interface PrecomputedRule {
   sets: PrecomputedSets
   hasMinDate: boolean
   hasMaxDate: boolean
+  priority: number
+  originalIndex: number
 }
 
 function precomputeSets(opts: DateConstraintProperties): PrecomputedSets {
@@ -168,6 +172,23 @@ function matchesRule(rule: PrecomputedRule, date: CalendarDate): boolean {
   return false
 }
 
+/**
+ * Find the best matching rule for a date: highest priority wins,
+ * ties broken by original array order (first match).
+ */
+function findBestRule(rules: PrecomputedRule[], date: CalendarDate): PrecomputedRule | undefined {
+  let best: PrecomputedRule | undefined
+  for (const rule of rules) {
+    if (!matchesRule(rule, date)) continue
+    if (!best || rule.priority > best.priority) {
+      best = rule
+    }
+    // Equal priority: first match wins (lower originalIndex)
+    // Since we iterate in order, first found at a given priority is kept
+  }
+  return best
+}
+
 // ---------------------------------------------------------------------------
 // createDateConstraint
 // ---------------------------------------------------------------------------
@@ -202,7 +223,7 @@ export function createDateConstraint(
   const globalSets = precomputeSets(options)
 
   // Precompute rule sets
-  const precomputedRules: PrecomputedRule[] | undefined = rules?.map((rule) => ({
+  const precomputedRules: PrecomputedRule[] | undefined = rules?.map((rule, index) => ({
     from: rule.from,
     to: rule.to,
     recurringMonths: rule.months ? new Set(rule.months) : undefined,
@@ -213,6 +234,8 @@ export function createDateConstraint(
     sets: precomputeSets(rule),
     hasMinDate: rule.minDate !== undefined,
     hasMaxDate: rule.maxDate !== undefined,
+    priority: rule.priority ?? 0,
+    originalIndex: index,
   }))
 
   // Fast path: no rules
@@ -220,9 +243,9 @@ export function createDateConstraint(
     return (date: CalendarDate): boolean => checkDisabled(date, minDate, maxDate, globalSets)
   }
 
-  // With rules: find the first matching rule, merge, and check
+  // With rules: find the best matching rule (highest priority), merge, and check
   return (date: CalendarDate): boolean => {
-    const rule = precomputedRules.find((r) => matchesRule(r, date))
+    const rule = findBestRule(precomputedRules, date)
 
     if (!rule) {
       return checkDisabled(date, minDate, maxDate, globalSets)
@@ -302,28 +325,29 @@ export function createRangeValidator(
     return () => true
   }
 
-  // Precompute rules for range validation
-  const rangeRules = rules
-    ?.filter((r) => r.minRange !== undefined || r.maxRange !== undefined || true)
-    .map((rule) => ({
-      from: rule.from,
-      to: rule.to,
-      recurringMonths: rule.months ? new Set(rule.months) : undefined,
-      minRange: rule.minRange,
-      maxRange: rule.maxRange,
-    }))
+  // Precompute rules for range validation (reuse PrecomputedRule for findBestRule)
+  const rangeRules: PrecomputedRule[] | undefined = rules?.map((rule, index) => ({
+    from: rule.from,
+    to: rule.to,
+    recurringMonths: rule.months ? new Set(rule.months) : undefined,
+    minDate: rule.minDate,
+    maxDate: rule.maxDate,
+    minRange: rule.minRange,
+    maxRange: rule.maxRange,
+    sets: precomputeSets(rule),
+    hasMinDate: rule.minDate !== undefined,
+    hasMaxDate: rule.maxDate !== undefined,
+    priority: rule.priority ?? 0,
+    originalIndex: index,
+  }))
 
   return (start: CalendarDate, end: CalendarDate): boolean => {
-    // Find rule based on start date
+    // Find rule based on start date (highest priority wins)
     let effectiveMinRange = minRange
     let effectiveMaxRange = maxRange
 
     if (rangeRules) {
-      const rule = rangeRules.find((r) => {
-        if (r.from && r.to) return start.isBetween(r.from, r.to)
-        if (r.recurringMonths) return r.recurringMonths.has(start.month)
-        return false
-      })
+      const rule = findBestRule(rangeRules, start)
       if (rule) {
         if (rule.minRange !== undefined) effectiveMinRange = rule.minRange
         if (rule.maxRange !== undefined) effectiveMaxRange = rule.maxRange
@@ -588,7 +612,7 @@ export function createDisabledReasons(
   const globalSets = precomputeSets(options)
 
   // Precompute rule sets
-  const precomputedRules: PrecomputedRule[] | undefined = rules?.map((rule) => ({
+  const precomputedRules: PrecomputedRule[] | undefined = rules?.map((rule, index) => ({
     from: rule.from,
     to: rule.to,
     recurringMonths: rule.months ? new Set(rule.months) : undefined,
@@ -599,6 +623,8 @@ export function createDisabledReasons(
     sets: precomputeSets(rule),
     hasMinDate: rule.minDate !== undefined,
     hasMaxDate: rule.maxDate !== undefined,
+    priority: rule.priority ?? 0,
+    originalIndex: index,
   }))
 
   // Fast path: no rules
@@ -606,9 +632,9 @@ export function createDisabledReasons(
     return (date: CalendarDate) => collectReasons(date, minDate, maxDate, globalSets, msgs)
   }
 
-  // With rules
+  // With rules (highest priority wins)
   return (date: CalendarDate): string[] => {
-    const rule = precomputedRules.find((r) => matchesRule(r, date))
+    const rule = findBestRule(precomputedRules, date)
 
     if (!rule) {
       return collectReasons(date, minDate, maxDate, globalSets, msgs)

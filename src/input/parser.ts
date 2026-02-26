@@ -154,8 +154,8 @@ export function parseDateRange(input: string, format: string): [CalendarDate, Ca
     if (idx !== -1) {
       const startStr = trimmed.slice(0, idx)
       const endStr = trimmed.slice(idx + sep.length)
-      const start = parseDate(startStr, format)
-      const end = parseDate(endStr, format)
+      const start = parseDate(startStr, format) ?? CalendarDate.fromISO(startStr.trim())
+      const end = parseDate(endStr, format) ?? CalendarDate.fromISO(endStr.trim())
       if (start && end) return [start, end]
     }
   }
@@ -178,7 +178,7 @@ export function parseDateMultiple(input: string, format: string): CalendarDate[]
   const dates: CalendarDate[] = []
 
   for (const part of parts) {
-    const date = parseDate(part, format)
+    const date = parseDate(part, format) ?? CalendarDate.fromISO(part.trim())
     if (date) dates.push(date)
   }
 

@@ -1,6 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createCalendarData } from '../../src/plugin/calendar-component'
-import { CalendarDate } from '../../src/core/calendar-date'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -39,8 +38,7 @@ function withAlpineMocks(
 }
 
 /**
- * Create a popup element containing an .rc-calendar child,
- * suitable for _startPositioning() to find.
+ * Create a popup element containing an .rc-calendar child.
  */
 function createPopupEl(): HTMLElement {
   const overlay = document.createElement('div')
@@ -48,12 +46,6 @@ function createPopupEl(): HTMLElement {
 
   const calendar = document.createElement('div')
   calendar.classList.add('rc-calendar')
-  // Mock getBoundingClientRect for computePosition
-  calendar.getBoundingClientRect = () => ({
-    x: 0, y: 0, width: 300, height: 280,
-    top: 0, right: 300, bottom: 280, left: 0,
-    toJSON: () => ({}),
-  })
   overlay.appendChild(calendar)
 
   return overlay
@@ -73,15 +65,15 @@ function createInputEl(): HTMLInputElement {
 }
 
 // ---------------------------------------------------------------------------
-// Responsive popup tests
+// Centered modal popup tests
 // ---------------------------------------------------------------------------
 
-describe('responsive popup — mobile (< 640px)', () => {
+describe('popup — centered modal (mobile)', () => {
   beforeEach(() => {
     setViewport(375, 667) // iPhone-sized
   })
 
-  it('does NOT use computePosition on mobile', () => {
+  it('does NOT apply inline position styles', () => {
     const popupEl = createPopupEl()
     const inputEl = createInputEl()
 
@@ -95,29 +87,11 @@ describe('responsive popup — mobile (< 640px)', () => {
     c.open()
     flushNextTick()
 
-    // On mobile, the calendar inside the popup should NOT have inline position styles
+    // CSS handles centering — no inline position styles
     const calendarEl = popupEl.querySelector('.rc-calendar') as HTMLElement
     expect(calendarEl.style.position).toBe('')
     expect(calendarEl.style.left).toBe('')
     expect(calendarEl.style.top).toBe('')
-  })
-
-  it('does not set up autoUpdate or document click handler on mobile', () => {
-    const popupEl = createPopupEl()
-    const inputEl = createInputEl()
-
-    const c = createCalendarData({ display: 'popup', mask: false })
-    const { flushNextTick } = withAlpineMocks(c, {
-      refs: { popup: popupEl, input: inputEl },
-    })
-    c.init()
-    flushNextTick()
-
-    c.open()
-    flushNextTick()
-
-    expect(c._autoUpdateCleanup).toBeNull()
-    expect(c._documentClickHandler).toBeNull()
   })
 
   it('popupStyle is set for full-screen overlay', () => {
@@ -127,16 +101,12 @@ describe('responsive popup — mobile (< 640px)', () => {
   })
 })
 
-describe('responsive popup — desktop (≥ 640px)', () => {
+describe('popup — centered modal (desktop)', () => {
   beforeEach(() => {
     setViewport(1024, 768)
   })
 
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  it('uses computePosition to float calendar below input', () => {
+  it('does NOT apply inline position styles on desktop either', () => {
     const popupEl = createPopupEl()
     const inputEl = createInputEl()
 
@@ -150,184 +120,14 @@ describe('responsive popup — desktop (≥ 640px)', () => {
     c.open()
     flushNextTick()
 
+    // CSS handles centering — no inline position styles
     const calendarEl = popupEl.querySelector('.rc-calendar') as HTMLElement
-    expect(calendarEl.style.position).toBe('fixed')
-    expect(calendarEl.style.left).not.toBe('')
-    expect(calendarEl.style.top).not.toBe('')
-    expect(calendarEl.style.zIndex).toBe('51')
-  })
-
-  it('positions calendar at correct coordinates', () => {
-    const popupEl = createPopupEl()
-    const inputEl = createInputEl()
-
-    const c = createCalendarData({
-      display: 'popup',
-      mask: false,
-      placement: 'bottom-start',
-      popupOffset: 4,
-    })
-    const { flushNextTick } = withAlpineMocks(c, {
-      refs: { popup: popupEl, input: inputEl },
-    })
-    c.init()
-    flushNextTick()
-
-    c.open()
-    flushNextTick()
-
-    const calendarEl = popupEl.querySelector('.rc-calendar') as HTMLElement
-    // Input: top=200, height=40, offset=4 → top = 244
-    expect(calendarEl.style.top).toBe('244px')
-    // Input: left=100, placement=bottom-start → left = 100
-    expect(calendarEl.style.left).toBe('100px')
-  })
-
-  it('sets up autoUpdate cleanup function', () => {
-    const popupEl = createPopupEl()
-    const inputEl = createInputEl()
-
-    const c = createCalendarData({ display: 'popup', mask: false })
-    const { flushNextTick } = withAlpineMocks(c, {
-      refs: { popup: popupEl, input: inputEl },
-    })
-    c.init()
-    flushNextTick()
-
-    c.open()
-    flushNextTick()
-
-    expect(c._autoUpdateCleanup).toBeTypeOf('function')
-  })
-
-  it('sets up document click handler for outside clicks', () => {
-    vi.useFakeTimers()
-    const popupEl = createPopupEl()
-    const inputEl = createInputEl()
-
-    const c = createCalendarData({ display: 'popup', mask: false })
-    const { flushNextTick } = withAlpineMocks(c, {
-      refs: { popup: popupEl, input: inputEl },
-    })
-    c.init()
-    flushNextTick()
-
-    c.open()
-    flushNextTick()
-
-    expect(c._documentClickHandler).toBeTypeOf('function')
-
-    // Advance timers so the deferred addEventListener fires
-    vi.advanceTimersByTime(1)
-
-    // Simulate outside click
-    const outsideClick = new MouseEvent('mousedown', { bubbles: true })
-    Object.defineProperty(outsideClick, 'target', { value: document.body })
-    document.dispatchEvent(outsideClick)
-
-    expect(c.isOpen).toBe(false)
-  })
-
-  it('does not close on click inside calendar', () => {
-    vi.useFakeTimers()
-    const popupEl = createPopupEl()
-    const inputEl = createInputEl()
-    const calendarEl = popupEl.querySelector('.rc-calendar') as HTMLElement
-
-    const c = createCalendarData({ display: 'popup', mask: false })
-    const { flushNextTick } = withAlpineMocks(c, {
-      refs: { popup: popupEl, input: inputEl },
-    })
-    c.init()
-    flushNextTick()
-
-    c.open()
-    flushNextTick()
-    vi.advanceTimersByTime(1)
-
-    // Simulate click inside calendar
-    const insideClick = new MouseEvent('mousedown', { bubbles: true })
-    Object.defineProperty(insideClick, 'target', { value: calendarEl })
-    document.dispatchEvent(insideClick)
-
-    expect(c.isOpen).toBe(true)
-  })
-
-  it('does not close on click on input', () => {
-    vi.useFakeTimers()
-    const popupEl = createPopupEl()
-    const inputEl = createInputEl()
-
-    const c = createCalendarData({ display: 'popup', mask: false })
-    const { flushNextTick } = withAlpineMocks(c, {
-      refs: { popup: popupEl, input: inputEl },
-    })
-    c.init()
-    flushNextTick()
-
-    c.open()
-    flushNextTick()
-    vi.advanceTimersByTime(1)
-
-    // Simulate click on input
-    const inputClick = new MouseEvent('mousedown', { bubbles: true })
-    Object.defineProperty(inputClick, 'target', { value: inputEl })
-    document.dispatchEvent(inputClick)
-
-    expect(c.isOpen).toBe(true)
-  })
-
-  it('close() cleans up autoUpdate and document listener', () => {
-    vi.useFakeTimers()
-    const popupEl = createPopupEl()
-    const inputEl = createInputEl()
-
-    const c = createCalendarData({ display: 'popup', mask: false })
-    const { flushNextTick } = withAlpineMocks(c, {
-      refs: { popup: popupEl, input: inputEl },
-    })
-    c.init()
-    flushNextTick()
-
-    c.open()
-    flushNextTick()
-    vi.advanceTimersByTime(1)
-
-    expect(c._autoUpdateCleanup).toBeTypeOf('function')
-    expect(c._documentClickHandler).toBeTypeOf('function')
-
-    c.close()
-
-    expect(c._autoUpdateCleanup).toBeNull()
-    expect(c._documentClickHandler).toBeNull()
-  })
-
-  it('close() resets inline styles on calendar element', () => {
-    const popupEl = createPopupEl()
-    const inputEl = createInputEl()
-
-    const c = createCalendarData({ display: 'popup', mask: false })
-    const { flushNextTick } = withAlpineMocks(c, {
-      refs: { popup: popupEl, input: inputEl },
-    })
-    c.init()
-    flushNextTick()
-
-    c.open()
-    flushNextTick()
-
-    const calendarEl = popupEl.querySelector('.rc-calendar') as HTMLElement
-    expect(calendarEl.style.position).toBe('fixed')
-
-    c.close()
-
     expect(calendarEl.style.position).toBe('')
     expect(calendarEl.style.left).toBe('')
     expect(calendarEl.style.top).toBe('')
-    expect(calendarEl.style.zIndex).toBe('')
   })
 
-  it('destroy() cleans up positioning', () => {
+  it('stores popup ref on open', () => {
     const popupEl = createPopupEl()
     const inputEl = createInputEl()
 
@@ -341,25 +141,33 @@ describe('responsive popup — desktop (≥ 640px)', () => {
     c.open()
     flushNextTick()
 
-    expect(c._autoUpdateCleanup).toBeTypeOf('function')
-
-    c.destroy()
-
-    expect(c._autoUpdateCleanup).toBeNull()
-    expect(c._documentClickHandler).toBeNull()
-    expect(c._popupEl).toBeNull()
+    expect(c._popupEl).toBe(popupEl)
   })
 
-  it('respects custom placement config', () => {
+  it('clears popup ref on close', () => {
     const popupEl = createPopupEl()
     const inputEl = createInputEl()
 
-    const c = createCalendarData({
-      display: 'popup',
-      mask: false,
-      placement: 'bottom-end',
-      popupOffset: 8,
+    const c = createCalendarData({ display: 'popup', mask: false })
+    const { flushNextTick } = withAlpineMocks(c, {
+      refs: { popup: popupEl, input: inputEl },
     })
+    c.init()
+    flushNextTick()
+
+    c.open()
+    flushNextTick()
+    expect(c._popupEl).toBe(popupEl)
+
+    c.close()
+    expect(c._popupEl).toBeNull()
+  })
+
+  it('destroy() cleans up popup ref', () => {
+    const popupEl = createPopupEl()
+    const inputEl = createInputEl()
+
+    const c = createCalendarData({ display: 'popup', mask: false })
     const { flushNextTick } = withAlpineMocks(c, {
       refs: { popup: popupEl, input: inputEl },
     })
@@ -369,15 +177,13 @@ describe('responsive popup — desktop (≥ 640px)', () => {
     c.open()
     flushNextTick()
 
-    const calendarEl = popupEl.querySelector('.rc-calendar') as HTMLElement
-    // Input: right=300, calendar width=300, placement=bottom-end → left = 300 - 300 = 0
-    expect(calendarEl.style.left).toBe('0px')
-    // Input: top=200, height=40, offset=8 → top = 248
-    expect(calendarEl.style.top).toBe('248px')
+    c.destroy()
+
+    expect(c._popupEl).toBeNull()
   })
 })
 
-describe('responsive popup — no popup element', () => {
+describe('popup — no popup element', () => {
   beforeEach(() => {
     setViewport(1024, 768)
   })
@@ -396,7 +202,7 @@ describe('responsive popup — no popup element', () => {
     c.open()
     flushNextTick()
 
-    expect(c._autoUpdateCleanup).toBeNull()
+    expect(c._popupEl).toBeNull()
   })
 
   it('handles missing input element gracefully', () => {
@@ -413,6 +219,6 @@ describe('responsive popup — no popup element', () => {
     c.open()
     flushNextTick()
 
-    expect(c._autoUpdateCleanup).toBeNull()
+    expect(c._popupEl).toBe(popupEl)
   })
 })
