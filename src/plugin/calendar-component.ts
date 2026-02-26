@@ -111,6 +111,8 @@ export interface CalendarConfig {
   value?: string
   /** Name attribute for hidden form input(s). */
   name?: string
+  /** ID attribute for the popup input element. Allows external `<label for="...">` association. */
+  inputId?: string
   /** Preferred popup placement. Default: 'bottom-start'. */
   placement?: Placement
   /** Offset in pixels between reference and popup. Default: 4. */
@@ -430,6 +432,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
   const showWeekNumbers = config.showWeekNumbers ?? false
   const presets: RangePreset[] = config.presets ?? []
   const inputName = config.name ?? ''
+  const inputId = config.inputId ?? null
   const locale = config.locale
   const closeOnSelect = config.closeOnSelect ?? true
   const beforeSelectCb = config.beforeSelect ?? null
@@ -579,6 +582,11 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     /** ISO string of focused date for aria-activedescendant binding. */
     get focusedDateISO(): string {
       return this.focusedDate ? this.focusedDate.toISO() : ''
+    },
+
+    /** ID for the popup input element (for external label association). */
+    get inputId(): string | null {
+      return inputId
     },
 
     /** Accessible label for the popup input element. */

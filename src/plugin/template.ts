@@ -30,7 +30,7 @@ function yearPickerView(): string {
     </div>
     <div class="rc-year-grid" role="grid" :aria-label="decadeLabel">
       <template x-for="cell in yearGrid.flat()" :key="cell.year">
-        <div :class="yearClasses(cell)" :aria-disabled="cell.isDisabled" role="gridcell" @click="!cell.isDisabled && selectYear(cell.year)" x-text="cell.label"></div>
+        <div :class="yearClasses(cell)" :aria-disabled="cell.isDisabled" role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectYear(cell.year)" x-text="cell.label"></div>
       </template>
     </div>
   </div>
@@ -47,7 +47,7 @@ function monthPickerView(): string {
     </div>
     <div class="rc-month-grid" role="grid" :aria-label="yearLabel">
       <template x-for="cell in monthGrid.flat()" :key="cell.month">
-        <div :class="monthClasses(cell)" :aria-disabled="cell.isDisabled" role="gridcell" @click="!cell.isDisabled && selectMonth(cell.month)" x-text="cell.label"></div>
+        <div :class="monthClasses(cell)" :aria-disabled="cell.isDisabled" role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectMonth(cell.month)" x-text="cell.label"></div>
       </template>
     </div>
   </div>
@@ -84,10 +84,10 @@ function dayView(isDual: boolean, showWeekNumbers: boolean): string {
 
   const cellsBlock = showWeekNumbers
     ? `<template x-for="item in dayGridItems(mg)" :key="item.key">
-              <div :class="item.isWeekNumber ? 'rc-week-number' : dayClasses(item.cell)" :id="!item.isWeekNumber ? ('day-' + item.cell.date.toISO()) : undefined" :aria-selected="!item.isWeekNumber ? isSelected(item.cell.date) : undefined" :aria-disabled="!item.isWeekNumber ? item.cell.isDisabled : undefined" :title="!item.isWeekNumber ? dayTitle(item.cell) : undefined" :role="!item.isWeekNumber ? 'gridcell' : undefined" @click="!item.isWeekNumber && !item.cell.isDisabled && selectDate(item.cell.date)" @mouseenter="!item.isWeekNumber && (hoverDate = item.cell.date)" @mouseleave="!item.isWeekNumber && (hoverDate = null)" x-text="item.isWeekNumber ? item.weekNumber : item.cell.date.day"></div>
+              <div :class="item.isWeekNumber ? 'rc-week-number' : dayClasses(item.cell)" :id="!item.isWeekNumber ? ('day-' + item.cell.date.toISO()) : undefined" :aria-selected="!item.isWeekNumber ? isSelected(item.cell.date) : undefined" :aria-disabled="!item.isWeekNumber ? item.cell.isDisabled : undefined" :title="!item.isWeekNumber ? dayTitle(item.cell) : undefined" :role="!item.isWeekNumber ? 'gridcell' : undefined" :tabindex="!item.isWeekNumber ? -1 : undefined" @click="!item.isWeekNumber && !item.cell.isDisabled && selectDate(item.cell.date)" @mouseenter="!item.isWeekNumber && (hoverDate = item.cell.date)" @mouseleave="!item.isWeekNumber && (hoverDate = null)" x-text="item.isWeekNumber ? item.weekNumber : item.cell.date.day"></div>
             </template>`
     : `<template x-for="cell in mg.rows.flat()" :key="cell.date.toISO()">
-              <div :class="dayClasses(cell)" :id="'day-' + cell.date.toISO()" :aria-selected="isSelected(cell.date)" :aria-disabled="cell.isDisabled" :title="dayTitle(cell)" role="gridcell" @click="!cell.isDisabled && selectDate(cell.date)" @mouseenter="hoverDate = cell.date" @mouseleave="hoverDate = null" x-text="cell.date.day"></div>
+              <div :class="dayClasses(cell)" :id="'day-' + cell.date.toISO()" :aria-selected="isSelected(cell.date)" :aria-disabled="cell.isDisabled" :title="dayTitle(cell)" role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectDate(cell.date)" @mouseenter="hoverDate = cell.date" @mouseleave="hoverDate = null" x-text="cell.date.day"></div>
             </template>`
 
   return `<template x-if="view === 'days'">
@@ -129,10 +129,10 @@ function scrollableDayView(showWeekNumbers: boolean, scrollHeight: number): stri
 
   const cellsBlock = showWeekNumbers
     ? `<template x-for="item in dayGridItems(mg)" :key="item.key">
-              <div :class="item.isWeekNumber ? 'rc-week-number' : dayClasses(item.cell)" :id="!item.isWeekNumber ? ('day-' + item.cell.date.toISO()) : undefined" :aria-selected="!item.isWeekNumber ? isSelected(item.cell.date) : undefined" :aria-disabled="!item.isWeekNumber ? item.cell.isDisabled : undefined" :title="!item.isWeekNumber ? dayTitle(item.cell) : undefined" :role="!item.isWeekNumber ? 'gridcell' : undefined" @click="!item.isWeekNumber && !item.cell.isDisabled && selectDate(item.cell.date)" @mouseenter="!item.isWeekNumber && (hoverDate = item.cell.date)" @mouseleave="!item.isWeekNumber && (hoverDate = null)" x-text="item.isWeekNumber ? item.weekNumber : item.cell.date.day"></div>
+              <div :class="item.isWeekNumber ? 'rc-week-number' : dayClasses(item.cell)" :id="!item.isWeekNumber ? ('day-' + item.cell.date.toISO()) : undefined" :aria-selected="!item.isWeekNumber ? isSelected(item.cell.date) : undefined" :aria-disabled="!item.isWeekNumber ? item.cell.isDisabled : undefined" :title="!item.isWeekNumber ? dayTitle(item.cell) : undefined" :role="!item.isWeekNumber ? 'gridcell' : undefined" :tabindex="!item.isWeekNumber ? -1 : undefined" @click="!item.isWeekNumber && !item.cell.isDisabled && selectDate(item.cell.date)" @mouseenter="!item.isWeekNumber && (hoverDate = item.cell.date)" @mouseleave="!item.isWeekNumber && (hoverDate = null)" x-text="item.isWeekNumber ? item.weekNumber : item.cell.date.day"></div>
             </template>`
     : `<template x-for="cell in mg.rows.flat()" :key="cell.date.toISO()">
-              <div :class="dayClasses(cell)" :id="'day-' + cell.date.toISO()" :aria-selected="isSelected(cell.date)" :aria-disabled="cell.isDisabled" :title="dayTitle(cell)" role="gridcell" @click="!cell.isDisabled && selectDate(cell.date)" @mouseenter="hoverDate = cell.date" @mouseleave="hoverDate = null" x-text="cell.date.day"></div>
+              <div :class="dayClasses(cell)" :id="'day-' + cell.date.toISO()" :aria-selected="isSelected(cell.date)" :aria-disabled="cell.isDisabled" :title="dayTitle(cell)" role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectDate(cell.date)" @mouseenter="hoverDate = cell.date" @mouseleave="hoverDate = null" x-text="cell.date.day"></div>
             </template>`
 
   return `<template x-if="view === 'days'">
@@ -190,9 +190,9 @@ function popupHeader(isWizard: boolean): string {
 }
 
 function presetsBlock(): string {
-  return `<div class="rc-presets" role="list" aria-label="Quick select">
+  return `<div class="rc-presets" role="group" aria-label="Quick select">
   <template x-for="(preset, pi) in presets" :key="pi">
-    <button class="rc-preset" role="listitem" @click="applyPreset(pi)" x-text="preset.label"></button>
+    <button class="rc-preset" @click="applyPreset(pi)" x-text="preset.label"></button>
   </template>
 </div>`
 }
@@ -263,7 +263,7 @@ ${calendarInner}
 
   if (isPopup) {
     // For popup: input + popup overlay wrapper
-    const inputEl = '<input x-ref="input" type="text" class="rc-input" :aria-label="inputAriaLabel" aria-haspopup="dialog" :aria-expanded="isOpen" @focus="handleFocus()" @blur="handleBlur()">'
+    const inputEl = '<input x-ref="input" type="text" class="rc-input" role="combobox" :id="inputId" :aria-label="inputAriaLabel" aria-haspopup="dialog" :aria-expanded="isOpen" autocomplete="off" @focus="handleFocus()" @blur="handleBlur()">'
     return inputEl + '\n' + popupWrapper(calendarEl)
   }
 

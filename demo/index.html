@@ -14,13 +14,13 @@
       background: #f8fafc;
     }
     h1 { margin-bottom: 0.5rem; }
-    h2 { margin-top: 2rem; color: #555; }
+    h2 { margin-top: 2rem; color: #4b5563; }
     .example { border: 1px solid #e5e7eb; border-radius: 8px; padding: 1.5rem; margin: 1rem 0; background: white; }
     .status { font-size: 0.85rem; color: #666; margin-bottom: 0.75rem; }
     details.custom-template { margin-top: 3rem; border-top: 2px solid #e5e7eb; padding-top: 1rem; }
-    details.custom-template > summary { cursor: pointer; font-weight: 600; color: #888; }
+    details.custom-template > summary { cursor: pointer; font-weight: 600; color: #6b7280; }
     .example details { margin-top: 0.75rem; border-top: 1px solid #e5e7eb; padding-top: 0; }
-    .example summary { cursor: pointer; font-size: 0.8rem; color: #888; padding: 0.5rem 0; }
+    .example summary { cursor: pointer; font-size: 0.8rem; color: #6b7280; padding: 0.5rem 0; }
     .example pre { margin: 0; padding: 0.75rem; background: #f1f5f9; border-radius: 6px; overflow-x: auto; font-size: 0.8rem; line-height: 1.5; }
     .example code { font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; }
   </style>
@@ -295,7 +295,7 @@
     <div class="status">
       Range mode | Min: 3 days | Max: 10 days
     </div>
-    <p style="font-size: 0.8rem; color: #888; margin: 0 0 0.5rem;">
+    <p style="font-size: 0.8rem; color: #6b7280; margin: 0 0 0.5rem;">
       Select a start date, then hover over other dates — invalid range endpoints appear dimmed.
     </p>
     <div x-data="calendar({
@@ -320,7 +320,7 @@
        =================================================================== -->
   <h2>Rules — Summer vs Winter Booking (Period Rules)</h2>
   <div class="example">
-    <div style="font-size: 0.8rem; color: #888; margin: 0 0 0.75rem; line-height: 1.5;">
+    <div style="font-size: 0.8rem; color: #6b7280; margin: 0 0 0.75rem; line-height: 1.5;">
       <strong>Global:</strong> 2–14 days, Sundays disabled<br>
       <strong>Summer (Jun–Aug):</strong> 7–21 days, all days enabled<br>
       <strong>Holidays (Dec 20–Jan 5):</strong> 3–7 days, all days enabled
@@ -460,7 +460,7 @@
               </div>
               <div class="rc-year-grid" role="grid" :aria-label="decadeLabel">
                 <template x-for="cell in yearGrid.flat()" :key="cell.year">
-                  <div :class="yearClasses(cell)" :aria-disabled="cell.isDisabled" role="gridcell" @click="!cell.isDisabled && selectYear(cell.year)" x-text="cell.label"></div>
+                  <div :class="yearClasses(cell)" :aria-disabled="cell.isDisabled" role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectYear(cell.year)" x-text="cell.label"></div>
                 </template>
               </div>
             </div>
@@ -475,7 +475,7 @@
               </div>
               <div class="rc-month-grid" role="grid" :aria-label="yearLabel">
                 <template x-for="cell in monthGrid.flat()" :key="cell.month">
-                  <div :class="monthClasses(cell)" :aria-disabled="cell.isDisabled" role="gridcell" @click="!cell.isDisabled && selectMonth(cell.month)" x-text="cell.label"></div>
+                  <div :class="monthClasses(cell)" :aria-disabled="cell.isDisabled" role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectMonth(cell.month)" x-text="cell.label"></div>
                 </template>
               </div>
             </div>
@@ -507,6 +507,7 @@
                              :aria-disabled="cell.isDisabled"
                              :title="dayTitle(cell)"
                              role="gridcell"
+                             tabindex="-1"
                              @click="!cell.isDisabled && selectDate(cell.date)"
                              @mouseenter="hoverDate = cell.date"
                              @mouseleave="hoverDate = null"

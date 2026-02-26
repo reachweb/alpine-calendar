@@ -57,6 +57,7 @@
     "@types/alpinejs": "^3.13.11",
     "@vitest/coverage-v8": "^4.0.18",
     "alpinejs": "^3.15.8",
+    "axe-core": "^4.11.1",
     "eslint": "^9.39.3",
     "eslint-config-prettier": "^10.1.8",
     "jsdom": "^28.1.0",

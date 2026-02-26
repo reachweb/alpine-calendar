@@ -39,9 +39,9 @@
   --color-calendar-primary-text: var(--color-white);
 
   /* Semantic colors */
-  --color-calendar-disabled: var(--color-gray-500);
-  --color-calendar-other-month: var(--color-gray-500);
-  --color-calendar-weekday: var(--color-gray-500);
+  --color-calendar-disabled: var(--color-gray-600);
+  --color-calendar-other-month: var(--color-gray-600);
+  --color-calendar-weekday: var(--color-gray-600);
   --color-calendar-range: var(--color-blue-50);
   --color-calendar-today-ring: var(--color-blue-400);
   --color-calendar-focus-ring: var(--color-blue-600);
@@ -713,6 +713,7 @@
  * ------------------------------------------------------------------------- */
 
 .rc-header__nav:focus-visible,
+.rc-header__label:focus-visible,
 .rc-popup-header__close:focus-visible,
 .rc-wizard-back:focus-visible,
 .rc-preset:focus-visible {

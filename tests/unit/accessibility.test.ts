@@ -413,6 +413,189 @@ describe('Template ARIA attributes', () => {
 })
 
 // ===========================================================================
+// Preset ARIA roles
+// ===========================================================================
+
+describe('Preset ARIA roles', () => {
+  it('presets container uses role="group" not role="list"', () => {
+    const html = generateCalendarTemplate({
+      display: 'inline',
+      isDualMonth: false,
+      isWizard: false,
+      hasName: false,
+      showWeekNumbers: false,
+      hasPresets: true,
+      isScrollable: false,
+      scrollHeight: 300,
+    })
+    expect(html).toContain('role="group"')
+    expect(html).toContain('aria-label="Quick select"')
+    expect(html).not.toContain('role="list"')
+  })
+
+  it('preset buttons have no role="listitem"', () => {
+    const html = generateCalendarTemplate({
+      display: 'inline',
+      isDualMonth: false,
+      isWizard: false,
+      hasName: false,
+      showWeekNumbers: false,
+      hasPresets: true,
+      isScrollable: false,
+      scrollHeight: 300,
+    })
+    expect(html).not.toContain('role="listitem"')
+  })
+})
+
+// ===========================================================================
+// Gridcell tabindex
+// ===========================================================================
+
+describe('Gridcell tabindex', () => {
+  it('year gridcells have tabindex="-1"', () => {
+    const html = generateCalendarTemplate({
+      display: 'inline',
+      isDualMonth: false,
+      isWizard: false,
+      hasName: false,
+      showWeekNumbers: false,
+      hasPresets: false,
+      isScrollable: false,
+      scrollHeight: 300,
+    })
+    // Year picker gridcells
+    expect(html).toContain('role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectYear')
+  })
+
+  it('month gridcells have tabindex="-1"', () => {
+    const html = generateCalendarTemplate({
+      display: 'inline',
+      isDualMonth: false,
+      isWizard: false,
+      hasName: false,
+      showWeekNumbers: false,
+      hasPresets: false,
+      isScrollable: false,
+      scrollHeight: 300,
+    })
+    expect(html).toContain('role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectMonth')
+  })
+
+  it('day gridcells have tabindex="-1"', () => {
+    const html = generateCalendarTemplate({
+      display: 'inline',
+      isDualMonth: false,
+      isWizard: false,
+      hasName: false,
+      showWeekNumbers: false,
+      hasPresets: false,
+      isScrollable: false,
+      scrollHeight: 300,
+    })
+    expect(html).toContain('role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectDate')
+  })
+
+  it('week-number day items use :tabindex binding', () => {
+    const html = generateCalendarTemplate({
+      display: 'inline',
+      isDualMonth: false,
+      isWizard: false,
+      hasName: false,
+      showWeekNumbers: true,
+      hasPresets: false,
+      isScrollable: false,
+      scrollHeight: 300,
+    })
+    expect(html).toContain(':tabindex="!item.isWeekNumber ? -1 : undefined"')
+  })
+
+  it('scrollable day gridcells have tabindex="-1"', () => {
+    const html = generateCalendarTemplate({
+      display: 'inline',
+      isDualMonth: false,
+      isWizard: false,
+      hasName: false,
+      showWeekNumbers: false,
+      hasPresets: false,
+      isScrollable: true,
+      scrollHeight: 300,
+    })
+    expect(html).toContain('role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectDate')
+  })
+
+  it('scrollable week-number items use :tabindex binding', () => {
+    const html = generateCalendarTemplate({
+      display: 'inline',
+      isDualMonth: false,
+      isWizard: false,
+      hasName: false,
+      showWeekNumbers: true,
+      hasPresets: false,
+      isScrollable: true,
+      scrollHeight: 300,
+    })
+    expect(html).toContain(':tabindex="!item.isWeekNumber ? -1 : undefined"')
+  })
+})
+
+// ===========================================================================
+// Popup input attributes
+// ===========================================================================
+
+describe('Popup input attributes', () => {
+  it('popup input has autocomplete="off"', () => {
+    const html = generateCalendarTemplate({
+      display: 'popup',
+      isDualMonth: false,
+      isWizard: false,
+      hasName: false,
+      showWeekNumbers: false,
+      hasPresets: false,
+      isScrollable: false,
+      scrollHeight: 300,
+    })
+    expect(html).toContain('autocomplete="off"')
+  })
+
+  it('popup input has :id="inputId" binding', () => {
+    const html = generateCalendarTemplate({
+      display: 'popup',
+      isDualMonth: false,
+      isWizard: false,
+      hasName: false,
+      showWeekNumbers: false,
+      hasPresets: false,
+      isScrollable: false,
+      scrollHeight: 300,
+    })
+    expect(html).toContain(':id="inputId"')
+  })
+})
+
+// ===========================================================================
+// inputId config option
+// ===========================================================================
+
+describe('inputId config option', () => {
+  it('defaults to null when not configured', () => {
+    const c = createCalendarData({})
+    const { flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+    expect(c.inputId).toBeNull()
+  })
+
+  it('returns configured value', () => {
+    const c = createCalendarData({ inputId: 'my-date-input' })
+    const { flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+    expect(c.inputId).toBe('my-date-input')
+  })
+})
+
+// ===========================================================================
 // Input and popup accessibility getters
 // ===========================================================================
 
@@ -556,12 +739,20 @@ describe('CSS regression guards', () => {
   const cssPath = resolve(__dirname, '../../styles/calendar.css')
   const css = readFileSync(cssPath, 'utf-8')
 
-  it('disabled text uses --color-gray-500 for sufficient contrast', () => {
-    expect(css).toContain('--color-calendar-disabled: var(--color-gray-500)')
+  it('disabled text uses --color-gray-600 for sufficient contrast', () => {
+    expect(css).toContain('--color-calendar-disabled: var(--color-gray-600)')
   })
 
-  it('other-month text uses --color-gray-500 for sufficient contrast', () => {
-    expect(css).toContain('--color-calendar-other-month: var(--color-gray-500)')
+  it('other-month text uses --color-gray-600 for sufficient contrast', () => {
+    expect(css).toContain('--color-calendar-other-month: var(--color-gray-600)')
+  })
+
+  it('weekday text uses --color-gray-600 for sufficient contrast', () => {
+    expect(css).toContain('--color-calendar-weekday: var(--color-gray-600)')
+  })
+
+  it('header label has :focus-visible style', () => {
+    expect(css).toContain('.rc-header__label:focus-visible')
   })
 
   it('contains .rc-sr-only class definition', () => {
