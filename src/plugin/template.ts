@@ -29,8 +29,12 @@ function yearPickerView(): string {
       <button class="rc-header__nav" @click="next()" :disabled="!canGoNext" aria-label="Next decade">&#8250;</button>
     </div>
     <div class="rc-year-grid" role="grid" :aria-label="decadeLabel">
-      <template x-for="cell in yearGrid.flat()" :key="cell.year">
-        <div :class="yearClasses(cell)" :aria-disabled="cell.isDisabled" role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectYear(cell.year)" x-text="cell.label"></div>
+      <template x-for="(row, ri) in yearGrid" :key="ri">
+        <div role="row" style="display:contents">
+          <template x-for="cell in row" :key="cell.year">
+            <div :class="yearClasses(cell)" :aria-disabled="cell.isDisabled" role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectYear(cell.year)" x-text="cell.label"></div>
+          </template>
+        </div>
       </template>
     </div>
   </div>
@@ -46,8 +50,12 @@ function monthPickerView(): string {
       <button class="rc-header__nav" @click="next()" :disabled="!canGoNext" aria-label="Next year">&#8250;</button>
     </div>
     <div class="rc-month-grid" role="grid" :aria-label="yearLabel">
-      <template x-for="cell in monthGrid.flat()" :key="cell.month">
-        <div :class="monthClasses(cell)" :aria-disabled="cell.isDisabled" role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectMonth(cell.month)" x-text="cell.label"></div>
+      <template x-for="(row, ri) in monthGrid" :key="ri">
+        <div role="row" style="display:contents">
+          <template x-for="cell in row" :key="cell.month">
+            <div :class="monthClasses(cell)" :aria-disabled="cell.isDisabled" role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectMonth(cell.month)" x-text="cell.label"></div>
+          </template>
+        </div>
       </template>
     </div>
   </div>
@@ -74,20 +82,27 @@ function dayView(isDual: boolean, showWeekNumbers: boolean): string {
           </template>
         </div>`
 
-  // Grid: use dayGridItems() helper when week numbers are enabled
+  // Grid: row-wrapped gridcells for ARIA compliance (role="grid" > role="row" > role="gridcell")
   const gridClass = showWeekNumbers
     ? `"rc-grid rc-grid--week-numbers"`
     : `"rc-grid"`
-  const gridClassBinding = showWeekNumbers
-    ? `:class="{ 'rc-grid--slide-next': _navDirection === 'next', 'rc-grid--slide-prev': _navDirection === 'prev' }"`
-    : `:class="{ 'rc-grid--slide-next': _navDirection === 'next', 'rc-grid--slide-prev': _navDirection === 'prev' }"`
+  const gridClassBinding = `:class="{ 'rc-grid--slide-next': _navDirection === 'next', 'rc-grid--slide-prev': _navDirection === 'prev' }"`
 
   const cellsBlock = showWeekNumbers
-    ? `<template x-for="item in dayGridItems(mg)" :key="item.key">
-              <div :class="item.isWeekNumber ? 'rc-week-number' : dayClasses(item.cell)" :id="!item.isWeekNumber ? ('day-' + item.cell.date.toISO()) : undefined" :aria-selected="!item.isWeekNumber ? isSelected(item.cell.date) : undefined" :aria-disabled="!item.isWeekNumber ? item.cell.isDisabled : undefined" :title="!item.isWeekNumber ? dayTitle(item.cell) : undefined" :role="!item.isWeekNumber ? 'gridcell' : undefined" :tabindex="!item.isWeekNumber ? -1 : undefined" @click="!item.isWeekNumber && !item.cell.isDisabled && selectDate(item.cell.date)" @mouseenter="!item.isWeekNumber && (hoverDate = item.cell.date)" @mouseleave="!item.isWeekNumber && (hoverDate = null)" x-text="item.isWeekNumber ? item.weekNumber : item.cell.date.day"></div>
+    ? `<template x-for="(row, ri) in mg.rows" :key="ri">
+              <div role="row" style="display:contents">
+                <div class="rc-week-number" x-text="mg.weekNumbers[ri]"></div>
+                <template x-for="cell in row" :key="cell.date.toISO()">
+                  <div :class="dayClasses(cell)" :id="'day-' + cell.date.toISO()" :aria-selected="isSelected(cell.date)" :aria-disabled="cell.isDisabled" :title="dayTitle(cell)" role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectDate(cell.date)" @mouseenter="hoverDate = cell.date" @mouseleave="hoverDate = null" x-text="cell.date.day"></div>
+                </template>
+              </div>
             </template>`
-    : `<template x-for="cell in mg.rows.flat()" :key="cell.date.toISO()">
-              <div :class="dayClasses(cell)" :id="'day-' + cell.date.toISO()" :aria-selected="isSelected(cell.date)" :aria-disabled="cell.isDisabled" :title="dayTitle(cell)" role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectDate(cell.date)" @mouseenter="hoverDate = cell.date" @mouseleave="hoverDate = null" x-text="cell.date.day"></div>
+    : `<template x-for="(row, ri) in mg.rows" :key="ri">
+              <div role="row" style="display:contents">
+                <template x-for="cell in row" :key="cell.date.toISO()">
+                  <div :class="dayClasses(cell)" :id="'day-' + cell.date.toISO()" :aria-selected="isSelected(cell.date)" :aria-disabled="cell.isDisabled" :title="dayTitle(cell)" role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectDate(cell.date)" @mouseenter="hoverDate = cell.date" @mouseleave="hoverDate = null" x-text="cell.date.day"></div>
+                </template>
+              </div>
             </template>`
 
   return `<template x-if="view === 'days'">
@@ -128,11 +143,20 @@ function scrollableDayView(showWeekNumbers: boolean, scrollHeight: number): stri
   const gridClass = showWeekNumbers ? `"rc-grid rc-grid--week-numbers"` : `"rc-grid"`
 
   const cellsBlock = showWeekNumbers
-    ? `<template x-for="item in dayGridItems(mg)" :key="item.key">
-              <div :class="item.isWeekNumber ? 'rc-week-number' : dayClasses(item.cell)" :id="!item.isWeekNumber ? ('day-' + item.cell.date.toISO()) : undefined" :aria-selected="!item.isWeekNumber ? isSelected(item.cell.date) : undefined" :aria-disabled="!item.isWeekNumber ? item.cell.isDisabled : undefined" :title="!item.isWeekNumber ? dayTitle(item.cell) : undefined" :role="!item.isWeekNumber ? 'gridcell' : undefined" :tabindex="!item.isWeekNumber ? -1 : undefined" @click="!item.isWeekNumber && !item.cell.isDisabled && selectDate(item.cell.date)" @mouseenter="!item.isWeekNumber && (hoverDate = item.cell.date)" @mouseleave="!item.isWeekNumber && (hoverDate = null)" x-text="item.isWeekNumber ? item.weekNumber : item.cell.date.day"></div>
+    ? `<template x-for="(row, ri) in mg.rows" :key="ri">
+              <div role="row" style="display:contents">
+                <div class="rc-week-number" x-text="mg.weekNumbers[ri]"></div>
+                <template x-for="cell in row" :key="cell.date.toISO()">
+                  <div :class="dayClasses(cell)" :id="'day-' + cell.date.toISO()" :aria-selected="isSelected(cell.date)" :aria-disabled="cell.isDisabled" :title="dayTitle(cell)" role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectDate(cell.date)" @mouseenter="hoverDate = cell.date" @mouseleave="hoverDate = null" x-text="cell.date.day"></div>
+                </template>
+              </div>
             </template>`
-    : `<template x-for="cell in mg.rows.flat()" :key="cell.date.toISO()">
-              <div :class="dayClasses(cell)" :id="'day-' + cell.date.toISO()" :aria-selected="isSelected(cell.date)" :aria-disabled="cell.isDisabled" :title="dayTitle(cell)" role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectDate(cell.date)" @mouseenter="hoverDate = cell.date" @mouseleave="hoverDate = null" x-text="cell.date.day"></div>
+    : `<template x-for="(row, ri) in mg.rows" :key="ri">
+              <div role="row" style="display:contents">
+                <template x-for="cell in row" :key="cell.date.toISO()">
+                  <div :class="dayClasses(cell)" :id="'day-' + cell.date.toISO()" :aria-selected="isSelected(cell.date)" :aria-disabled="cell.isDisabled" :title="dayTitle(cell)" role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectDate(cell.date)" @mouseenter="hoverDate = cell.date" @mouseleave="hoverDate = null" x-text="cell.date.day"></div>
+                </template>
+              </div>
             </template>`
 
   return `<template x-if="view === 'days'">

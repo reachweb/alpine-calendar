@@ -496,7 +496,7 @@ describe('Gridcell tabindex', () => {
     expect(html).toContain('role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectDate')
   })
 
-  it('week-number day items use :tabindex binding', () => {
+  it('week-number grid wraps cells in role="row"', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
       isDualMonth: false,
@@ -507,7 +507,8 @@ describe('Gridcell tabindex', () => {
       isScrollable: false,
       scrollHeight: 300,
     })
-    expect(html).toContain(':tabindex="!item.isWeekNumber ? -1 : undefined"')
+    expect(html).toContain('role="row" style="display:contents"')
+    expect(html).toContain('role="gridcell" tabindex="-1"')
   })
 
   it('scrollable day gridcells have tabindex="-1"', () => {
@@ -524,7 +525,7 @@ describe('Gridcell tabindex', () => {
     expect(html).toContain('role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectDate')
   })
 
-  it('scrollable week-number items use :tabindex binding', () => {
+  it('scrollable week-number grid wraps cells in role="row"', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
       isDualMonth: false,
@@ -535,7 +536,8 @@ describe('Gridcell tabindex', () => {
       isScrollable: true,
       scrollHeight: 300,
     })
-    expect(html).toContain(':tabindex="!item.isWeekNumber ? -1 : undefined"')
+    expect(html).toContain('role="row" style="display:contents"')
+    expect(html).toContain('role="gridcell" tabindex="-1"')
   })
 })
 
