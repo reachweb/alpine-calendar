@@ -27,7 +27,7 @@ let globalDefaults: Partial<CalendarConfig> = {}
  */
 export function calendarPlugin(Alpine: AlpineType) {
   Alpine.data('calendar', (config: CalendarConfig = {}) =>
-    createCalendarData({ ...globalDefaults, ...config }),
+    createCalendarData({ ...globalDefaults, ...config }, Alpine),
   )
 }
 

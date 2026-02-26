@@ -16,6 +16,7 @@ import { parseDate, parseDateRange, parseDateMultiple } from '../input/parser'
 import { attachMask } from '../input/mask'
 import { computePosition, autoUpdate } from '../positioning/popup'
 import type { Placement } from '../positioning/popup'
+import { generateCalendarTemplate } from './template'
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -140,6 +141,8 @@ export interface CalendarConfig {
   ) => boolean | void
   /** Custom messages for disabled-date tooltips. Overrides default English strings. */
   constraintMessages?: ConstraintMessages
+  /** Auto-render template when element is empty. Default: true. Set false to require manual template. */
+  template?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -376,7 +379,7 @@ function buildConstraints(
  * This factory is called by `Alpine.data('calendar', createCalendarData)`.
  * The returned object becomes the reactive component state.
  */
-export function createCalendarData(config: CalendarConfig = {}) {
+export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initTree: (el: HTMLElement) => void }) {
   // --- Validate config ---
   validateConfig(config)
 
@@ -514,6 +517,8 @@ export function createCalendarData(config: CalendarConfig = {}) {
     _popupEl: null as HTMLElement | null,
     _autoUpdateCleanup: null as (() => void) | null,
     _documentClickHandler: null as ((e: Event) => void) | null,
+    _Alpine: (Alpine ?? null) as { initTree: (el: HTMLElement) => void } | null,
+    _autoRendered: false,
 
     // --- Getters ---
 
@@ -589,6 +594,24 @@ export function createCalendarData(config: CalendarConfig = {}) {
     // --- Lifecycle ---
 
     init() {
+      // Auto-template injection: if element is empty, inject default template
+      const el = alpine(this).$el
+      const hasContent = Array.from(el.childNodes).some(
+        (n) => n.nodeType === 1 || (n.nodeType === 3 && n.textContent?.trim()),
+      )
+      if (!hasContent && config.template !== false && this._Alpine?.initTree) {
+        el.innerHTML = generateCalendarTemplate({
+          display: this.display,
+          isDualMonth: this.monthCount > 1,
+          isWizard: this.wizardMode !== 'none',
+          hasName: !!this.inputName,
+        })
+        for (const child of Array.from(el.children)) {
+          this._Alpine.initTree(child as HTMLElement)
+        }
+        this._autoRendered = true
+      }
+
       this._rebuildGrid()
       this._rebuildMonthGrid()
       this._rebuildYearGrid()
@@ -625,6 +648,10 @@ export function createCalendarData(config: CalendarConfig = {}) {
       }
       this._inputEl = null
       this._popupEl = null
+      if (this._autoRendered) {
+        alpine(this).$el.innerHTML = ''
+        this._autoRendered = false
+      }
     },
 
     // --- Grid ---

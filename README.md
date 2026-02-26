@@ -35,130 +35,68 @@ The CDN build auto-registers via `alpine:init` — no manual setup needed. Works
 
 ## Quick Start
 
+The calendar auto-renders a complete template when the element is empty — no manual HTML needed:
+
 ### Inline Single Date
 
 ```html
-<div x-data="calendar({ mode: 'single', firstDay: 1 })">
-  <div class="rc-calendar" @keydown="handleKeydown($event)" tabindex="0" role="application">
-    <template x-if="view === 'days'">
-      <div class="rc-months">
-        <template x-for="(mg, gi) in grid" :key="mg.year + '-' + mg.month">
-          <div>
-            <div class="rc-header">
-              <button class="rc-header__nav" @click="prev()">&#8249;</button>
-              <span class="rc-header__label" @click="setView('months')" x-text="monthYearLabel(gi)"></span>
-              <button class="rc-header__nav" @click="next()">&#8250;</button>
-            </div>
-            <div class="rc-weekdays">
-              <template x-for="wd in weekdayHeaders" :key="wd">
-                <span class="rc-weekday" x-text="wd"></span>
-              </template>
-            </div>
-            <div class="rc-grid" role="grid">
-              <template x-for="cell in mg.rows.flat()" :key="cell.date.toISO()">
-                <div :class="dayClasses(cell)"
-                     :aria-selected="isSelected(cell.date)"
-                     :aria-disabled="cell.isDisabled"
-                     role="gridcell"
-                     @click="!cell.isDisabled && selectDate(cell.date)"
-                     @mouseenter="hoverDate = cell.date"
-                     @mouseleave="hoverDate = null"
-                     x-text="cell.date.day">
-                </div>
-              </template>
-            </div>
-          </div>
-        </template>
-      </div>
-    </template>
-  </div>
-  <p>Selected: <span x-text="formattedValue || 'none'"></span></p>
-</div>
+<div x-data="calendar({ mode: 'single', firstDay: 1 })"></div>
 ```
 
-### Popup with Input Masking
+### Popup with Input
 
 ```html
-<div x-data="calendar({ mode: 'single', display: 'popup', mask: true })">
-  <input x-ref="input" type="text"
-         @focus="handleFocus()"
-         @blur="handleBlur()">
-
-  <div x-ref="popup" x-show="isOpen" :style="popupStyle"
-       class="rc-popup-overlay" @click.self="close()">
-    <div class="rc-calendar" @keydown="handleKeydown($event)" tabindex="0">
-      <!-- same calendar template as above -->
-    </div>
-  </div>
-</div>
+<div x-data="calendar({ mode: 'single', display: 'popup' })"></div>
 ```
+
+Auto-renders an `<input>` with focus/blur handlers and a popup overlay with close button, transitions, and mobile bottom-sheet behavior.
 
 ### Range Selection (2-Month)
 
 ```html
-<div x-data="calendar({ mode: 'range', months: 2, firstDay: 1 })">
-  <div class="rc-calendar" @keydown="handleKeydown($event)" tabindex="0">
-    <template x-if="view === 'days'">
-      <div class="rc-months" :class="{ 'rc-months--dual': monthCount === 2 }">
-        <template x-for="(mg, gi) in grid" :key="mg.year + '-' + mg.month">
-          <div>
-            <div class="rc-header">
-              <button class="rc-header__nav" @click="prev()"
-                      :style="gi > 0 ? 'visibility:hidden' : ''">&#8249;</button>
-              <span class="rc-header__label" x-text="monthYearLabel(gi)"></span>
-              <button class="rc-header__nav" @click="next()"
-                      :style="gi < grid.length - 1 ? 'visibility:hidden' : ''">&#8250;</button>
-            </div>
-            <!-- weekdays + grid same as single -->
-          </div>
-        </template>
-      </div>
-    </template>
-  </div>
-</div>
+<div x-data="calendar({ mode: 'range', months: 2, firstDay: 1 })"></div>
 ```
 
 ### Multiple Date Selection
 
 ```html
-<div x-data="calendar({ mode: 'multiple' })">
-  <!-- same template structure -->
-  <p x-text="selectedDates.length + ' dates selected'"></p>
-</div>
+<div x-data="calendar({ mode: 'multiple' })"></div>
 ```
 
 ### Birth Date Wizard
 
 ```html
-<div x-data="calendar({ mode: 'single', wizard: true })">
-  <div class="rc-calendar rc-calendar--wizard">
-    <div class="rc-wizard-steps">
-      <template x-for="s in wizardTotalSteps" :key="s">
-        <span :class="{ 'active': wizardStep >= s }"></span>
-      </template>
-    </div>
-    <span class="rc-wizard-label" x-text="wizardStepLabel"></span>
-    <button class="rc-wizard-back" x-show="wizardStep > 1" @click="wizardBack()">Back</button>
-
-    <!-- Year view (step 1) -->
-    <template x-if="view === 'years'">
-      <!-- year grid template -->
-    </template>
-
-    <!-- Month view (step 2) -->
-    <template x-if="view === 'months'">
-      <!-- month grid template -->
-    </template>
-
-    <!-- Day view (step 3) -->
-    <template x-if="view === 'days'">
-      <!-- day grid template -->
-    </template>
-  </div>
-</div>
+<div x-data="calendar({ mode: 'single', wizard: true })"></div>
 ```
 
 Wizard modes: `true` (or `'full'`) for Year → Month → Day, `'year-month'` for Year → Month, `'month-day'` for Month → Day.
+
+### Form Submission
+
+```html
+<form>
+  <div x-data="calendar({ mode: 'single', name: 'date' })"></div>
+  <button type="submit">Submit</button>
+</form>
+```
+
+When `name` is set, hidden `<input>` elements are auto-generated for form submission.
+
+### Disabling Auto-Rendering
+
+Set `template: false` to require a manual template, or simply add child elements — the calendar skips auto-rendering when the element has content:
+
+```html
+<!-- Manual template (auto-rendering skipped) -->
+<div x-data="calendar({ mode: 'single' })">
+  <div class="rc-calendar" @keydown="handleKeydown($event)" tabindex="0" role="application">
+    <!-- your custom template here -->
+  </div>
+</div>
+
+<!-- Explicitly disabled -->
+<div x-data="calendar({ mode: 'single', template: false })"></div>
+```
 
 ## Configuration
 
@@ -181,6 +119,7 @@ All options are passed via `x-data="calendar({ ... })"`.
 | `closeOnSelect` | `boolean` | `true` | Close popup after selection |
 | `wizard` | `boolean \| 'year-month' \| 'month-day'` | `false` | Birth date wizard mode |
 | `beforeSelect` | `(date, ctx) => boolean` | — | Custom validation before selection |
+| `template` | `boolean` | `true` | Auto-render template when element is empty |
 
 ### Date Constraints
 
@@ -445,9 +384,9 @@ Instance config overrides global defaults.
 
 | File | Format | Size (gzip) | Use case |
 |------|--------|-------------|----------|
-| `alpine-calendar.es.js` | ESM | ~16KB | Bundler (`import`) |
-| `alpine-calendar.umd.js` | UMD | ~9KB | Legacy (`require()`) |
-| `alpine-calendar.cdn.js` | IIFE | ~9KB | CDN / `<script>` tag |
+| `alpine-calendar.es.js` | ESM | ~19KB | Bundler (`import`) |
+| `alpine-calendar.umd.js` | UMD | ~12KB | Legacy (`require()`) |
+| `alpine-calendar.cdn.js` | IIFE | ~12KB | CDN / `<script>` tag |
 | `alpine-calendar.css` | CSS | ~4KB | All environments |
 
 ## TypeScript
@@ -508,7 +447,6 @@ Use `wire:ignore` on the calendar container to prevent Livewire from morphing it
 <div wire:ignore>
   <div x-data="calendar({ mode: 'single', display: 'popup' })"
        @calendar:change="$wire.set('date', $event.detail.value)">
-    <!-- calendar template -->
   </div>
 </div>
 ```
