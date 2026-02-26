@@ -14,7 +14,7 @@ export interface TemplateOptions {
 }
 
 // Close icon SVG (inline, no external deps)
-const closeSvg = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>'
+const closeSvg = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>'
 
 // ---------------------------------------------------------------------------
 // View fragments
@@ -42,7 +42,7 @@ function monthPickerView(): string {
   <div class="rc-view-enter">
     <div class="rc-header">
       <button class="rc-header__nav" @click="prev()" :disabled="!canGoPrev" aria-label="Previous year">&#8249;</button>
-      <span class="rc-header__label" @click="setView('years')" x-text="yearLabel"></span>
+      <button class="rc-header__label" @click="setView('years')" aria-label="Change view" x-text="yearLabel"></button>
       <button class="rc-header__nav" @click="next()" :disabled="!canGoNext" aria-label="Next year">&#8250;</button>
     </div>
     <div class="rc-month-grid" role="grid" :aria-label="yearLabel">
@@ -96,7 +96,7 @@ function dayView(isDual: boolean, showWeekNumbers: boolean): string {
       <div${isDual ? '' : ''}>
         <div class="rc-header">
           <button class="rc-header__nav" @click="prev()" :disabled="!canGoPrev" aria-label="Previous month"${prevStyle}>&#8249;</button>
-          <span class="rc-header__label" @click="setView('months')" x-text="monthYearLabel(gi)"></span>
+          <button class="rc-header__label" @click="setView('months')" aria-label="Change view" x-text="monthYearLabel(gi)"></button>
           <button class="rc-header__nav" @click="next()" :disabled="!canGoNext" aria-label="Next month"${nextStyle}>&#8250;</button>
         </div>
         ${weekdayBlock}
@@ -174,7 +174,7 @@ function wizardSummary(): string {
 }
 
 function popupWrapper(content: string): string {
-  return `<div x-ref="popup" x-show="isOpen" :style="popupStyle" class="rc-popup-overlay" @click.self="close()" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+  return `<div x-ref="popup" x-show="isOpen" :style="popupStyle" class="rc-popup-overlay" @click.self="close()" role="dialog" aria-modal="true" :aria-label="popupAriaLabel" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
 ${content}
 </div>`
 }
@@ -257,12 +257,13 @@ export function generateCalendarTemplate(options: TemplateOptions): string {
 
   // Wrap in rc-calendar container
   const calendarEl = `<div class="${calendarClass}" @keydown="handleKeydown($event)" tabindex="0" :aria-activedescendant="focusedDateISO ? 'day-' + focusedDateISO : null" role="application" aria-label="${ariaLabel}">
+<div class="rc-sr-only" role="status" aria-live="polite" aria-atomic="true" x-text="_statusMessage"></div>
 ${calendarInner}
 </div>`
 
   if (isPopup) {
     // For popup: input + popup overlay wrapper
-    const inputEl = '<input x-ref="input" type="text" class="rc-input" @focus="handleFocus()" @blur="handleBlur()">'
+    const inputEl = '<input x-ref="input" type="text" class="rc-input" :aria-label="inputAriaLabel" aria-haspopup="dialog" :aria-expanded="isOpen" @focus="handleFocus()" @blur="handleBlur()">'
     return inputEl + '\n' + popupWrapper(calendarEl)
   }
 

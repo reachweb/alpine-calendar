@@ -493,6 +493,29 @@ Use `wire:ignore` on the calendar container to prevent Livewire from morphing it
 </div>
 ```
 
+## Development
+
+```bash
+pnpm install          # Install dependencies
+pnpm dev              # Start dev server with demo
+pnpm test             # Run tests
+pnpm test:watch       # Run tests in watch mode
+pnpm test:coverage    # Run tests with coverage report
+pnpm typecheck        # Type-check without emitting
+pnpm lint             # Lint source files
+pnpm lint:fix         # Lint and auto-fix
+pnpm format           # Format source files with Prettier
+pnpm build            # Build all bundles (ESM + UMD + CDN + CSS + types)
+pnpm build:lib        # Build ESM + UMD only
+pnpm build:cdn        # Build CDN/IIFE bundle only
+```
+
+Before a release, run the full verification chain:
+
+```bash
+pnpm typecheck && pnpm lint && pnpm test && pnpm build
+```
+
 ## License
 
 MIT

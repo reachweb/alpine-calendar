@@ -151,7 +151,7 @@ export interface CalendarConfig {
       /** Whether this click would select or deselect the date. */
       action: 'select' | 'deselect'
     },
-  ) => boolean | void
+  ) => boolean | undefined
   /** Custom messages for disabled-date tooltips. Overrides default English strings. */
   constraintMessages?: ConstraintMessages
   /** Auto-render template when element is empty. Default: true. Set false to require manual template. */
@@ -558,6 +558,9 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
      */
     _selectionRev: 0,
 
+    // --- Accessibility: live region ---
+    _statusMessage: '' as string,
+
     // --- Getters ---
 
     get selectedDates(): CalendarDate[] {
@@ -576,6 +579,21 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     /** ISO string of focused date for aria-activedescendant binding. */
     get focusedDateISO(): string {
       return this.focusedDate ? this.focusedDate.toISO() : ''
+    },
+
+    /** Accessible label for the popup input element. */
+    get inputAriaLabel(): string {
+      if (mode === 'range') return 'Select date range'
+      if (mode === 'multiple') return 'Select dates'
+      if (wizard) return 'Select birth date'
+      return 'Select date'
+    },
+
+    /** Accessible label for the popup dialog. */
+    get popupAriaLabel(): string {
+      if (wizard) return 'Birth date wizard'
+      if (mode === 'range') return 'Date range picker'
+      return 'Date picker'
     },
 
     /** Label for the current wizard step (e.g. "Select Year"). */
@@ -662,15 +680,18 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       alpine(this).$watch('month', () => {
         this._rebuildGrid()
         this._emitNavigate()
+        this._announceNavigation()
       })
       alpine(this).$watch('year', () => {
         this._rebuildGrid()
         this._rebuildMonthGrid()
         this._rebuildYearGrid()
         this._emitNavigate()
+        this._announceNavigation()
       })
       alpine(this).$watch('view', () => {
         this._emitViewChange()
+        this._announceViewChange()
       })
 
       // Auto-bind to x-ref="input" if present
@@ -1080,6 +1101,45 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       this._syncing = false
     },
 
+    /** Announce a message to screen readers via the aria-live status region. */
+    _announce(message: string) {
+      this._statusMessage = ''
+      alpine(this).$nextTick(() => {
+        this._statusMessage = message
+      })
+    },
+
+    /** Announce the current navigation context (month/year/decade) for screen readers. */
+    _announceNavigation() {
+      if (this.view === 'days') {
+        if (this.monthCount > 1 && !this.isScrollable) {
+          // Dual-month: announce both months
+          const labels: string[] = []
+          for (let i = 0; i < this.grid.length; i++) {
+            labels.push(this.monthYearLabel(i))
+          }
+          this._announce(labels.join(' \u2013 '))
+        } else {
+          this._announce(this.monthYearLabel(0))
+        }
+      } else if (this.view === 'months') {
+        this._announce('Year: ' + this.year)
+      } else if (this.view === 'years') {
+        this._announce('Decade: ' + this.decadeLabel)
+      }
+    },
+
+    /** Announce the new view after a view switch for screen readers. */
+    _announceViewChange() {
+      if (this.view === 'days') {
+        this._announce(this.monthYearLabel(0))
+      } else if (this.view === 'months') {
+        this._announce('Select month, ' + this.year)
+      } else if (this.view === 'years') {
+        this._announce('Select year, ' + this.decadeLabel)
+      }
+    },
+
     /** Dispatch calendar:change event with current selection state. */
     _emitChange() {
       alpine(this).$dispatch('calendar:change', {
@@ -1178,6 +1238,10 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         if (result === false) return
       }
 
+      // Capture pre-toggle state for announcements
+      const wasSelected = this._selection.isSelected(date)
+      const wasPartialRange = mode === 'range' && (this._selection as RangeSelection).isPartial()
+
       this._selection.toggle(date)
       if (wizard) this._wizardDay = date.day
       // Bump reactive counter so Alpine re-evaluates dayClasses() bindings.
@@ -1185,6 +1249,31 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       this._selectionRev++
       this._emitChange()
       this._syncInputFromSelection()
+
+      // Announce selection to screen readers
+      const dateLabel = date.format({ weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }, locale)
+      if (mode === 'single') {
+        this._announce(dateLabel + ' selected')
+      } else if (mode === 'multiple') {
+        const count = this._selection.toArray().length
+        if (wasSelected) {
+          this._announce(dateLabel + ' deselected. ' + count + ' dates selected')
+        } else {
+          this._announce(dateLabel + ' selected. ' + count + ' dates selected')
+        }
+      } else if (mode === 'range') {
+        const range = this._selection as RangeSelection
+        if (range.isPartial()) {
+          this._announce('Range start: ' + dateLabel + '. Select end date')
+        } else if (wasPartialRange) {
+          const dates = range.toArray()
+          if (dates.length === 2) {
+            const startLabel = (dates[0] as CalendarDate).format({ weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }, locale)
+            const endLabel = (dates[1] as CalendarDate).format({ weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }, locale)
+            this._announce('Range: ' + startLabel + ' to ' + endLabel)
+          }
+        }
+      }
 
       // Auto-close popup after selection is complete
       if (closeOnSelect && display === 'popup' && this.isOpen) {
@@ -1238,7 +1327,8 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       // No start selected yet, or range is already complete (next click restarts)
       if (!range.isPartial()) return true
 
-      const rangeStart = range.getStart()!
+      const rangeStart = range.getStart()
+      if (!rangeStart) return true
 
       // Clicking the same date as start deselects — always allowed
       if (date.isSame(rangeStart)) return true
@@ -1271,6 +1361,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       this._selectionRev++
       this._emitChange()
       this._syncInputFromSelection()
+      this._announce('Selection cleared')
     },
 
     // --- Programmatic control ---
@@ -1727,7 +1818,9 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         const monthEls = container.querySelectorAll('[data-month-id]')
         let visibleIndex = 0
         for (let i = 0; i < monthEls.length; i++) {
-          const rect = monthEls[i]!.getBoundingClientRect()
+          const el = monthEls[i]
+          if (!el) continue
+          const rect = el.getBoundingClientRect()
           // The last month whose top is at or above the container top
           if (rect.top <= containerTop + 10) {
             visibleIndex = i
