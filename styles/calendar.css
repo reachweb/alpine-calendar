@@ -1,18 +1,57 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+ * Theme Variables
+ *
+ * All visual properties are defined here as CSS custom properties via
+ * Tailwind CSS 4's @theme directive. Override any variable in your own CSS
+ * to customize the calendar's appearance:
+ *
+ *   @import "@reachgr/alpine-calendar/css";
+ *
+ *   @theme {
+ *     --color-calendar-primary: var(--color-indigo-600);
+ *     --color-calendar-primary-text: var(--color-white);
+ *     --color-calendar-today-ring: var(--color-indigo-400);
+ *     --color-calendar-range: var(--color-indigo-50);
+ *     --radius-calendar: var(--radius-md);
+ *   }
+ *
+ * Or use plain CSS custom properties for non-Tailwind projects:
+ *
+ *   :root {
+ *     --color-calendar-primary: #4f46e5;
+ *     --color-calendar-primary-text: #ffffff;
+ *   }
+ *
+ * ------------------------------------------------------------------------- */
+
 @theme {
+  /* Surface colors */
   --color-calendar-bg: var(--color-white);
   --color-calendar-text: var(--color-gray-900);
+  --color-calendar-border: var(--color-gray-200);
+  --color-calendar-hover: var(--color-gray-100);
+  --color-calendar-overlay: oklch(0 0 0 / 0.2);
+
+  /* Primary accent (selected, active states) */
   --color-calendar-primary: var(--color-blue-600);
   --color-calendar-primary-text: var(--color-white);
-  --color-calendar-hover: var(--color-gray-100);
+
+  /* Semantic colors */
   --color-calendar-disabled: var(--color-gray-300);
+  --color-calendar-other-month: var(--color-gray-400);
+  --color-calendar-weekday: var(--color-gray-500);
   --color-calendar-range: var(--color-blue-50);
   --color-calendar-today-ring: var(--color-blue-400);
-  --color-calendar-border: var(--color-gray-200);
-  --color-calendar-other-month: var(--color-gray-400);
+  --color-calendar-focus-ring: var(--color-blue-600);
+
+  /* Layout tokens */
   --radius-calendar: var(--radius-lg);
   --shadow-calendar: var(--shadow-lg);
+
+  /* Typography */
+  --font-calendar: system-ui, -apple-system, sans-serif;
 }
 
 /* ---------------------------------------------------------------------------
@@ -27,7 +66,15 @@
   box-shadow: var(--shadow-calendar);
   padding: 1rem;
   width: fit-content;
-  font-family: system-ui, -apple-system, sans-serif;
+  min-width: 17.5rem; /* 280px — usable on smallest viewports */
+  max-width: 100%;
+  font-family: var(--font-calendar);
+}
+
+@media (max-width: 639px) {
+  .rc-calendar {
+    padding: 0.75rem;
+  }
 }
 
 /* 2-month layout: stacked on mobile, side-by-side on sm+ */
@@ -97,7 +144,7 @@
   text-align: center;
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--color-calendar-disabled);
+  color: var(--color-calendar-weekday);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 0.25rem;
@@ -124,8 +171,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
+  aspect-ratio: 1;
+  min-height: 2.25rem; /* 36px baseline touch target */
   font-size: 0.875rem;
   border-radius: 9999px;
   cursor: pointer;
@@ -194,20 +241,53 @@
   background-color: transparent;
 }
 
+/* Range invalid — hovered date would form an invalid range (e.g., outside minRange/maxRange) */
+.rc-day--range-invalid {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* Focused (keyboard navigation) */
 .rc-day--focused:not(.rc-day--selected):not(.rc-day--range-start):not(.rc-day--range-end) {
-  box-shadow: 0 0 0 2px var(--color-calendar-primary);
+  box-shadow: 0 0 0 2px var(--color-calendar-focus-ring);
 }
 
 /* ---------------------------------------------------------------------------
- * Popup overlay
+ * Popup overlay — responsive
+ *
+ * Mobile  (< 640px): full-screen backdrop with calendar as bottom sheet.
+ * Desktop (≥ 640px): transparent overlay (click-outside catcher only);
+ *                     calendar is floating-positioned by JS via computePosition.
  * ------------------------------------------------------------------------- */
 
 .rc-popup-overlay {
   display: flex;
-  align-items: center;
+  align-items: flex-end; /* bottom sheet alignment (mobile default) */
   justify-content: center;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--color-calendar-overlay);
+}
+
+/* Mobile bottom sheet: calendar stretches full-width at the bottom */
+@media (max-width: 639px) {
+  .rc-popup-overlay .rc-calendar {
+    width: 100%;
+    max-width: 100%;
+    border-radius: var(--radius-calendar) var(--radius-calendar) 0 0;
+    border-bottom: none;
+    box-shadow: 0 -4px 16px oklch(0 0 0 / 0.12);
+  }
+}
+
+/* Desktop: transparent overlay, pointer-events disabled (click-outside via JS) */
+@media (min-width: 640px) {
+  .rc-popup-overlay {
+    background: transparent;
+    pointer-events: none;
+  }
+
+  .rc-popup-overlay .rc-calendar {
+    pointer-events: auto;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -247,12 +327,12 @@
 }
 
 /* ---------------------------------------------------------------------------
- * Month picker (4×3 grid of months)
+ * Month picker (3×4 grid of months)
  * ------------------------------------------------------------------------- */
 
 .rc-month-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 0.5rem;
   padding: 0.25rem;
 }
@@ -297,6 +377,56 @@
 }
 
 /* ---------------------------------------------------------------------------
+ * Year picker (3×4 grid of years)
+ * ------------------------------------------------------------------------- */
+
+.rc-year-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  padding: 0.25rem;
+}
+
+.rc-year {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.75rem;
+  font-size: 0.875rem;
+  border-radius: var(--radius-calendar);
+  cursor: pointer;
+  transition: background-color 150ms, color 150ms;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.rc-year:hover:not(.rc-year--disabled):not(.rc-year--selected) {
+  background-color: var(--color-calendar-hover);
+}
+
+/* Current year (today's year) */
+.rc-year--current:not(.rc-year--selected) {
+  box-shadow: inset 0 0 0 1.5px var(--color-calendar-today-ring);
+}
+
+/* Selected year (the year currently being viewed in month view) */
+.rc-year--selected {
+  background-color: var(--color-calendar-primary);
+  color: var(--color-calendar-primary-text);
+  font-weight: 600;
+}
+
+/* Disabled year (outside min/max range) */
+.rc-year--disabled {
+  color: var(--color-calendar-disabled);
+  cursor: not-allowed;
+}
+
+.rc-year--disabled:hover {
+  background-color: transparent;
+}
+
+/* ---------------------------------------------------------------------------
  * Month transition animation
  * ------------------------------------------------------------------------- */
 
@@ -323,21 +453,150 @@
   animation: rc-slide-in-from-left 200ms ease-out;
 }
 
+/* ---------------------------------------------------------------------------
+ * View switch animation (days ↔ months ↔ years)
+ * ------------------------------------------------------------------------- */
+
+@keyframes rc-view-enter {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.rc-view-enter {
+  animation: rc-view-enter 150ms ease-out;
+}
+
+/* ---------------------------------------------------------------------------
+ * Mobile bottom sheet slide-up
+ * ------------------------------------------------------------------------- */
+
+@keyframes rc-slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+@media (max-width: 639px) {
+  .rc-popup-overlay .rc-calendar {
+    animation: rc-slide-up 200ms ease-out;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Reduced motion — disable all calendar animations
+ * ------------------------------------------------------------------------- */
+
 @media (prefers-reduced-motion: reduce) {
   .rc-grid--slide-next,
-  .rc-grid--slide-prev {
+  .rc-grid--slide-prev,
+  .rc-view-enter,
+  .rc-popup-overlay .rc-calendar {
     animation: none;
   }
 }
 
 /* ---------------------------------------------------------------------------
- * Touch-friendly: enlarge day cells on mobile
+ * Birth Date Wizard
+ * ------------------------------------------------------------------------- */
+
+.rc-wizard-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.rc-wizard-step {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background-color: var(--color-calendar-border);
+  transition: background-color 200ms, transform 200ms;
+}
+
+.rc-wizard-step--active {
+  background-color: var(--color-calendar-primary);
+  transform: scale(1.25);
+}
+
+.rc-wizard-step--done {
+  background-color: var(--color-calendar-primary);
+}
+
+.rc-wizard-label {
+  text-align: center;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-calendar-weekday);
+  margin-bottom: 0.5rem;
+}
+
+.rc-wizard-back {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8125rem;
+  color: var(--color-calendar-primary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-calendar);
+  transition: background-color 150ms;
+  margin-bottom: 0.5rem;
+}
+
+.rc-wizard-back:hover {
+  background-color: var(--color-calendar-hover);
+}
+
+/* Wizard: consistent width across all steps (match 7-col day grid) */
+.rc-calendar--wizard {
+  min-width: 17.5rem;
+}
+
+.rc-wizard-summary {
+  text-align: center;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-calendar-text);
+  padding-top: 0.5rem;
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--color-calendar-border);
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+
+/* Wizard: larger touch targets for month/year cells */
+.rc-calendar--wizard .rc-month,
+.rc-calendar--wizard .rc-year {
+  height: 3.25rem;
+  font-size: 0.9375rem;
+}
+
+/* ---------------------------------------------------------------------------
+ * Touch-friendly: enlarge targets on mobile (44px minimum tap targets)
  * ------------------------------------------------------------------------- */
 
 @media (max-width: 639px) {
   .rc-day {
+    min-height: 2.75rem; /* 44px touch target */
+    font-size: 0.9375rem;
+  }
+
+  .rc-header__nav {
     width: 2.75rem;
     height: 2.75rem;
-    font-size: 0.9375rem;
+  }
+
+  .rc-month,
+  .rc-year {
+    min-height: 2.75rem;
+  }
+
+  /* Wizard: even larger touch targets on mobile */
+  .rc-calendar--wizard .rc-month,
+  .rc-calendar--wizard .rc-year {
+    height: 3.5rem;
+    font-size: 1rem;
   }
 }

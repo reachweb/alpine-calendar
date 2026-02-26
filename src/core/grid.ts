@@ -67,7 +67,7 @@ export function generateMonth(
 }
 
 // ---------------------------------------------------------------------------
-// Month view grid (4×3 of month cells)
+// Month view grid (3×4 of month cells)
 // ---------------------------------------------------------------------------
 
 /** Metadata for a single month cell in the month picker view. */
@@ -85,7 +85,7 @@ export interface MonthCell {
 }
 
 /**
- * Generate a 4×3 grid of months for the month picker view.
+ * Generate a 3×4 grid of months for the month picker view.
  *
  * @param year             - Year to display
  * @param today            - Reference date for "isCurrentMonth" marking
@@ -102,10 +102,10 @@ export function generateMonthGrid(
   const disabledFn = isMonthDisabled ?? (() => false)
 
   const rows: MonthCell[][] = []
-  for (let row = 0; row < 4; row++) {
+  for (let row = 0; row < 3; row++) {
     const cells: MonthCell[] = []
-    for (let col = 0; col < 3; col++) {
-      const month = row * 3 + col + 1
+    for (let col = 0; col < 4; col++) {
+      const month = row * 4 + col + 1
       const d = new CalendarDate(year, month, 1)
       cells.push({
         month,
@@ -113,6 +113,60 @@ export function generateMonthGrid(
         label: d.format({ month: 'short' }, locale),
         isCurrentMonth: todayRef.month === month && todayRef.year === year,
         isDisabled: disabledFn(year, month),
+      })
+    }
+    rows.push(cells)
+  }
+
+  return rows
+}
+
+// ---------------------------------------------------------------------------
+// Year view grid (3×4 of year cells)
+// ---------------------------------------------------------------------------
+
+/** Metadata for a single year cell in the year picker view. */
+export interface YearCell {
+  /** Full year number (e.g. 2026). */
+  year: number
+  /** Year as string label. */
+  label: string
+  /** Whether this is the current year (today's year). */
+  isCurrentYear: boolean
+  /** Whether this entire year is outside the selectable range. */
+  isDisabled: boolean
+}
+
+/**
+ * Generate a 3×4 grid of years for the year picker view.
+ *
+ * Shows 12 consecutive years in a block aligned to multiples of 12.
+ * For example, if centerYear is 2026, the grid shows 2016–2027.
+ *
+ * @param centerYear      - Year to determine which 12-year block to display
+ * @param today           - Reference date for "isCurrentYear" marking
+ * @param isYearDisabled  - Optional callback to check if a year should be disabled
+ */
+export function generateYearGrid(
+  centerYear: number,
+  today?: CalendarDate,
+  isYearDisabled?: (year: number) => boolean,
+): YearCell[][] {
+  const todayRef = today ?? CalendarDate.today()
+  const disabledFn = isYearDisabled ?? (() => false)
+
+  const startYear = Math.floor(centerYear / 12) * 12
+
+  const rows: YearCell[][] = []
+  for (let row = 0; row < 3; row++) {
+    const cells: YearCell[] = []
+    for (let col = 0; col < 4; col++) {
+      const year = startYear + row * 4 + col
+      cells.push({
+        year,
+        label: String(year),
+        isCurrentYear: todayRef.year === year,
+        isDisabled: disabledFn(year),
       })
     }
     rows.push(cells)

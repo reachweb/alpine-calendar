@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { CalendarDate } from '../../src/core/calendar-date'
 import {
   createDateConstraint,
+  createMonthConstraint,
+  createYearConstraint,
   createRangeValidator,
   isDateDisabled,
 } from '../../src/core/constraints'
@@ -855,5 +857,409 @@ describe('isDateDisabled', () => {
         ],
       }),
     ).toBe(true) // Saturday in June rule
+  })
+})
+
+// ---------------------------------------------------------------------------
+// disabledMonths / enabledMonths — day-level impact
+// ---------------------------------------------------------------------------
+
+describe('createDateConstraint — disabledMonths', () => {
+  it('disables all days in disabled months', () => {
+    const check = createDateConstraint({
+      disabledMonths: [1, 2], // January and February
+    })
+    expect(check(new CalendarDate(2025, 1, 15))).toBe(true) // Jan
+    expect(check(new CalendarDate(2025, 2, 28))).toBe(true) // Feb
+    expect(check(new CalendarDate(2025, 3, 1))).toBe(false) // Mar
+    expect(check(new CalendarDate(2025, 12, 25))).toBe(false) // Dec
+  })
+
+  it('handles empty array (no months disabled)', () => {
+    const check = createDateConstraint({ disabledMonths: [] })
+    expect(check(new CalendarDate(2025, 1, 15))).toBe(false)
+  })
+
+  it('combines with minDate/maxDate', () => {
+    const check = createDateConstraint({
+      minDate: new CalendarDate(2025, 1, 1),
+      maxDate: new CalendarDate(2025, 12, 31),
+      disabledMonths: [6], // June disabled
+    })
+    expect(check(new CalendarDate(2025, 6, 15))).toBe(true) // June — disabled month
+    expect(check(new CalendarDate(2025, 5, 15))).toBe(false) // May — ok
+    expect(check(new CalendarDate(2024, 6, 15))).toBe(true) // before minDate
+  })
+
+  it('enabledDates overrides disabledMonths', () => {
+    const check = createDateConstraint({
+      disabledMonths: [1], // January disabled
+      enabledDates: [new CalendarDate(2025, 1, 1)], // force-enable New Year
+    })
+    expect(check(new CalendarDate(2025, 1, 1))).toBe(false) // force-enabled
+    expect(check(new CalendarDate(2025, 1, 2))).toBe(true) // rest of Jan disabled
+  })
+})
+
+describe('createDateConstraint — enabledMonths', () => {
+  it('only allows dates in enabled months', () => {
+    const check = createDateConstraint({
+      enabledMonths: [6, 7, 8], // Summer only
+    })
+    expect(check(new CalendarDate(2025, 5, 31))).toBe(true) // May
+    expect(check(new CalendarDate(2025, 6, 1))).toBe(false) // June
+    expect(check(new CalendarDate(2025, 7, 15))).toBe(false) // July
+    expect(check(new CalendarDate(2025, 8, 31))).toBe(false) // August
+    expect(check(new CalendarDate(2025, 9, 1))).toBe(true) // September
+  })
+
+  it('empty array disables all months', () => {
+    const check = createDateConstraint({ enabledMonths: [] })
+    expect(check(new CalendarDate(2025, 6, 15))).toBe(true)
+    expect(check(new CalendarDate(2025, 1, 1))).toBe(true)
+  })
+
+  it('enabledDates overrides enabledMonths', () => {
+    const check = createDateConstraint({
+      enabledMonths: [6, 7, 8], // Summer only
+      enabledDates: [new CalendarDate(2025, 12, 25)], // force-enable Christmas
+    })
+    expect(check(new CalendarDate(2025, 12, 25))).toBe(false) // force-enabled
+    expect(check(new CalendarDate(2025, 12, 26))).toBe(true) // rest of Dec disabled
+  })
+})
+
+// ---------------------------------------------------------------------------
+// disabledYears / enabledYears — day-level impact
+// ---------------------------------------------------------------------------
+
+describe('createDateConstraint — disabledYears', () => {
+  it('disables all days in disabled years', () => {
+    const check = createDateConstraint({
+      disabledYears: [2020, 2021],
+    })
+    expect(check(new CalendarDate(2020, 6, 15))).toBe(true)
+    expect(check(new CalendarDate(2021, 1, 1))).toBe(true)
+    expect(check(new CalendarDate(2022, 1, 1))).toBe(false)
+    expect(check(new CalendarDate(2025, 6, 15))).toBe(false)
+  })
+
+  it('handles empty array', () => {
+    const check = createDateConstraint({ disabledYears: [] })
+    expect(check(new CalendarDate(2025, 6, 15))).toBe(false)
+  })
+
+  it('enabledDates overrides disabledYears', () => {
+    const check = createDateConstraint({
+      disabledYears: [2020],
+      enabledDates: [new CalendarDate(2020, 3, 15)],
+    })
+    expect(check(new CalendarDate(2020, 3, 15))).toBe(false) // force-enabled
+    expect(check(new CalendarDate(2020, 3, 16))).toBe(true) // rest of 2020 disabled
+  })
+})
+
+describe('createDateConstraint — enabledYears', () => {
+  it('only allows dates in enabled years', () => {
+    const check = createDateConstraint({
+      enabledYears: [2025, 2026],
+    })
+    expect(check(new CalendarDate(2024, 12, 31))).toBe(true)
+    expect(check(new CalendarDate(2025, 1, 1))).toBe(false)
+    expect(check(new CalendarDate(2026, 12, 31))).toBe(false)
+    expect(check(new CalendarDate(2027, 1, 1))).toBe(true)
+  })
+
+  it('empty array disables all years', () => {
+    const check = createDateConstraint({ enabledYears: [] })
+    expect(check(new CalendarDate(2025, 6, 15))).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Combined month + year constraints at day level
+// ---------------------------------------------------------------------------
+
+describe('createDateConstraint — combined month/year constraints', () => {
+  it('disabledYears + disabledMonths both apply', () => {
+    const check = createDateConstraint({
+      disabledYears: [2020],
+      disabledMonths: [12], // December
+    })
+    expect(check(new CalendarDate(2020, 6, 15))).toBe(true) // disabled year
+    expect(check(new CalendarDate(2025, 12, 25))).toBe(true) // disabled month
+    expect(check(new CalendarDate(2025, 6, 15))).toBe(false) // ok
+  })
+
+  it('enabledYears + enabledMonths both restrict', () => {
+    const check = createDateConstraint({
+      enabledYears: [2025, 2026],
+      enabledMonths: [6, 7, 8],
+    })
+    expect(check(new CalendarDate(2025, 6, 15))).toBe(false) // right year + month
+    expect(check(new CalendarDate(2025, 1, 15))).toBe(true) // right year, wrong month
+    expect(check(new CalendarDate(2024, 6, 15))).toBe(true) // wrong year, right month
+  })
+
+  it('disabledMonths + disabledDaysOfWeek stack', () => {
+    const check = createDateConstraint({
+      disabledMonths: [1],
+      disabledDaysOfWeek: [0, 6],
+    })
+    // Jan 15 2025 is Wednesday — disabled by month
+    expect(check(new CalendarDate(2025, 1, 15))).toBe(true)
+    // Feb 15 2025 is Saturday — disabled by DOW
+    expect(check(new CalendarDate(2025, 2, 15))).toBe(true)
+    // Feb 17 2025 is Monday — neither
+    expect(check(new CalendarDate(2025, 2, 17))).toBe(false)
+  })
+
+  it('rules can override disabledMonths for a period', () => {
+    const check = createDateConstraint({
+      disabledMonths: [1, 2], // Jan/Feb globally disabled
+      rules: [
+        {
+          from: new CalendarDate(2025, 1, 1),
+          to: new CalendarDate(2025, 3, 31),
+          disabledMonths: [], // clear month restrictions in Q1 2025
+        },
+      ],
+    })
+    // Q1 2025: rule clears disabledMonths → all allowed
+    expect(check(new CalendarDate(2025, 1, 15))).toBe(false)
+    expect(check(new CalendarDate(2025, 2, 15))).toBe(false)
+    // Outside rule: global disabledMonths applies
+    expect(check(new CalendarDate(2025, 1, 15))).toBe(false) // this is within the rule
+    expect(check(new CalendarDate(2026, 1, 15))).toBe(true) // outside rule, Jan disabled
+  })
+})
+
+// ---------------------------------------------------------------------------
+// createMonthConstraint
+// ---------------------------------------------------------------------------
+
+describe('createMonthConstraint', () => {
+  describe('no constraints', () => {
+    it('returns false for any month when no options are set', () => {
+      const check = createMonthConstraint({})
+      expect(check(2025, 1)).toBe(false)
+      expect(check(2025, 6)).toBe(false)
+      expect(check(2025, 12)).toBe(false)
+    })
+  })
+
+  describe('minDate / maxDate boundary', () => {
+    it('disables months entirely before minDate', () => {
+      const check = createMonthConstraint({
+        minDate: new CalendarDate(2025, 4, 15),
+      })
+      expect(check(2025, 3)).toBe(true) // Mar ends before Apr 15
+      expect(check(2025, 4)).toBe(false) // Apr contains minDate
+      expect(check(2025, 5)).toBe(false)
+    })
+
+    it('disables months entirely after maxDate', () => {
+      const check = createMonthConstraint({
+        maxDate: new CalendarDate(2025, 9, 15),
+      })
+      expect(check(2025, 9)).toBe(false) // Sep contains maxDate
+      expect(check(2025, 10)).toBe(true) // Oct starts after Sep 15
+      expect(check(2025, 12)).toBe(true)
+    })
+  })
+
+  describe('disabledMonths', () => {
+    it('disables specific months', () => {
+      const check = createMonthConstraint({
+        disabledMonths: [1, 2, 12],
+      })
+      expect(check(2025, 1)).toBe(true) // Jan
+      expect(check(2025, 2)).toBe(true) // Feb
+      expect(check(2025, 3)).toBe(false) // Mar
+      expect(check(2025, 12)).toBe(true) // Dec
+    })
+
+    it('handles empty array', () => {
+      const check = createMonthConstraint({ disabledMonths: [] })
+      expect(check(2025, 1)).toBe(false)
+    })
+
+    it('applies across all years', () => {
+      const check = createMonthConstraint({ disabledMonths: [6] })
+      expect(check(2024, 6)).toBe(true)
+      expect(check(2025, 6)).toBe(true)
+      expect(check(2026, 6)).toBe(true)
+    })
+  })
+
+  describe('enabledMonths', () => {
+    it('only allows specified months', () => {
+      const check = createMonthConstraint({
+        enabledMonths: [6, 7, 8],
+      })
+      expect(check(2025, 5)).toBe(true)
+      expect(check(2025, 6)).toBe(false)
+      expect(check(2025, 7)).toBe(false)
+      expect(check(2025, 8)).toBe(false)
+      expect(check(2025, 9)).toBe(true)
+    })
+
+    it('empty array disables all months', () => {
+      const check = createMonthConstraint({ enabledMonths: [] })
+      for (let m = 1; m <= 12; m++) {
+        expect(check(2025, m)).toBe(true)
+      }
+    })
+  })
+
+  describe('disabledYears cascading to months', () => {
+    it('disables all months in a disabled year', () => {
+      const check = createMonthConstraint({
+        disabledYears: [2020],
+      })
+      for (let m = 1; m <= 12; m++) {
+        expect(check(2020, m)).toBe(true)
+      }
+      expect(check(2021, 1)).toBe(false)
+    })
+  })
+
+  describe('enabledYears cascading to months', () => {
+    it('disables all months in non-enabled years', () => {
+      const check = createMonthConstraint({
+        enabledYears: [2025],
+      })
+      expect(check(2025, 6)).toBe(false)
+      expect(check(2024, 6)).toBe(true)
+      expect(check(2026, 6)).toBe(true)
+    })
+  })
+
+  describe('combined', () => {
+    it('minDate + disabledMonths', () => {
+      const check = createMonthConstraint({
+        minDate: new CalendarDate(2025, 3, 1),
+        disabledMonths: [6],
+      })
+      expect(check(2025, 2)).toBe(true) // before minDate
+      expect(check(2025, 3)).toBe(false) // at minDate
+      expect(check(2025, 6)).toBe(true) // disabled month
+      expect(check(2025, 7)).toBe(false) // ok
+    })
+
+    it('enabledYears + enabledMonths', () => {
+      const check = createMonthConstraint({
+        enabledYears: [2025],
+        enabledMonths: [6, 7, 8],
+      })
+      expect(check(2025, 6)).toBe(false)
+      expect(check(2025, 1)).toBe(true) // wrong month
+      expect(check(2024, 6)).toBe(true) // wrong year
+    })
+
+    it('disabledYears + disabledMonths', () => {
+      const check = createMonthConstraint({
+        disabledYears: [2020],
+        disabledMonths: [12],
+      })
+      expect(check(2020, 6)).toBe(true) // disabled year
+      expect(check(2025, 12)).toBe(true) // disabled month
+      expect(check(2025, 6)).toBe(false) // ok
+    })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// createYearConstraint
+// ---------------------------------------------------------------------------
+
+describe('createYearConstraint', () => {
+  describe('no constraints', () => {
+    it('returns false for any year when no options are set', () => {
+      const check = createYearConstraint({})
+      expect(check(2020)).toBe(false)
+      expect(check(2025)).toBe(false)
+      expect(check(2030)).toBe(false)
+    })
+  })
+
+  describe('minDate / maxDate boundary', () => {
+    it('disables years entirely before minDate', () => {
+      const check = createYearConstraint({
+        minDate: new CalendarDate(2025, 6, 1),
+      })
+      expect(check(2024)).toBe(true) // ends Dec 31 2024, before Jun 1 2025
+      expect(check(2025)).toBe(false) // contains minDate
+      expect(check(2026)).toBe(false)
+    })
+
+    it('disables years entirely after maxDate', () => {
+      const check = createYearConstraint({
+        maxDate: new CalendarDate(2025, 6, 30),
+      })
+      expect(check(2025)).toBe(false) // contains maxDate
+      expect(check(2026)).toBe(true) // starts Jan 1 2026, after Jun 30 2025
+    })
+  })
+
+  describe('disabledYears', () => {
+    it('disables specific years', () => {
+      const check = createYearConstraint({
+        disabledYears: [2020, 2021, 2022],
+      })
+      expect(check(2019)).toBe(false)
+      expect(check(2020)).toBe(true)
+      expect(check(2021)).toBe(true)
+      expect(check(2022)).toBe(true)
+      expect(check(2023)).toBe(false)
+    })
+
+    it('handles empty array', () => {
+      const check = createYearConstraint({ disabledYears: [] })
+      expect(check(2025)).toBe(false)
+    })
+  })
+
+  describe('enabledYears', () => {
+    it('only allows specified years', () => {
+      const check = createYearConstraint({
+        enabledYears: [2025, 2026, 2027],
+      })
+      expect(check(2024)).toBe(true)
+      expect(check(2025)).toBe(false)
+      expect(check(2026)).toBe(false)
+      expect(check(2027)).toBe(false)
+      expect(check(2028)).toBe(true)
+    })
+
+    it('empty array disables all years', () => {
+      const check = createYearConstraint({ enabledYears: [] })
+      expect(check(2025)).toBe(true)
+      expect(check(2000)).toBe(true)
+    })
+  })
+
+  describe('combined', () => {
+    it('minDate + disabledYears', () => {
+      const check = createYearConstraint({
+        minDate: new CalendarDate(2020, 1, 1),
+        disabledYears: [2022],
+      })
+      expect(check(2019)).toBe(true) // before minDate
+      expect(check(2020)).toBe(false)
+      expect(check(2022)).toBe(true) // explicitly disabled
+      expect(check(2025)).toBe(false)
+    })
+
+    it('maxDate + enabledYears', () => {
+      const check = createYearConstraint({
+        maxDate: new CalendarDate(2026, 12, 31),
+        enabledYears: [2025, 2026],
+      })
+      expect(check(2024)).toBe(true) // not in enabledYears
+      expect(check(2025)).toBe(false) // enabled + within range
+      expect(check(2026)).toBe(false) // enabled + within range
+      expect(check(2027)).toBe(true) // after maxDate
+    })
   })
 })

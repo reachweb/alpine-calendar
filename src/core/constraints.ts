@@ -1,4 +1,4 @@
-import type { CalendarDate } from './calendar-date'
+import { CalendarDate } from './calendar-date'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -22,6 +22,14 @@ export interface DateConstraintProperties {
   enabledDates?: CalendarDate[]
   /** Days of the week to enable (whitelist — all other days are disabled). */
   enabledDaysOfWeek?: number[]
+  /** Specific months to disable (1 = January, …, 12 = December). */
+  disabledMonths?: number[]
+  /** Months to enable (whitelist — all other months are disabled). */
+  enabledMonths?: number[]
+  /** Specific years to disable. */
+  disabledYears?: number[]
+  /** Years to enable (whitelist — all other years are disabled). */
+  enabledYears?: number[]
   /** Minimum range length in days (inclusive). Only used in range mode. */
   minRange?: number
   /** Maximum range length in days (inclusive). Only used in range mode. */
@@ -62,6 +70,10 @@ interface PrecomputedSets {
   disabledDays: Set<number> | undefined
   enabledKeys: Set<string> | undefined
   enabledDays: Set<number> | undefined
+  disabledMonths: Set<number> | undefined
+  enabledMonths: Set<number> | undefined
+  disabledYears: Set<number> | undefined
+  enabledYears: Set<number> | undefined
 }
 
 interface PrecomputedRule {
@@ -84,6 +96,10 @@ function precomputeSets(opts: DateConstraintProperties): PrecomputedSets {
     disabledDays: opts.disabledDaysOfWeek ? new Set(opts.disabledDaysOfWeek) : undefined,
     enabledKeys: opts.enabledDates ? new Set(opts.enabledDates.map((d) => d.toKey())) : undefined,
     enabledDays: opts.enabledDaysOfWeek ? new Set(opts.enabledDaysOfWeek) : undefined,
+    disabledMonths: opts.disabledMonths ? new Set(opts.disabledMonths) : undefined,
+    enabledMonths: opts.enabledMonths ? new Set(opts.enabledMonths) : undefined,
+    disabledYears: opts.disabledYears ? new Set(opts.disabledYears) : undefined,
+    enabledYears: opts.enabledYears ? new Set(opts.enabledYears) : undefined,
   }
 }
 
@@ -101,20 +117,28 @@ function checkDisabled(
   if (minDate && date.isBefore(minDate)) return true
   if (maxDate && date.isAfter(maxDate)) return true
 
-  // 2. enabledDates force-enables specific dates (bypass DOW and blacklist checks)
+  // 2. enabledDates force-enables specific dates (bypass all other checks)
   if (sets.enabledKeys && sets.enabledKeys.has(date.toKey())) return false
+
+  // 3. Year-level constraints
+  if (sets.enabledYears && !sets.enabledYears.has(date.year)) return true
+  if (sets.disabledYears && sets.disabledYears.has(date.year)) return true
+
+  // 4. Month-level constraints
+  if (sets.enabledMonths && !sets.enabledMonths.has(date.month)) return true
+  if (sets.disabledMonths && sets.disabledMonths.has(date.month)) return true
 
   // Compute day-of-week once if needed
   const needsDow = sets.enabledDays !== undefined || sets.disabledDays !== undefined
   const dow = needsDow ? date.toNativeDate().getDay() : -1
 
-  // 3. enabledDaysOfWeek whitelist — if set, only these days are allowed
+  // 5. enabledDaysOfWeek whitelist — if set, only these days are allowed
   if (sets.enabledDays && !sets.enabledDays.has(dow)) return true
 
-  // 4. disabledDates blacklist
+  // 6. disabledDates blacklist
   if (sets.disabledKeys && sets.disabledKeys.has(date.toKey())) return true
 
-  // 5. disabledDaysOfWeek blacklist
+  // 7. disabledDaysOfWeek blacklist
   if (sets.disabledDays && sets.disabledDays.has(dow)) return true
 
   return false
@@ -192,6 +216,16 @@ export function createDateConstraint(
         rule.sets.enabledKeys !== undefined ? rule.sets.enabledKeys : globalSets.enabledKeys,
       enabledDays:
         rule.sets.enabledDays !== undefined ? rule.sets.enabledDays : globalSets.enabledDays,
+      disabledMonths:
+        rule.sets.disabledMonths !== undefined
+          ? rule.sets.disabledMonths
+          : globalSets.disabledMonths,
+      enabledMonths:
+        rule.sets.enabledMonths !== undefined ? rule.sets.enabledMonths : globalSets.enabledMonths,
+      disabledYears:
+        rule.sets.disabledYears !== undefined ? rule.sets.disabledYears : globalSets.disabledYears,
+      enabledYears:
+        rule.sets.enabledYears !== undefined ? rule.sets.enabledYears : globalSets.enabledYears,
     }
 
     return checkDisabled(date, effectiveMinDate, effectiveMaxDate, mergedSets)
@@ -273,6 +307,108 @@ export function createRangeValidator(
     if (effectiveMaxRange !== undefined && length > effectiveMaxRange) return false
 
     return true
+  }
+}
+
+// ---------------------------------------------------------------------------
+// createMonthConstraint
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a single `isMonthDisabled` function from constraint options.
+ *
+ * A month is disabled when:
+ * 1. The entire month falls outside [minDate, maxDate].
+ * 2. The year is disabled (via disabledYears or not in enabledYears).
+ * 3. The month number is disabled (via disabledMonths or not in enabledMonths).
+ *
+ * @example
+ * ```ts
+ * const isDisabled = createMonthConstraint({
+ *   minDate: new CalendarDate(2025, 3, 1),
+ *   disabledMonths: [1, 2], // no January or February
+ * })
+ * isDisabled(2025, 1)  // true (January disabled)
+ * isDisabled(2025, 6)  // false
+ * ```
+ */
+export function createMonthConstraint(
+  options: DateConstraintOptions,
+): (year: number, month: number) => boolean {
+  const { minDate, maxDate } = options
+
+  const disabledMonthSet = options.disabledMonths ? new Set(options.disabledMonths) : undefined
+  const enabledMonthSet = options.enabledMonths ? new Set(options.enabledMonths) : undefined
+  const disabledYearSet = options.disabledYears ? new Set(options.disabledYears) : undefined
+  const enabledYearSet = options.enabledYears ? new Set(options.enabledYears) : undefined
+
+  return (year: number, month: number): boolean => {
+    // 1. Boundary: entire month outside [minDate, maxDate]
+    if (minDate) {
+      const endOfMonth = new CalendarDate(year, month, 1).endOfMonth()
+      if (endOfMonth.isBefore(minDate)) return true
+    }
+    if (maxDate) {
+      const startOfMonth = new CalendarDate(year, month, 1)
+      if (startOfMonth.isAfter(maxDate)) return true
+    }
+
+    // 2. Year constraints cascade to months
+    if (enabledYearSet && !enabledYearSet.has(year)) return true
+    if (disabledYearSet && disabledYearSet.has(year)) return true
+
+    // 3. Month constraints
+    if (enabledMonthSet && !enabledMonthSet.has(month)) return true
+    if (disabledMonthSet && disabledMonthSet.has(month)) return true
+
+    return false
+  }
+}
+
+// ---------------------------------------------------------------------------
+// createYearConstraint
+// ---------------------------------------------------------------------------
+
+/**
+ * Create a single `isYearDisabled` function from constraint options.
+ *
+ * A year is disabled when:
+ * 1. The entire year falls outside [minDate, maxDate].
+ * 2. The year is in disabledYears or not in enabledYears.
+ *
+ * @example
+ * ```ts
+ * const isDisabled = createYearConstraint({
+ *   disabledYears: [2020, 2021],
+ * })
+ * isDisabled(2020)  // true
+ * isDisabled(2025)  // false
+ * ```
+ */
+export function createYearConstraint(
+  options: DateConstraintOptions,
+): (year: number) => boolean {
+  const { minDate, maxDate } = options
+
+  const disabledYearSet = options.disabledYears ? new Set(options.disabledYears) : undefined
+  const enabledYearSet = options.enabledYears ? new Set(options.enabledYears) : undefined
+
+  return (year: number): boolean => {
+    // 1. Boundary: entire year outside [minDate, maxDate]
+    if (minDate) {
+      const endOfYear = new CalendarDate(year, 12, 31)
+      if (endOfYear.isBefore(minDate)) return true
+    }
+    if (maxDate) {
+      const startOfYear = new CalendarDate(year, 1, 1)
+      if (startOfYear.isAfter(maxDate)) return true
+    }
+
+    // 2. Year constraints
+    if (enabledYearSet && !enabledYearSet.has(year)) return true
+    if (disabledYearSet && disabledYearSet.has(year)) return true
+
+    return false
   }
 }
 

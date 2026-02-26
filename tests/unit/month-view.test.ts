@@ -47,11 +47,11 @@ function createComponent(config: CalendarConfig = {}) {
 // ---------------------------------------------------------------------------
 
 describe('generateMonthGrid', () => {
-  it('returns a 4×3 grid (4 rows of 3 months)', () => {
+  it('returns a 3×4 grid (3 rows of 4 months)', () => {
     const grid = generateMonthGrid(2026)
-    expect(grid).toHaveLength(4)
+    expect(grid).toHaveLength(3)
     for (const row of grid) {
-      expect(row).toHaveLength(3)
+      expect(row).toHaveLength(4)
     }
   })
 
@@ -82,7 +82,7 @@ describe('generateMonthGrid', () => {
   it('marks the current month correctly', () => {
     const today = new CalendarDate(2026, 3, 15)
     const grid = generateMonthGrid(2026, today)
-    const marchCell = grid[0]![2]! // Row 0, Col 2 = March
+    const marchCell = grid[0]![2]! // Row 0, Col 2 = March (4-col layout)
     expect(marchCell.isCurrentMonth).toBe(true)
 
     // Other months should not be current
@@ -116,15 +116,15 @@ describe('generateMonthGrid', () => {
 
     // Months 1-6 should be enabled
     for (let i = 0; i < 6; i++) {
-      const row = Math.floor(i / 3)
-      const col = i % 3
+      const row = Math.floor(i / 4)
+      const col = i % 4
       expect(grid[row]![col]!.isDisabled).toBe(false)
     }
 
     // Months 7-12 should be disabled
     for (let i = 6; i < 12; i++) {
-      const row = Math.floor(i / 3)
-      const col = i % 3
+      const row = Math.floor(i / 4)
+      const col = i % 4
       expect(grid[row]![col]!.isDisabled).toBe(true)
     }
   })
@@ -154,9 +154,9 @@ describe('month view — component integration', () => {
 
   it('monthGrid is populated on init', () => {
     const { c } = createComponent()
-    expect(c.monthGrid).toHaveLength(4)
+    expect(c.monthGrid).toHaveLength(3)
     for (const row of c.monthGrid) {
-      expect(row).toHaveLength(3)
+      expect(row).toHaveLength(4)
     }
   })
 
@@ -281,8 +281,8 @@ describe('month disabling with constraints', () => {
     expect(c.monthGrid[0]![2]!.isDisabled).toBe(true) // Mar
 
     // April and after should be enabled
-    expect(c.monthGrid[1]![0]!.isDisabled).toBe(false) // Apr
-    expect(c.monthGrid[1]![1]!.isDisabled).toBe(false) // May
+    expect(c.monthGrid[0]![3]!.isDisabled).toBe(false) // Apr
+    expect(c.monthGrid[1]![0]!.isDisabled).toBe(false) // May
   })
 
   it('disables months after maxDate', () => {
@@ -293,12 +293,12 @@ describe('month disabling with constraints', () => {
     c._rebuildMonthGrid()
 
     // Sep should be enabled (maxDate is within Sep)
-    expect(c.monthGrid[2]![2]!.isDisabled).toBe(false) // Sep
+    expect(c.monthGrid[2]![0]!.isDisabled).toBe(false) // Sep
 
     // Oct, Nov, Dec should be disabled
-    expect(c.monthGrid[3]![0]!.isDisabled).toBe(true) // Oct
-    expect(c.monthGrid[3]![1]!.isDisabled).toBe(true) // Nov
-    expect(c.monthGrid[3]![2]!.isDisabled).toBe(true) // Dec
+    expect(c.monthGrid[2]![1]!.isDisabled).toBe(true) // Oct
+    expect(c.monthGrid[2]![2]!.isDisabled).toBe(true) // Nov
+    expect(c.monthGrid[2]![3]!.isDisabled).toBe(true) // Dec
   })
 
   it('disables all months when year is entirely before minDate', () => {
@@ -354,12 +354,120 @@ describe('month disabling with constraints', () => {
     const janCell = c.monthGrid[0]![0]!
     expect(janCell.isDisabled).toBe(true)
 
-    // selectMonth is called from template only when !cell.isDisabled
-    // So we verify the cell reports disabled and the template would skip it
+    // selectMonth guards against disabled months
+    const origMonth = c.month
     c.selectMonth(1)
-    // selectMonth always sets the month (the template guards the call)
-    // But the month view should still show it as disabled
-    expect(c.monthGrid[0]![0]!.isDisabled).toBe(true)
+    expect(c.month).toBe(origMonth) // month unchanged
+    expect(c.view).toBe('months') // still in months view
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Month disabling with disabledMonths / enabledMonths
+// ---------------------------------------------------------------------------
+
+describe('month disabling with disabledMonths', () => {
+  it('disables specific months across all years', () => {
+    const { c } = createComponent({
+      disabledMonths: [1, 2, 12],
+    })
+    c.year = 2026
+    c._rebuildMonthGrid()
+
+    expect(c.monthGrid[0]![0]!.isDisabled).toBe(true) // Jan
+    expect(c.monthGrid[0]![1]!.isDisabled).toBe(true) // Feb
+    expect(c.monthGrid[0]![2]!.isDisabled).toBe(false) // Mar
+    expect(c.monthGrid[2]![3]!.isDisabled).toBe(true) // Dec
+
+    // Same for a different year
+    c.year = 2030
+    c._rebuildMonthGrid()
+    expect(c.monthGrid[0]![0]!.isDisabled).toBe(true) // Jan 2030
+    expect(c.monthGrid[0]![2]!.isDisabled).toBe(false) // Mar 2030
+  })
+
+  it('selectMonth rejects disabled month', () => {
+    const { c } = createComponent({ disabledMonths: [6] })
+    c.setView('months')
+    const origMonth = c.month
+    c.selectMonth(6)
+    expect(c.month).toBe(origMonth) // unchanged
+    expect(c.view).toBe('months') // still in months view
+  })
+
+  it('days in disabled months are also disabled', () => {
+    const { c } = createComponent({ disabledMonths: [1] })
+    // Try selecting a day in January — should be rejected
+    const janDate = new CalendarDate(2026, 1, 15)
+    c.selectDate(janDate)
+    expect(c.selectedDates).toHaveLength(0)
+  })
+})
+
+describe('month disabling with enabledMonths', () => {
+  it('only enables specified months', () => {
+    const { c } = createComponent({
+      enabledMonths: [6, 7, 8], // Summer only
+    })
+    c.year = 2026
+    c._rebuildMonthGrid()
+
+    // Jan-May disabled
+    for (let i = 0; i < 5; i++) {
+      const row = Math.floor(i / 4)
+      const col = i % 4
+      expect(c.monthGrid[row]![col]!.isDisabled).toBe(true)
+    }
+
+    // Jun, Jul, Aug enabled
+    expect(c.monthGrid[1]![1]!.isDisabled).toBe(false) // Jun (month 6, index 5)
+    expect(c.monthGrid[1]![2]!.isDisabled).toBe(false) // Jul
+    expect(c.monthGrid[1]![3]!.isDisabled).toBe(false) // Aug
+
+    // Sep-Dec disabled
+    for (let i = 8; i < 12; i++) {
+      const row = Math.floor(i / 4)
+      const col = i % 4
+      expect(c.monthGrid[row]![col]!.isDisabled).toBe(true)
+    }
+  })
+
+  it('selectMonth rejects non-enabled month', () => {
+    const { c } = createComponent({ enabledMonths: [6, 7, 8] })
+    c.setView('months')
+    const origMonth = c.month
+    c.selectMonth(1) // January not in whitelist
+    expect(c.month).toBe(origMonth)
+  })
+})
+
+describe('month disabling with disabledYears cascading', () => {
+  it('all months disabled when year is in disabledYears', () => {
+    const { c } = createComponent({
+      disabledYears: [2026],
+    })
+    c.year = 2026
+    c._rebuildMonthGrid()
+
+    for (const row of c.monthGrid) {
+      for (const cell of row) {
+        expect(cell.isDisabled).toBe(true)
+      }
+    }
+  })
+
+  it('months enabled in non-disabled year', () => {
+    const { c } = createComponent({
+      disabledYears: [2026],
+    })
+    c.year = 2025
+    c._rebuildMonthGrid()
+
+    for (const row of c.monthGrid) {
+      for (const cell of row) {
+        expect(cell.isDisabled).toBe(false)
+      }
+    }
   })
 })
 
