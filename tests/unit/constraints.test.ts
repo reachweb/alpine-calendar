@@ -1263,3 +1263,314 @@ describe('createYearConstraint', () => {
     })
   })
 })
+
+// ---------------------------------------------------------------------------
+// Recurring month rules
+// ---------------------------------------------------------------------------
+
+describe('recurring month rules', () => {
+  describe('createDateConstraint with months rules', () => {
+    it('applies rule to matching months every year', () => {
+      const check = createDateConstraint({
+        rules: [{
+          months: [6, 7, 8], // summer months
+          disabledDaysOfWeek: [0, 6], // no weekends in summer
+        }],
+      })
+      // A Saturday in June 2025
+      expect(check(new CalendarDate(2025, 6, 7))).toBe(true) // Saturday in summer → disabled
+      // A Monday in June 2025
+      expect(check(new CalendarDate(2025, 6, 9))).toBe(false) // Monday in summer → enabled
+      // A Saturday in May 2025 (not summer)
+      expect(check(new CalendarDate(2025, 5, 3))).toBe(false) // Saturday outside rule → global (no constraint)
+    })
+
+    it('recurring months rule applies across different years', () => {
+      const check = createDateConstraint({
+        rules: [{
+          months: [12], // December rule
+          disabledDaysOfWeek: [0, 6],
+        }],
+      })
+      // December Saturday in 2025
+      expect(check(new CalendarDate(2025, 12, 6))).toBe(true)
+      // December Saturday in 2026
+      expect(check(new CalendarDate(2026, 12, 5))).toBe(true)
+      // December Monday in 2025
+      expect(check(new CalendarDate(2025, 12, 1))).toBe(false)
+    })
+
+    it('recurring months rule overrides global constraints', () => {
+      const check = createDateConstraint({
+        disabledDaysOfWeek: [0, 6], // globally disable weekends
+        rules: [{
+          months: [1], // January: override to allow all days
+          disabledDaysOfWeek: [], // empty array = no days disabled
+        }],
+      })
+      // Saturday in January → rule overrides global, weekends allowed
+      expect(check(new CalendarDate(2025, 1, 4))).toBe(false)
+      // Saturday in February → global rule, weekends disabled
+      expect(check(new CalendarDate(2025, 2, 1))).toBe(true)
+    })
+
+    it('recurring months rule with enabledDaysOfWeek', () => {
+      const check = createDateConstraint({
+        rules: [{
+          months: [3, 4], // March and April
+          enabledDaysOfWeek: [1, 2, 3, 4, 5], // weekdays only
+        }],
+      })
+      // Weekday in March
+      expect(check(new CalendarDate(2025, 3, 3))).toBe(false) // Monday → allowed
+      // Weekend in March
+      expect(check(new CalendarDate(2025, 3, 1))).toBe(true) // Saturday → disabled
+      // Weekend in May (no rule)
+      expect(check(new CalendarDate(2025, 5, 3))).toBe(false) // Saturday, no rule → global allows
+    })
+
+    it('recurring months rule with disabledDates', () => {
+      const check = createDateConstraint({
+        rules: [{
+          months: [7], // July
+          disabledDates: [
+            new CalendarDate(2025, 7, 4), // Independence Day
+            new CalendarDate(2025, 7, 25),
+          ],
+        }],
+      })
+      expect(check(new CalendarDate(2025, 7, 4))).toBe(true) // disabled
+      expect(check(new CalendarDate(2025, 7, 5))).toBe(false) // not disabled
+      expect(check(new CalendarDate(2025, 7, 25))).toBe(true) // disabled
+    })
+
+    it('recurring months rule with enabledDates override', () => {
+      const check = createDateConstraint({
+        rules: [{
+          months: [12],
+          disabledDaysOfWeek: [0, 6], // no weekends in December
+          enabledDates: [new CalendarDate(2025, 12, 25)], // but Christmas is OK even if it's a Thursday
+        }],
+      })
+      // Christmas 2025 is Thursday, but enabledDates overrides
+      expect(check(new CalendarDate(2025, 12, 25))).toBe(false)
+      // Saturday in December → disabled
+      expect(check(new CalendarDate(2025, 12, 6))).toBe(true)
+    })
+
+    it('first matching rule wins (date-range before recurring)', () => {
+      const check = createDateConstraint({
+        rules: [
+          {
+            from: new CalendarDate(2025, 6, 1),
+            to: new CalendarDate(2025, 6, 30),
+            disabledDaysOfWeek: [0, 6, 5], // no weekends+Friday in June 2025 specifically
+          },
+          {
+            months: [6], // June every year — less restrictive
+            disabledDaysOfWeek: [0, 6],
+          },
+        ],
+      })
+      // Friday in June 2025 → first rule matches (date-range), Friday disabled
+      expect(check(new CalendarDate(2025, 6, 6))).toBe(true)
+      // Friday in June 2026 → first rule doesn't match, second rule matches, Friday allowed
+      expect(check(new CalendarDate(2026, 6, 5))).toBe(false)
+    })
+
+    it('first matching rule wins (recurring before date-range)', () => {
+      const check = createDateConstraint({
+        rules: [
+          {
+            months: [6], // June recurring: no weekends
+            disabledDaysOfWeek: [0, 6],
+          },
+          {
+            from: new CalendarDate(2025, 6, 1),
+            to: new CalendarDate(2025, 6, 30),
+            disabledDaysOfWeek: [0, 6, 5], // would also disable Friday but never reached
+          },
+        ],
+      })
+      // Friday in June 2025 → first rule (recurring) matches, only weekends disabled
+      expect(check(new CalendarDate(2025, 6, 6))).toBe(false) // Friday → allowed
+    })
+
+    it('recurring rule with minDate/maxDate override', () => {
+      const check = createDateConstraint({
+        minDate: new CalendarDate(2025, 1, 1),
+        maxDate: new CalendarDate(2025, 12, 31),
+        rules: [{
+          months: [6, 7, 8],
+          minDate: new CalendarDate(2025, 6, 15), // summer starts mid-June
+        }],
+      })
+      // June 1 falls in the recurring rule → rule minDate = June 15
+      expect(check(new CalendarDate(2025, 6, 1))).toBe(true) // before rule minDate
+      expect(check(new CalendarDate(2025, 6, 15))).toBe(false) // on rule minDate
+      expect(check(new CalendarDate(2025, 6, 20))).toBe(false) // after rule minDate
+      // Outside rule, global minDate applies
+      expect(check(new CalendarDate(2024, 12, 31))).toBe(true) // before global minDate
+      expect(check(new CalendarDate(2025, 1, 1))).toBe(false) // on global minDate
+    })
+
+    it('single recurring month', () => {
+      const check = createDateConstraint({
+        rules: [{
+          months: [2], // February only
+          disabledDaysOfWeek: [0], // no Sundays in February
+        }],
+      })
+      // Sunday in February
+      expect(check(new CalendarDate(2025, 2, 2))).toBe(true) // disabled
+      // Monday in February
+      expect(check(new CalendarDate(2025, 2, 3))).toBe(false) // allowed
+      // Sunday in March (no rule)
+      expect(check(new CalendarDate(2025, 3, 2))).toBe(false) // allowed (no rule)
+    })
+
+    it('all months in recurring rule effectively makes it global', () => {
+      const check = createDateConstraint({
+        rules: [{
+          months: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+          disabledDaysOfWeek: [0, 6],
+        }],
+      })
+      // Every month is covered, so weekends are disabled everywhere
+      expect(check(new CalendarDate(2025, 1, 4))).toBe(true) // Saturday Jan
+      expect(check(new CalendarDate(2025, 7, 6))).toBe(true) // Sunday Jul
+      expect(check(new CalendarDate(2025, 10, 6))).toBe(false) // Monday Oct
+    })
+
+    it('global minDate/maxDate still enforced even with recurring rule', () => {
+      const check = createDateConstraint({
+        minDate: new CalendarDate(2025, 1, 1),
+        maxDate: new CalendarDate(2025, 12, 31),
+        rules: [{
+          months: [6],
+          // Rule doesn't override minDate/maxDate
+        }],
+      })
+      // June 2024 matches recurring month but before global minDate
+      expect(check(new CalendarDate(2024, 6, 15))).toBe(true)
+      // June 2025 within global bounds
+      expect(check(new CalendarDate(2025, 6, 15))).toBe(false)
+      // June 2026 matches recurring month but after global maxDate
+      expect(check(new CalendarDate(2026, 6, 15))).toBe(true)
+    })
+  })
+
+  describe('createRangeValidator with months rules', () => {
+    it('applies minRange from recurring rule based on start month', () => {
+      const validate = createRangeValidator({
+        minRange: 3,
+        rules: [{
+          months: [6, 7, 8], // summer: stricter minimum
+          minRange: 5,
+        }],
+      })
+      // Start in June → summer rule: minRange 5
+      expect(validate(
+        new CalendarDate(2025, 6, 1),
+        new CalendarDate(2025, 6, 3),
+      )).toBe(false) // 3 < 5
+      expect(validate(
+        new CalendarDate(2025, 6, 1),
+        new CalendarDate(2025, 6, 5),
+      )).toBe(true) // 5 >= 5
+
+      // Start in March → no rule: global minRange 3
+      expect(validate(
+        new CalendarDate(2025, 3, 1),
+        new CalendarDate(2025, 3, 3),
+      )).toBe(true) // 3 >= 3
+      expect(validate(
+        new CalendarDate(2025, 3, 1),
+        new CalendarDate(2025, 3, 2),
+      )).toBe(false) // 2 < 3
+    })
+
+    it('applies maxRange from recurring rule', () => {
+      const validate = createRangeValidator({
+        maxRange: 14,
+        rules: [{
+          months: [12], // December: shorter max
+          maxRange: 7,
+        }],
+      })
+      // Start in December → rule maxRange 7
+      expect(validate(
+        new CalendarDate(2025, 12, 1),
+        new CalendarDate(2025, 12, 7),
+      )).toBe(true) // 7 <= 7
+      expect(validate(
+        new CalendarDate(2025, 12, 1),
+        new CalendarDate(2025, 12, 8),
+      )).toBe(false) // 8 > 7
+
+      // Start in January → global maxRange 14
+      expect(validate(
+        new CalendarDate(2025, 1, 1),
+        new CalendarDate(2025, 1, 14),
+      )).toBe(true) // 14 <= 14
+    })
+
+    it('recurring rule overrides both minRange and maxRange', () => {
+      const validate = createRangeValidator({
+        minRange: 2,
+        maxRange: 30,
+        rules: [{
+          months: [7, 8],
+          minRange: 7,
+          maxRange: 14,
+        }],
+      })
+      // Start in July → rule: 7-14
+      expect(validate(
+        new CalendarDate(2025, 7, 1),
+        new CalendarDate(2025, 7, 5),
+      )).toBe(false) // 5 < 7
+      expect(validate(
+        new CalendarDate(2025, 7, 1),
+        new CalendarDate(2025, 7, 7),
+      )).toBe(true) // 7 >= 7 && 7 <= 14
+      expect(validate(
+        new CalendarDate(2025, 7, 1),
+        new CalendarDate(2025, 7, 15),
+      )).toBe(false) // 15 > 14
+
+      // Start in September → global: 2-30
+      expect(validate(
+        new CalendarDate(2025, 9, 1),
+        new CalendarDate(2025, 9, 20),
+      )).toBe(true) // within 2-30
+    })
+
+    it('date-range rule takes priority over recurring rule for range validation', () => {
+      const validate = createRangeValidator({
+        rules: [
+          {
+            from: new CalendarDate(2025, 6, 1),
+            to: new CalendarDate(2025, 6, 30),
+            minRange: 10,
+          },
+          {
+            months: [6],
+            minRange: 3,
+          },
+        ],
+      })
+      // Start in June 2025 → first rule (date-range) matches: minRange 10
+      expect(validate(
+        new CalendarDate(2025, 6, 1),
+        new CalendarDate(2025, 6, 5),
+      )).toBe(false) // 5 < 10
+
+      // Start in June 2026 → first rule doesn't match, second (recurring) matches: minRange 3
+      expect(validate(
+        new CalendarDate(2026, 6, 1),
+        new CalendarDate(2026, 6, 3),
+      )).toBe(true) // 3 >= 3
+    })
+  })
+})

@@ -42,12 +42,18 @@ export interface DateConstraintProperties {
  * When checking a date, if it falls within [from, to], the rule's
  * properties override the global defaults. Unset properties inherit
  * from the global configuration. First matching rule wins.
+ *
+ * Rules can match by date range (`from`/`to`) or by recurring months
+ * (`months`). If `months` is set, the rule applies to those months
+ * every year without needing explicit date ranges.
  */
 export interface DateConstraintRule extends DateConstraintProperties {
   /** Start of the period this rule applies to (inclusive). */
-  from: CalendarDate
+  from?: CalendarDate
   /** End of the period this rule applies to (inclusive). */
-  to: CalendarDate
+  to?: CalendarDate
+  /** Recurring months this rule applies to (1=Jan, …, 12=Dec). Matches every year. */
+  months?: number[]
 }
 
 /**
@@ -77,8 +83,9 @@ interface PrecomputedSets {
 }
 
 interface PrecomputedRule {
-  from: CalendarDate
-  to: CalendarDate
+  from: CalendarDate | undefined
+  to: CalendarDate | undefined
+  recurringMonths: Set<number> | undefined
   minDate: CalendarDate | undefined
   maxDate: CalendarDate | undefined
   minRange: number | undefined
@@ -145,6 +152,23 @@ function checkDisabled(
 }
 
 // ---------------------------------------------------------------------------
+// Rule matching
+// ---------------------------------------------------------------------------
+
+/** Check if a date matches a precomputed rule (date-range or recurring months). */
+function matchesRule(rule: PrecomputedRule, date: CalendarDate): boolean {
+  // Date-range rule: from/to both set
+  if (rule.from && rule.to) {
+    return date.isBetween(rule.from, rule.to)
+  }
+  // Recurring months rule
+  if (rule.recurringMonths) {
+    return rule.recurringMonths.has(date.month)
+  }
+  return false
+}
+
+// ---------------------------------------------------------------------------
 // createDateConstraint
 // ---------------------------------------------------------------------------
 
@@ -181,6 +205,7 @@ export function createDateConstraint(
   const precomputedRules: PrecomputedRule[] | undefined = rules?.map((rule) => ({
     from: rule.from,
     to: rule.to,
+    recurringMonths: rule.months ? new Set(rule.months) : undefined,
     minDate: rule.minDate,
     maxDate: rule.maxDate,
     minRange: rule.minRange,
@@ -197,7 +222,7 @@ export function createDateConstraint(
 
   // With rules: find the first matching rule, merge, and check
   return (date: CalendarDate): boolean => {
-    const rule = precomputedRules.find((r) => date.isBetween(r.from, r.to))
+    const rule = precomputedRules.find((r) => matchesRule(r, date))
 
     if (!rule) {
       return checkDisabled(date, minDate, maxDate, globalSets)
@@ -283,6 +308,7 @@ export function createRangeValidator(
     .map((rule) => ({
       from: rule.from,
       to: rule.to,
+      recurringMonths: rule.months ? new Set(rule.months) : undefined,
       minRange: rule.minRange,
       maxRange: rule.maxRange,
     }))
@@ -293,7 +319,11 @@ export function createRangeValidator(
     let effectiveMaxRange = maxRange
 
     if (rangeRules) {
-      const rule = rangeRules.find((r) => start.isBetween(r.from, r.to))
+      const rule = rangeRules.find((r) => {
+        if (r.from && r.to) return start.isBetween(r.from, r.to)
+        if (r.recurringMonths) return r.recurringMonths.has(start.month)
+        return false
+      })
       if (rule) {
         if (rule.minRange !== undefined) effectiveMinRange = rule.minRange
         if (rule.maxRange !== undefined) effectiveMaxRange = rule.maxRange
@@ -423,4 +453,191 @@ export function createYearConstraint(
  */
 export function isDateDisabled(date: CalendarDate, options: DateConstraintOptions): boolean {
   return createDateConstraint(options)(date)
+}
+
+// ---------------------------------------------------------------------------
+// Constraint messages (configurable tooltip text)
+// ---------------------------------------------------------------------------
+
+/**
+ * Custom messages for each constraint reason. All properties are optional —
+ * defaults are used for any omitted keys.
+ */
+export interface ConstraintMessages {
+  beforeMinDate?: string
+  afterMaxDate?: string
+  disabledDate?: string
+  disabledDayOfWeek?: string
+  disabledMonth?: string
+  disabledYear?: string
+  notEnabledDate?: string
+  notEnabledDayOfWeek?: string
+  notEnabledMonth?: string
+  notEnabledYear?: string
+}
+
+const DEFAULT_MESSAGES: Required<ConstraintMessages> = {
+  beforeMinDate: 'Before the earliest available date',
+  afterMaxDate: 'After the latest available date',
+  disabledDate: 'This date is not available',
+  disabledDayOfWeek: 'This day of the week is not available',
+  disabledMonth: 'This month is not available',
+  disabledYear: 'This year is not available',
+  notEnabledDate: 'This date is not available',
+  notEnabledDayOfWeek: 'This day of the week is not available',
+  notEnabledMonth: 'This month is not available',
+  notEnabledYear: 'This year is not available',
+}
+
+// ---------------------------------------------------------------------------
+// createDisabledReasons
+// ---------------------------------------------------------------------------
+
+function collectReasons(
+  date: CalendarDate,
+  minDate: CalendarDate | undefined,
+  maxDate: CalendarDate | undefined,
+  sets: PrecomputedSets,
+  msgs: Required<ConstraintMessages>,
+): string[] {
+  const reasons: string[] = []
+
+  // 1. Boundary check
+  if (minDate && date.isBefore(minDate)) {
+    reasons.push(msgs.beforeMinDate)
+    return reasons // absolute — no further checks
+  }
+  if (maxDate && date.isAfter(maxDate)) {
+    reasons.push(msgs.afterMaxDate)
+    return reasons // absolute — no further checks
+  }
+
+  // 2. enabledDates force-enables (bypass)
+  if (sets.enabledKeys && sets.enabledKeys.has(date.toKey())) return reasons
+
+  // 3. Year-level
+  if (sets.enabledYears && !sets.enabledYears.has(date.year)) {
+    reasons.push(msgs.notEnabledYear)
+    return reasons
+  }
+  if (sets.disabledYears && sets.disabledYears.has(date.year)) {
+    reasons.push(msgs.disabledYear)
+    return reasons
+  }
+
+  // 4. Month-level
+  if (sets.enabledMonths && !sets.enabledMonths.has(date.month)) {
+    reasons.push(msgs.notEnabledMonth)
+    return reasons
+  }
+  if (sets.disabledMonths && sets.disabledMonths.has(date.month)) {
+    reasons.push(msgs.disabledMonth)
+    return reasons
+  }
+
+  // 5. Day-of-week
+  const needsDow = sets.enabledDays !== undefined || sets.disabledDays !== undefined
+  const dow = needsDow ? date.toNativeDate().getDay() : -1
+
+  if (sets.enabledDays && !sets.enabledDays.has(dow)) {
+    reasons.push(msgs.notEnabledDayOfWeek)
+  }
+
+  // 6. Specific dates
+  if (sets.disabledKeys && sets.disabledKeys.has(date.toKey())) {
+    reasons.push(msgs.disabledDate)
+  }
+
+  // 7. Day-of-week blacklist
+  if (sets.disabledDays && sets.disabledDays.has(dow)) {
+    reasons.push(msgs.disabledDayOfWeek)
+  }
+
+  return reasons
+}
+
+/**
+ * Create a function that returns human-readable reasons why a date is
+ * disabled. Returns an empty array for enabled dates.
+ *
+ * Uses the same logic as `createDateConstraint` (including period-specific
+ * rules) but produces descriptive messages instead of a boolean.
+ *
+ * @example
+ * ```ts
+ * const getReasons = createDisabledReasons({
+ *   minDate: new CalendarDate(2025, 3, 1),
+ *   disabledDaysOfWeek: [0, 6],
+ * })
+ * getReasons(new CalendarDate(2025, 2, 28))
+ * // → ['Before the earliest available date']
+ * getReasons(new CalendarDate(2025, 3, 1))
+ * // → [] (enabled)
+ * getReasons(new CalendarDate(2025, 3, 2))
+ * // → ['This day of the week is not available'] (Sunday)
+ * ```
+ */
+export function createDisabledReasons(
+  options: DateConstraintOptions,
+  messages?: ConstraintMessages,
+): (date: CalendarDate) => string[] {
+  const { minDate, maxDate, rules } = options
+  const msgs = { ...DEFAULT_MESSAGES, ...messages }
+
+  // Precompute global sets
+  const globalSets = precomputeSets(options)
+
+  // Precompute rule sets
+  const precomputedRules: PrecomputedRule[] | undefined = rules?.map((rule) => ({
+    from: rule.from,
+    to: rule.to,
+    recurringMonths: rule.months ? new Set(rule.months) : undefined,
+    minDate: rule.minDate,
+    maxDate: rule.maxDate,
+    minRange: rule.minRange,
+    maxRange: rule.maxRange,
+    sets: precomputeSets(rule),
+    hasMinDate: rule.minDate !== undefined,
+    hasMaxDate: rule.maxDate !== undefined,
+  }))
+
+  // Fast path: no rules
+  if (!precomputedRules || precomputedRules.length === 0) {
+    return (date: CalendarDate) => collectReasons(date, minDate, maxDate, globalSets, msgs)
+  }
+
+  // With rules
+  return (date: CalendarDate): string[] => {
+    const rule = precomputedRules.find((r) => matchesRule(r, date))
+
+    if (!rule) {
+      return collectReasons(date, minDate, maxDate, globalSets, msgs)
+    }
+
+    const effectiveMinDate = rule.hasMinDate ? rule.minDate : minDate
+    const effectiveMaxDate = rule.hasMaxDate ? rule.maxDate : maxDate
+
+    const mergedSets: PrecomputedSets = {
+      disabledKeys:
+        rule.sets.disabledKeys !== undefined ? rule.sets.disabledKeys : globalSets.disabledKeys,
+      disabledDays:
+        rule.sets.disabledDays !== undefined ? rule.sets.disabledDays : globalSets.disabledDays,
+      enabledKeys:
+        rule.sets.enabledKeys !== undefined ? rule.sets.enabledKeys : globalSets.enabledKeys,
+      enabledDays:
+        rule.sets.enabledDays !== undefined ? rule.sets.enabledDays : globalSets.enabledDays,
+      disabledMonths:
+        rule.sets.disabledMonths !== undefined
+          ? rule.sets.disabledMonths
+          : globalSets.disabledMonths,
+      enabledMonths:
+        rule.sets.enabledMonths !== undefined ? rule.sets.enabledMonths : globalSets.enabledMonths,
+      disabledYears:
+        rule.sets.disabledYears !== undefined ? rule.sets.disabledYears : globalSets.disabledYears,
+      enabledYears:
+        rule.sets.enabledYears !== undefined ? rule.sets.enabledYears : globalSets.enabledYears,
+    }
+
+    return collectReasons(date, effectiveMinDate, effectiveMaxDate, mergedSets, msgs)
+  }
 }

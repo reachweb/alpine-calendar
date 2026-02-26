@@ -69,11 +69,17 @@ export { generateMonth, generateMonths, generateMonthGrid, generateYearGrid } fr
 export type { DayCell, MonthGrid, MonthCell, YearCell } from './core/grid'
 export { SingleSelection, MultipleSelection, RangeSelection } from './core/selection'
 export type { Selection } from './core/selection'
-export { createDateConstraint, createRangeValidator, isDateDisabled } from './core/constraints'
+export {
+  createDateConstraint,
+  createRangeValidator,
+  createDisabledReasons,
+  isDateDisabled,
+} from './core/constraints'
 export type {
   DateConstraintOptions,
   DateConstraintProperties,
   DateConstraintRule,
+  ConstraintMessages,
 } from './core/constraints'
 export type { CalendarConfigRule } from './plugin/calendar-component'
 export { parseDate, parseDateRange, parseDateMultiple } from './input/parser'

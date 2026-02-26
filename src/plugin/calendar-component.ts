@@ -4,8 +4,9 @@ import {
   createMonthConstraint,
   createYearConstraint,
   createRangeValidator,
+  createDisabledReasons,
 } from '../core/constraints'
-import type { DateConstraintOptions, DateConstraintRule } from '../core/constraints'
+import type { DateConstraintOptions, DateConstraintRule, ConstraintMessages } from '../core/constraints'
 import { generateMonths, generateMonthGrid, generateYearGrid } from '../core/grid'
 import type { MonthGrid, MonthCell, YearCell } from '../core/grid'
 import { SingleSelection, MultipleSelection, RangeSelection } from '../core/selection'
@@ -22,10 +23,12 @@ import type { Placement } from '../positioning/popup'
 
 /** Period-specific constraint rule (string-based for Alpine/HTML config). */
 export interface CalendarConfigRule {
-  /** Start of the period (ISO string). */
-  from: string
-  /** End of the period (ISO string). */
-  to: string
+  /** Start of the period (ISO string). Required unless `months` is set. */
+  from?: string
+  /** End of the period (ISO string). Required unless `months` is set. */
+  to?: string
+  /** Recurring months this rule applies to (1=Jan, …, 12=Dec). Matches every year. */
+  months?: number[]
   /** Minimum selectable date within this period (ISO string). */
   minDate?: string
   /** Maximum selectable date within this period (ISO string). */
@@ -135,6 +138,8 @@ export interface CalendarConfig {
       action: 'select' | 'deselect'
     },
   ) => boolean | void
+  /** Custom messages for disabled-date tooltips. Overrides default English strings. */
+  constraintMessages?: ConstraintMessages
 }
 
 // ---------------------------------------------------------------------------
@@ -171,11 +176,22 @@ function parseISODates(arr: string[]): CalendarDate[] {
 }
 
 function parseConfigRule(rule: CalendarConfigRule): DateConstraintRule | null {
-  const from = parseISODate(rule.from)
-  const to = parseISODate(rule.to)
-  if (!from || !to) return null
+  const from = rule.from ? parseISODate(rule.from) : null
+  const to = rule.to ? parseISODate(rule.to) : null
 
-  const result: DateConstraintRule = { from, to }
+  // A rule must have either a date range (from+to) or recurring months
+  const hasDateRange = from !== null && to !== null
+  const hasMonths = Array.isArray(rule.months) && rule.months.length > 0
+  if (!hasDateRange && !hasMonths) return null
+
+  const result: DateConstraintRule = {}
+  if (hasDateRange) {
+    result.from = from
+    result.to = to
+  }
+  if (hasMonths) {
+    result.months = rule.months
+  }
 
   if (rule.minDate) {
     const d = parseISODate(rule.minDate)
@@ -281,13 +297,17 @@ interface ConstraintFunctions {
   isRangeValid: (start: CalendarDate, end: CalendarDate) => boolean
   isMonthDisabled: (year: number, month: number) => boolean
   isYearDisabled: (year: number) => boolean
+  getDisabledReasons: (d: CalendarDate) => string[]
 }
 
 /**
  * Build constraint functions from a CalendarConfig (or partial update).
  * Reused by both initial config parsing and `updateConstraints()`.
  */
-function buildConstraints(cfg: Partial<CalendarConfig>): ConstraintFunctions {
+function buildConstraints(
+  cfg: Partial<CalendarConfig>,
+  messages?: ConstraintMessages,
+): ConstraintFunctions {
   const opts: DateConstraintOptions = {}
 
   if (cfg.minDate) {
@@ -342,6 +362,7 @@ function buildConstraints(cfg: Partial<CalendarConfig>): ConstraintFunctions {
     isRangeValid: createRangeValidator(opts),
     isMonthDisabled: createMonthConstraint(opts),
     isYearDisabled: createYearConstraint(opts),
+    getDisabledReasons: createDisabledReasons(opts, messages),
   }
 }
 
@@ -386,7 +407,8 @@ export function createCalendarData(config: CalendarConfig = {}) {
   const beforeSelectCb = config.beforeSelect ?? null
 
   // --- Build constraint functions ---
-  const constraints = buildConstraints(config)
+  const constraintMessages = config.constraintMessages
+  const constraints = buildConstraints(config, constraintMessages)
 
   // --- Create selection model ---
   function buildSelection(): Selection {
@@ -485,6 +507,7 @@ export function createCalendarData(config: CalendarConfig = {}) {
     _isRangeValid: constraints.isRangeValid,
     _isMonthDisabled: constraints.isMonthDisabled,
     _isYearDisabled: constraints.isYearDisabled,
+    _getDisabledReasons: constraints.getDisabledReasons,
     _inputEl: null as HTMLInputElement | null,
     _detachMask: null as (() => void) | null,
     _syncing: false,
@@ -776,6 +799,17 @@ export function createCalendarData(config: CalendarConfig = {}) {
         'rc-day--focused': this.focusedDate !== null && this.focusedDate.isSame(d),
         'rc-day--range-invalid': rangeInvalid,
       }
+    },
+
+    /**
+     * Get tooltip text for a day cell explaining why it is disabled.
+     * Returns an empty string for enabled dates.
+     */
+    dayTitle(
+      cell: { date: CalendarDate; isDisabled: boolean },
+    ): string {
+      if (!cell.isDisabled) return ''
+      return this._getDisabledReasons(cell.date).join('; ')
     },
 
     // --- Input binding ---
@@ -1104,6 +1138,17 @@ export function createCalendarData(config: CalendarConfig = {}) {
       return this._isRangeValid(start, end)
     },
 
+    /**
+     * Get human-readable reasons why a date is disabled.
+     * Returns an empty array for enabled dates.
+     * Accepts a CalendarDate or ISO string.
+     */
+    getDisabledReason(date: CalendarDate | string): string[] {
+      const d = typeof date === 'string' ? CalendarDate.fromISO(date) : date
+      if (!d) return []
+      return this._getDisabledReasons(d)
+    },
+
     clearSelection() {
       this._selection.clear()
       this._rebuildGrid()
@@ -1249,11 +1294,12 @@ export function createCalendarData(config: CalendarConfig = {}) {
      * ```
      */
     updateConstraints(updates: Partial<CalendarConfig>) {
-      const c = buildConstraints(updates)
+      const c = buildConstraints(updates, constraintMessages)
       this._isDisabledDate = c.isDisabledDate
       this._isRangeValid = c.isRangeValid
       this._isMonthDisabled = c.isMonthDisabled
       this._isYearDisabled = c.isYearDisabled
+      this._getDisabledReasons = c.getDisabledReasons
       this._rebuildGrid()
       this._rebuildMonthGrid()
       this._rebuildYearGrid()

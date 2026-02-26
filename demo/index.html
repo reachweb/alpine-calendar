@@ -1210,6 +1210,295 @@
     </div>
   </div>
 
+  <!-- ===================================================================
+       Constraints — Min/Max Date & Disabled Weekends
+       =================================================================== -->
+  <h2>Constraints — Min/Max Date & No Weekends</h2>
+  <div class="example">
+    <div x-data="calendar({
+      mode: 'single',
+      display: 'inline',
+      firstDay: 1,
+      minDate: '2026-02-01',
+      maxDate: '2026-04-30',
+      disabledDaysOfWeek: [0, 6],
+    })">
+      <div class="status">
+        Min: 2026-02-01 | Max: 2026-04-30 | Weekends disabled |
+        Selected: <span x-text="formattedValue || 'none'"></span>
+      </div>
+
+      <div class="rc-calendar"
+           @keydown="handleKeydown($event)"
+           tabindex="0"
+           role="application"
+           aria-label="Calendar with constraints">
+
+        <template x-if="view === 'days'">
+          <div class="rc-months rc-view-enter">
+            <template x-for="(mg, gi) in grid" :key="mg.year + '-' + mg.month">
+              <div>
+                <div class="rc-header">
+                  <button class="rc-header__nav" @click="prev()" :disabled="!canGoPrev" aria-label="Previous month">&#8249;</button>
+                  <span class="rc-header__label" @click="setView('months')" x-text="monthYearLabel(gi)"></span>
+                  <button class="rc-header__nav" @click="next()" :disabled="!canGoNext" aria-label="Next month">&#8250;</button>
+                </div>
+                <div class="rc-weekdays">
+                  <template x-for="wd in weekdayHeaders" :key="wd">
+                    <span class="rc-weekday" x-text="wd"></span>
+                  </template>
+                </div>
+                <div class="rc-grid-wrapper">
+                  <div class="rc-grid"
+                       :class="{ 'rc-grid--slide-next': _navDirection === 'next', 'rc-grid--slide-prev': _navDirection === 'prev' }"
+                       @animationend="_navDirection = ''"
+                       role="grid" :aria-label="monthYearLabel(gi)">
+                    <template x-for="cell in mg.rows.flat()" :key="cell.date.toISO()">
+                      <div :class="dayClasses(cell)"
+                           :id="'day-' + cell.date.toISO()"
+                           :aria-selected="isSelected(cell.date)"
+                           :aria-disabled="cell.isDisabled"
+                           role="gridcell"
+                           @click="!cell.isDisabled && selectDate(cell.date)"
+                           @mouseenter="hoverDate = cell.date"
+                           @mouseleave="hoverDate = null"
+                           x-text="cell.date.day">
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       Constraints — Disabled Specific Dates + Enabled Exceptions
+       =================================================================== -->
+  <h2>Constraints — Disabled Dates with Exceptions</h2>
+  <div class="example">
+    <div x-data="calendar({
+      mode: 'single',
+      display: 'inline',
+      firstDay: 1,
+      disabledDaysOfWeek: [0, 6],
+      enabledDates: ['2026-03-07', '2026-03-08'],
+      disabledDates: ['2026-03-09', '2026-03-10', '2026-03-11'],
+    })">
+      <div class="status">
+        Weekends disabled, but Mar 7–8 (Sat–Sun) force-enabled |
+        Mar 9–11 (Mon–Wed) explicitly disabled |
+        Selected: <span x-text="formattedValue || 'none'"></span>
+      </div>
+
+      <div class="rc-calendar"
+           @keydown="handleKeydown($event)"
+           tabindex="0"
+           role="application"
+           aria-label="Calendar with exceptions">
+
+        <template x-if="view === 'days'">
+          <div class="rc-months rc-view-enter">
+            <template x-for="(mg, gi) in grid" :key="mg.year + '-' + mg.month">
+              <div>
+                <div class="rc-header">
+                  <button class="rc-header__nav" @click="prev()" aria-label="Previous month">&#8249;</button>
+                  <span class="rc-header__label" @click="setView('months')" x-text="monthYearLabel(gi)"></span>
+                  <button class="rc-header__nav" @click="next()" aria-label="Next month">&#8250;</button>
+                </div>
+                <div class="rc-weekdays">
+                  <template x-for="wd in weekdayHeaders" :key="wd">
+                    <span class="rc-weekday" x-text="wd"></span>
+                  </template>
+                </div>
+                <div class="rc-grid-wrapper">
+                  <div class="rc-grid"
+                       :class="{ 'rc-grid--slide-next': _navDirection === 'next', 'rc-grid--slide-prev': _navDirection === 'prev' }"
+                       @animationend="_navDirection = ''"
+                       role="grid" :aria-label="monthYearLabel(gi)">
+                    <template x-for="cell in mg.rows.flat()" :key="cell.date.toISO()">
+                      <div :class="dayClasses(cell)"
+                           :id="'day-' + cell.date.toISO()"
+                           :aria-selected="isSelected(cell.date)"
+                           :aria-disabled="cell.isDisabled"
+                           role="gridcell"
+                           @click="!cell.isDisabled && selectDate(cell.date)"
+                           @mouseenter="hoverDate = cell.date"
+                           @mouseleave="hoverDate = null"
+                           x-text="cell.date.day">
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       Range — Min/Max Range with Hover Preview
+       =================================================================== -->
+  <h2>Range — Min/Max Range (3–10 days) with Hover Preview</h2>
+  <div class="example">
+    <div x-data="calendar({
+      mode: 'range',
+      display: 'inline',
+      firstDay: 1,
+      minRange: 3,
+      maxRange: 10,
+    })">
+      <div class="status">
+        Range mode | Min: 3 days | Max: 10 days |
+        Selected: <span x-text="formattedValue || 'none'"></span>
+      </div>
+      <p style="font-size: 0.8rem; color: #888; margin: 0 0 0.5rem;">
+        Select a start date, then hover over other dates — invalid range endpoints appear dimmed.
+      </p>
+
+      <div class="rc-calendar"
+           @keydown="handleKeydown($event)"
+           tabindex="0"
+           :aria-activedescendant="focusedDateISO ? 'day-' + focusedDateISO : null"
+           role="application"
+           aria-label="Range calendar with constraints">
+
+        <template x-if="view === 'days'">
+          <div class="rc-months rc-view-enter">
+            <template x-for="(mg, gi) in grid" :key="mg.year + '-' + mg.month">
+              <div>
+                <div class="rc-header">
+                  <button class="rc-header__nav" @click="prev()" aria-label="Previous month">&#8249;</button>
+                  <span class="rc-header__label" @click="setView('months')" x-text="monthYearLabel(gi)"></span>
+                  <button class="rc-header__nav" @click="next()" aria-label="Next month">&#8250;</button>
+                </div>
+                <div class="rc-weekdays">
+                  <template x-for="wd in weekdayHeaders" :key="wd">
+                    <span class="rc-weekday" x-text="wd"></span>
+                  </template>
+                </div>
+                <div class="rc-grid-wrapper">
+                  <div class="rc-grid"
+                       :class="{ 'rc-grid--slide-next': _navDirection === 'next', 'rc-grid--slide-prev': _navDirection === 'prev' }"
+                       @animationend="_navDirection = ''"
+                       role="grid" :aria-label="monthYearLabel(gi)">
+                    <template x-for="cell in mg.rows.flat()" :key="cell.date.toISO()">
+                      <div :class="dayClasses(cell)"
+                           :id="'day-' + cell.date.toISO()"
+                           :aria-selected="isSelected(cell.date)"
+                           :aria-disabled="cell.isDisabled"
+                           role="gridcell"
+                           @click="!cell.isDisabled && selectDate(cell.date)"
+                           @mouseenter="hoverDate = cell.date"
+                           @mouseleave="hoverDate = null"
+                           x-text="cell.date.day">
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       Rules — Period-Specific Constraints (Summer vs Winter)
+       =================================================================== -->
+  <h2>Rules — Summer vs Winter Booking (Period Rules)</h2>
+  <div class="example">
+    <div x-data="calendar({
+      mode: 'range',
+      display: 'inline',
+      months: 2,
+      firstDay: 1,
+      minRange: 2,
+      maxRange: 14,
+      disabledDaysOfWeek: [0],
+      rules: [
+        {
+          from: '2026-06-01',
+          to: '2026-08-31',
+          minRange: 7,
+          maxRange: 21,
+          disabledDaysOfWeek: [],
+        },
+        {
+          from: '2026-12-20',
+          to: '2027-01-05',
+          minRange: 3,
+          maxRange: 7,
+          enabledDaysOfWeek: [1, 2, 3, 4, 5, 6, 0],
+        }
+      ],
+    })">
+      <div class="status">
+        Range mode | 2-month view |
+        Selected: <span x-text="formattedValue || 'none'"></span>
+      </div>
+      <div style="font-size: 0.8rem; color: #888; margin: 0 0 0.75rem; line-height: 1.5;">
+        <strong>Global:</strong> 2–14 days, Sundays disabled<br>
+        <strong>Summer (Jun–Aug):</strong> 7–21 days, all days enabled<br>
+        <strong>Holidays (Dec 20–Jan 5):</strong> 3–7 days, all days enabled
+      </div>
+
+      <div class="rc-calendar"
+           @keydown="handleKeydown($event)"
+           tabindex="0"
+           :aria-activedescendant="focusedDateISO ? 'day-' + focusedDateISO : null"
+           role="application"
+           aria-label="Calendar with period rules">
+
+        <template x-if="view === 'days'">
+          <div class="rc-months" :class="{ 'rc-months--dual': monthCount === 2 }">
+            <template x-for="(mg, gi) in grid" :key="mg.year + '-' + mg.month">
+              <div>
+                <div class="rc-header">
+                  <button class="rc-header__nav" @click="prev()" aria-label="Previous month"
+                          :style="gi > 0 ? 'visibility:hidden' : ''">&#8249;</button>
+                  <span class="rc-header__label" @click="setView('months')" x-text="monthYearLabel(gi)"></span>
+                  <button class="rc-header__nav" @click="next()" aria-label="Next month"
+                          :style="gi < grid.length - 1 ? 'visibility:hidden' : ''">&#8250;</button>
+                </div>
+                <div class="rc-weekdays">
+                  <template x-for="wd in weekdayHeaders" :key="wd">
+                    <span class="rc-weekday" x-text="wd"></span>
+                  </template>
+                </div>
+                <div class="rc-grid-wrapper">
+                  <div class="rc-grid"
+                       :class="{ 'rc-grid--slide-next': _navDirection === 'next', 'rc-grid--slide-prev': _navDirection === 'prev' }"
+                       @animationend="_navDirection = ''"
+                       role="grid" :aria-label="monthYearLabel(gi)">
+                    <template x-for="cell in mg.rows.flat()" :key="cell.date.toISO()">
+                      <div :class="dayClasses(cell)"
+                           :id="'day-' + cell.date.toISO()"
+                           :aria-selected="isSelected(cell.date)"
+                           :aria-disabled="cell.isDisabled"
+                           role="gridcell"
+                           @click="!cell.isDisabled && selectDate(cell.date)"
+                           @mouseenter="hoverDate = cell.date"
+                           @mouseleave="hoverDate = null"
+                           x-text="cell.date.day">
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
   <script type="module">
     import Alpine from 'alpinejs'
     import { calendarPlugin } from '../src/index.ts'

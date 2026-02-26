@@ -804,6 +804,135 @@ describe('constraints — rules', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Constraints — recurring month rules
+// ---------------------------------------------------------------------------
+
+describe('constraints — recurring month rules', () => {
+  it('applies recurring months rule to disable weekends in summer', () => {
+    const c = createCalendarData({
+      rules: [
+        {
+          months: [6, 7, 8],
+          disabledDaysOfWeek: [0, 6],
+        },
+      ],
+    })
+    withAlpineMocks(c)
+    c.init()
+    // Saturday in June → disabled by rule
+    c.selectDate('2025-06-07')
+    expect(c.selectedDates).toHaveLength(0)
+    // Monday in June → allowed
+    c.selectDate('2025-06-09')
+    expect(c.selectedDates).toHaveLength(1)
+  })
+
+  it('falls back to global constraints for months not in recurring rule', () => {
+    const c = createCalendarData({
+      disabledDaysOfWeek: [0], // globally disable Sundays
+      rules: [
+        {
+          months: [6],
+          disabledDaysOfWeek: [6], // in any June, disable Saturdays instead
+        },
+      ],
+    })
+    withAlpineMocks(c)
+    c.init()
+    // June Sunday — rule overrides (rule says [6] not [0]) → allowed
+    c.selectDate('2025-06-15')
+    expect(c.selectedDates).toHaveLength(1)
+    c.clearSelection()
+    // March Sunday — global rule: Sundays disabled
+    c.selectDate('2025-03-02')
+    expect(c.selectedDates).toHaveLength(0)
+  })
+
+  it('applies recurring months rule with minRange for range mode', () => {
+    const c = createCalendarData({
+      mode: 'range',
+      minRange: 3,
+      rules: [
+        {
+          months: [7, 8],
+          minRange: 5,
+        },
+      ],
+    })
+    withAlpineMocks(c)
+    c.init()
+    // Start in July (recurring rule: minRange 5)
+    c.selectDate('2025-07-10')
+    c.selectDate('2025-07-13') // 4 days < 5 → rejected
+    expect(c.selectedDates).toHaveLength(1)
+    c.clearSelection()
+    // Start in July, valid range
+    c.selectDate('2025-07-10')
+    c.selectDate('2025-07-14') // 5 days = 5 → accepted
+    expect(c.selectedDates).toHaveLength(2)
+  })
+
+  it('handles rule with only months (no from/to)', () => {
+    const c = createCalendarData({
+      rules: [
+        {
+          months: [12],
+          disabledDaysOfWeek: [0, 6],
+        },
+      ],
+    })
+    withAlpineMocks(c)
+    c.init()
+    // Saturday in December → disabled
+    c.selectDate('2025-12-06')
+    expect(c.selectedDates).toHaveLength(0)
+    // Monday in December → allowed
+    c.selectDate('2025-12-01')
+    expect(c.selectedDates).toHaveLength(1)
+  })
+
+  it('skips rule with neither from/to nor months', () => {
+    const c = createCalendarData({
+      rules: [
+        {
+          // No from/to and no months → invalid rule, skipped
+          disabledDaysOfWeek: [0, 6],
+        },
+      ],
+    })
+    withAlpineMocks(c)
+    c.init()
+    // Saturday → no rule active → allowed
+    c.selectDate('2025-06-14')
+    expect(c.selectedDates).toHaveLength(1)
+  })
+
+  it('recurring rule works with updateConstraints', () => {
+    const c = createCalendarData({})
+    withAlpineMocks(c)
+    c.init()
+    // No constraints initially
+    c.selectDate('2025-07-05') // Saturday
+    expect(c.selectedDates).toHaveLength(1)
+    c.clearSelection()
+
+    // Add recurring rule via updateConstraints
+    c.updateConstraints({
+      rules: [
+        {
+          months: [7],
+          disabledDaysOfWeek: [0, 6],
+        },
+      ],
+    })
+    c.selectDate('2025-07-05') // Saturday in July → now disabled
+    expect(c.selectedDates).toHaveLength(0)
+    c.selectDate('2025-07-07') // Monday in July → allowed
+    expect(c.selectedDates).toHaveLength(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Initial value
 // ---------------------------------------------------------------------------
 
