@@ -1083,6 +1083,66 @@ describe('initial value', () => {
     expect(c.selectedDates[1].toISO()).toBe('2025-06-15')
   })
 
+  it('rejects initial range violating minRange', () => {
+    const c = createCalendarData({
+      mode: 'range',
+      format: 'YYYY-MM-DD',
+      value: '2025-06-01 - 2025-06-03',
+      minRange: 7,
+    })
+    // 2 days apart < minRange 7 → no selection
+    expect(c.selectedDates).toHaveLength(0)
+  })
+
+  it('rejects initial range violating maxRange', () => {
+    const c = createCalendarData({
+      mode: 'range',
+      format: 'YYYY-MM-DD',
+      value: '2025-06-01 - 2025-06-30',
+      maxRange: 7,
+    })
+    // 29 days apart > maxRange 7 → no selection
+    expect(c.selectedDates).toHaveLength(0)
+  })
+
+  it('accepts initial range satisfying minRange and maxRange', () => {
+    const c = createCalendarData({
+      mode: 'range',
+      format: 'YYYY-MM-DD',
+      value: '2025-06-01 - 2025-06-05',
+      minRange: 3,
+      maxRange: 10,
+    })
+    // 4 days apart, within [3, 10] → selection accepted
+    expect(c.selectedDates).toHaveLength(2)
+    expect(c.selectedDates[0].toISO()).toBe('2025-06-01')
+    expect(c.selectedDates[1].toISO()).toBe('2025-06-05')
+  })
+
+  it('accepts reversed initial range satisfying minRange', () => {
+    const c = createCalendarData({
+      mode: 'range',
+      format: 'YYYY-MM-DD',
+      value: '2025-06-10 - 2025-06-01', // reversed
+      minRange: 3,
+    })
+    // 9 days apart ≥ minRange 3 → normalised and accepted
+    expect(c.selectedDates).toHaveLength(2)
+    expect(c.selectedDates[0].toISO()).toBe('2025-06-01')
+    expect(c.selectedDates[1].toISO()).toBe('2025-06-10')
+  })
+
+  it('rejects reversed initial range violating minRange', () => {
+    const c = createCalendarData({
+      mode: 'range',
+      format: 'YYYY-MM-DD',
+      value: '2025-06-03 - 2025-06-01', // reversed, 2 days apart
+      minRange: 7,
+    })
+    // 2 days apart < minRange 7 → rejected
+    expect(c.selectedDates).toHaveLength(0)
+  })
+
   it('parses initial value in multiple mode', () => {
     const c = createCalendarData({
       mode: 'multiple',
@@ -1704,6 +1764,59 @@ describe('handleBlur() — range mode', () => {
     c2.bindInput(input2)
 
     input2.value = '10/06/2025 – 12/06/2025' // 3 days < 5
+    c2.handleBlur()
+
+    expect(c2.selectedDates).toHaveLength(0)
+  })
+
+  it('accepts reversed range on blur when it satisfies minRange', () => {
+    const c2 = createCalendarData({
+      mode: 'range',
+      mask: false,
+      minRange: 3,
+    })
+    withAlpineMocks(c2)
+    c2.init()
+    const input2 = document.createElement('input')
+    c2.bindInput(input2)
+
+    input2.value = '20/06/2025 – 10/06/2025' // reversed, 10 days ≥ 3
+    c2.handleBlur()
+
+    expect(c2.selectedDates).toHaveLength(2)
+    expect(c2.selectedDates[0].toISO()).toBe('2025-06-10')
+    expect(c2.selectedDates[1].toISO()).toBe('2025-06-20')
+  })
+
+  it('rejects reversed range on blur when it violates minRange', () => {
+    const c2 = createCalendarData({
+      mode: 'range',
+      mask: false,
+      minRange: 15,
+    })
+    withAlpineMocks(c2)
+    c2.init()
+    const input2 = document.createElement('input')
+    c2.bindInput(input2)
+
+    input2.value = '20/06/2025 – 10/06/2025' // reversed, 10 days < 15
+    c2.handleBlur()
+
+    expect(c2.selectedDates).toHaveLength(0)
+  })
+
+  it('rejects reversed range on blur when it exceeds maxRange', () => {
+    const c2 = createCalendarData({
+      mode: 'range',
+      mask: false,
+      maxRange: 5,
+    })
+    withAlpineMocks(c2)
+    c2.init()
+    const input2 = document.createElement('input')
+    c2.bindInput(input2)
+
+    input2.value = '20/06/2025 – 10/06/2025' // reversed, 10 days > 5
     c2.handleBlur()
 
     expect(c2.selectedDates).toHaveLength(0)

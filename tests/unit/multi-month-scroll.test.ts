@@ -381,17 +381,16 @@ describe('multi-month scrollable — backward compat', () => {
 // ---------------------------------------------------------------------------
 
 describe('multi-month scrollable — lifecycle', () => {
-  it('destroy cleans up scroll handler', () => {
+  it('destroy disconnects IntersectionObserver', () => {
     const { c } = createComponent({ months: 3 })
-    const removeEventListenerSpy = vi.fn()
-    const handler = () => {}
-    c._scrollHandler = handler
-    c._scrollContainerEl = { removeEventListener: removeEventListenerSpy } as unknown as HTMLElement
+    const disconnectSpy = vi.fn()
+    c._scrollObserver = { disconnect: disconnectSpy } as unknown as IntersectionObserver
+    c._scrollContainerEl = document.createElement('div')
 
     c.destroy()
 
-    expect(removeEventListenerSpy).toHaveBeenCalledWith('scroll', handler)
-    expect(c._scrollHandler).toBeNull()
+    expect(disconnectSpy).toHaveBeenCalled()
+    expect(c._scrollObserver).toBeNull()
     expect(c._scrollContainerEl).toBeNull()
   })
 
@@ -405,5 +404,187 @@ describe('multi-month scrollable — lifecycle', () => {
     const first = c.grid[0] as MonthGrid
     expect(first.year).toBe(2026)
     expect(first.month).toBe(5)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// IntersectionObserver scroll tracking
+// ---------------------------------------------------------------------------
+
+describe('multi-month scrollable — IntersectionObserver', () => {
+  let observedElements: Element[]
+  let observerCallback: IntersectionObserverCallback
+  let observerOptions: IntersectionObserverInit | undefined
+  let disconnectSpy: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    observedElements = []
+    disconnectSpy = vi.fn()
+
+    // Mock IntersectionObserver in jsdom
+    vi.stubGlobal('IntersectionObserver', class {
+      constructor(callback: IntersectionObserverCallback, options?: IntersectionObserverInit) {
+        observerCallback = callback
+        observerOptions = options
+      }
+      observe(el: Element) { observedElements.push(el) }
+      unobserve() {}
+      disconnect() { disconnectSpy() }
+    })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  function createScrollableComponent() {
+    const c = createCalendarData({ months: 6, value: '2026-03-15', format: 'YYYY-MM-DD' })
+
+    // Build a mock DOM — but grid is empty until init, so init first with a
+    // bare element, then build the DOM and call _initScrollListener directly.
+    const el = document.createElement('div')
+    const mocks = withAlpineMocks(c, { el })
+    c.init()
+    // Don't flush yet — we need to set up the DOM before the scroll listener runs
+
+    // Now grid is populated; build scroll container with month elements
+    const scrollContainer = document.createElement('div')
+    scrollContainer.classList.add('rc-months--scroll')
+    for (let i = 0; i < c.grid.length; i++) {
+      const monthEl = document.createElement('div')
+      const mg = c.grid[i] as MonthGrid
+      monthEl.setAttribute('data-month-id', `month-${mg.year}-${mg.month}`)
+      scrollContainer.appendChild(monthEl)
+    }
+    el.appendChild(scrollContainer)
+
+    // Now flush, which will trigger _initScrollListener
+    mocks.flushNextTick()
+    return { c, el, scrollContainer, ...mocks }
+  }
+
+  it('creates observer with correct options', () => {
+    createScrollableComponent()
+
+    expect(observerOptions).toBeDefined()
+    expect(observerOptions!.rootMargin).toBe('0px 0px -90% 0px')
+    expect(observerOptions!.threshold).toBe(0)
+  })
+
+  it('observes all month elements', () => {
+    const { c } = createScrollableComponent()
+
+    expect(observedElements.length).toBe(c.grid.length)
+    for (const el of observedElements) {
+      expect(el.getAttribute('data-month-id')).toMatch(/^month-\d+-\d+$/)
+    }
+  })
+
+  it('updates _scrollVisibleIndex when observer fires', () => {
+    const { c } = createScrollableComponent()
+
+    expect(c._scrollVisibleIndex).toBe(0)
+
+    // Simulate months 2 and 3 becoming visible
+    observerCallback(
+      [
+        { target: observedElements[2], isIntersecting: true } as unknown as IntersectionObserverEntry,
+        { target: observedElements[3], isIntersecting: true } as unknown as IntersectionObserverEntry,
+      ],
+      {} as IntersectionObserver,
+    )
+    expect(c._scrollVisibleIndex).toBe(2)
+
+    // Simulate month 2 leaving, month 4 entering → min is now 3
+    observerCallback(
+      [
+        { target: observedElements[2], isIntersecting: false } as unknown as IntersectionObserverEntry,
+        { target: observedElements[4], isIntersecting: true } as unknown as IntersectionObserverEntry,
+      ],
+      {} as IntersectionObserver,
+    )
+    expect(c._scrollVisibleIndex).toBe(3)
+  })
+
+  it('disconnect called on destroy', () => {
+    const { c } = createScrollableComponent()
+
+    c.destroy()
+
+    expect(disconnectSpy).toHaveBeenCalled()
+    expect(c._scrollObserver).toBeNull()
+  })
+
+  it('re-binds observer after goTo()', () => {
+    const { c, flushNextTick, el } = createScrollableComponent()
+
+    // goTo triggers _rebuildGrid + _rebindScrollObserver in $nextTick
+    c.goTo(2027, 1)
+
+    // After rebuild, update the DOM to match the new grid
+    const scrollContainer = el.querySelector('.rc-months--scroll')!
+    scrollContainer.innerHTML = ''
+    for (let i = 0; i < c.grid.length; i++) {
+      const monthEl = document.createElement('div')
+      const mg = c.grid[i] as MonthGrid
+      monthEl.setAttribute('data-month-id', `month-${mg.year}-${mg.month}`)
+      monthEl.scrollIntoView = vi.fn() // jsdom doesn't have scrollIntoView
+      scrollContainer.appendChild(monthEl)
+    }
+
+    // Reset tracking to verify re-observation
+    disconnectSpy.mockClear()
+    observedElements = []
+
+    flushNextTick()
+
+    expect(disconnectSpy).toHaveBeenCalled()
+    expect(observedElements.length).toBeGreaterThan(0)
+    expect(c._scrollObserver).not.toBeNull()
+  })
+
+  it('re-binds observer after updateConstraints()', () => {
+    const { c, flushNextTick } = createScrollableComponent()
+
+    disconnectSpy.mockClear()
+    observedElements = []
+
+    c.updateConstraints({ minDate: '2026-04-01' })
+    flushNextTick()
+
+    expect(disconnectSpy).toHaveBeenCalled()
+    expect(observedElements.length).toBeGreaterThan(0)
+    expect(c._scrollObserver).not.toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// IntersectionObserver feature guard
+// ---------------------------------------------------------------------------
+
+describe('multi-month scrollable — IntersectionObserver guard', () => {
+  it('does not throw when IntersectionObserver is undefined', () => {
+    const origIO = globalThis.IntersectionObserver
+    // @ts-expect-error — deliberately removing for SSR simulation
+    delete globalThis.IntersectionObserver
+
+    try {
+      const c = createCalendarData({ months: 6, value: '2026-03-15', format: 'YYYY-MM-DD' })
+      const el = document.createElement('div')
+      const scrollContainer = document.createElement('div')
+      scrollContainer.classList.add('rc-months--scroll')
+      el.appendChild(scrollContainer)
+
+      const mocks = withAlpineMocks(c, { el })
+
+      expect(() => {
+        c.init()
+        mocks.flushNextTick()
+      }).not.toThrow()
+
+      expect(c._scrollObserver).toBeNull()
+    } finally {
+      globalThis.IntersectionObserver = origIO
+    }
   })
 })

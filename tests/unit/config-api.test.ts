@@ -348,3 +348,46 @@ describe('updateConstraints', () => {
     expect(c._isDisabledDate(sat)).toBe(false)
   })
 })
+
+// ---------------------------------------------------------------------------
+// Timezone validation
+// ---------------------------------------------------------------------------
+
+describe('timezone validation', () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    warnSpy.mockRestore()
+  })
+
+  it('warns on invalid timezone and does not crash', () => {
+    const c = createCalendarData({ timezone: 'Invalid/Timezone' })
+    const mocks = withAlpineMocks(c)
+    c.init()
+    mocks.flushNextTick()
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('invalid timezone'),
+    )
+    // Component should still be functional (fallback to no timezone)
+    expect(c.selectedDates).toHaveLength(0)
+    expect(c.grid.length).toBeGreaterThan(0)
+  })
+
+  it('does not warn for a valid timezone', () => {
+    const c = createCalendarData({ timezone: 'America/New_York' })
+    const mocks = withAlpineMocks(c)
+    c.init()
+    mocks.flushNextTick()
+
+    // No timezone-related warning
+    const tzWarns = warnSpy.mock.calls.filter((args) =>
+      String(args[0]).includes('timezone'),
+    )
+    expect(tzWarns).toHaveLength(0)
+  })
+})

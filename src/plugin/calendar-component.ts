@@ -307,6 +307,15 @@ function validateConfig(config: CalendarConfig): void {
   if (config.wizard && config.mode && config.mode !== 'single') {
     warn(`wizard mode is designed for single selection; mode "${config.mode}" may not work as expected`)
   }
+
+  // timezone must be a valid IANA timezone string
+  if (config.timezone) {
+    try {
+      Intl.DateTimeFormat(undefined, { timeZone: config.timezone })
+    } catch {
+      warn(`invalid timezone: "${config.timezone}"`)
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -406,7 +415,14 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
   const display = config.display ?? 'inline'
   const format = config.format ?? 'DD/MM/YYYY'
   const firstDay = config.firstDay ?? 0
-  const timezone = config.timezone
+  let timezone = config.timezone
+  if (timezone) {
+    try {
+      Intl.DateTimeFormat(undefined, { timeZone: timezone })
+    } catch {
+      timezone = undefined
+    }
+  }
   const wizardConfig = config.wizard ?? false
   const rawMonthCount = config.months ?? 1
   // Force months: 1 when wizard + scrollable
@@ -452,9 +468,13 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       if (d && !constraints.isDisabledDate(d)) selection.toggle(d)
     } else if (mode === 'range') {
       const range = parseDateRange(config.value, format)
-      if (range && !constraints.isDisabledDate(range[0]) && !constraints.isDisabledDate(range[1])) {
-        selection.toggle(range[0])
-        selection.toggle(range[1])
+      if (range) {
+        let [start, end] = range
+        if (end.isBefore(start)) { const tmp = start; start = end; end = tmp }
+        if (!constraints.isDisabledDate(start) && !constraints.isDisabledDate(end) && constraints.isRangeValid(start, end)) {
+          selection.toggle(start)
+          selection.toggle(end)
+        }
       }
     } else if (mode === 'multiple') {
       const dates = parseDateMultiple(config.value, format)
@@ -546,7 +566,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     isScrollable,
     _scrollHeight: scrollHeight,
     _scrollContainerEl: null as HTMLElement | null,
-    _scrollHandler: null as (() => void) | null,
+    _scrollObserver: null as IntersectionObserver | null,
     /** Index into grid[] of the month currently visible at top of scroll viewport. */
     _scrollVisibleIndex: 0,
     /**
@@ -683,6 +703,9 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         this._rebuildGrid()
         this._emitNavigate()
         this._announceNavigation()
+        if (this.isScrollable) {
+          alpine(this).$nextTick(() => { this._rebindScrollObserver() })
+        }
       })
       alpine(this).$watch('year', () => {
         this._rebuildGrid()
@@ -690,6 +713,9 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         this._rebuildYearGrid()
         this._emitNavigate()
         this._announceNavigation()
+        if (this.isScrollable) {
+          alpine(this).$nextTick(() => { this._rebindScrollObserver() })
+        }
       })
       alpine(this).$watch('view', () => {
         this._emitViewChange()
@@ -710,9 +736,9 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     },
 
     destroy() {
-      if (this._scrollHandler && this._scrollContainerEl) {
-        this._scrollContainerEl.removeEventListener('scroll', this._scrollHandler)
-        this._scrollHandler = null
+      if (this._scrollObserver) {
+        this._scrollObserver.disconnect()
+        this._scrollObserver = null
       }
       this._scrollContainerEl = null
       if (this._detachMask) {
@@ -1050,18 +1076,21 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         }
       } else if (mode === 'range') {
         const range = parseDateRange(value, format)
-        if (
-          range &&
-          !this._isDisabledDate(range[0]) &&
-          !this._isDisabledDate(range[1]) &&
-          this._isRangeValid(range[0], range[1])
-        ) {
-          this._selection.clear()
-          this._selection.toggle(range[0])
-          this._selection.toggle(range[1])
-          this.month = range[0].month
-          this.year = range[0].year
-          changed = true
+        if (range) {
+          let [start, end] = range
+          if (end.isBefore(start)) { const tmp = start; start = end; end = tmp }
+          if (
+            !this._isDisabledDate(start) &&
+            !this._isDisabledDate(end) &&
+            this._isRangeValid(start, end)
+          ) {
+            this._selection.clear()
+            this._selection.toggle(start)
+            this._selection.toggle(end)
+            this.month = start.month
+            this.year = start.year
+            changed = true
+          }
         }
       } else if (mode === 'multiple') {
         const dates = parseDateMultiple(value, format)
@@ -1471,7 +1500,10 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       this.view = 'days'
       if (this.isScrollable) {
         this._rebuildGrid()
-        alpine(this).$nextTick(() => { this._scrollToMonth(year, month ?? this.month) })
+        alpine(this).$nextTick(() => {
+          this._rebindScrollObserver()
+          this._scrollToMonth(year, month ?? this.month)
+        })
       }
     },
 
@@ -1549,6 +1581,9 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       this._rebuildGrid()
       this._rebuildMonthGrid()
       this._rebuildYearGrid()
+      if (this.isScrollable) {
+        alpine(this).$nextTick(() => { this._rebindScrollObserver() })
+      }
     },
 
     // --- View switching ---
@@ -1810,39 +1845,54 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       return d.format({ month: 'long', year: 'numeric' }, locale)
     },
 
-    /** Attach a scroll listener that updates the sticky header as the user scrolls. */
+    /** Attach an IntersectionObserver that updates the sticky header as the user scrolls. */
     _initScrollListener() {
+      if (typeof IntersectionObserver === 'undefined') return
       const el = alpine(this).$el
       const container = el.querySelector('.rc-months--scroll') as HTMLElement | null
       if (!container) return
       this._scrollContainerEl = container
 
-      let ticking = false
-      const handler = () => {
-        if (ticking) return
-        ticking = true
-        requestAnimationFrame(() => {
-          const containerTop = container.getBoundingClientRect().top
-          const monthEls = container.querySelectorAll('[data-month-id]')
-          let visibleIndex = 0
-          for (let i = 0; i < monthEls.length; i++) {
-            const el = monthEls[i]
-            if (!el) continue
-            const rect = el.getBoundingClientRect()
-            // The last month whose top is at or above the container top
-            if (rect.top <= containerTop + 10) {
-              visibleIndex = i
+      const monthEls = container.querySelectorAll('[data-month-id]')
+      if (monthEls.length === 0) return
+
+      const indexMap = new Map<Element, number>()
+      monthEls.forEach((el, i) => indexMap.set(el, i))
+
+      const visible = new Set<number>()
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            const idx = indexMap.get(entry.target)
+            if (idx === undefined) continue
+            if (entry.isIntersecting) {
+              visible.add(idx)
+            } else {
+              visible.delete(idx)
             }
           }
-          if (this._scrollVisibleIndex !== visibleIndex) {
-            this._scrollVisibleIndex = visibleIndex
+          if (visible.size > 0) {
+            const minIdx = Math.min(...visible)
+            if (this._scrollVisibleIndex !== minIdx) {
+              this._scrollVisibleIndex = minIdx
+            }
           }
-          ticking = false
-        })
-      }
+        },
+        { root: container, rootMargin: '0px 0px -90% 0px', threshold: 0 },
+      )
 
-      container.addEventListener('scroll', handler, { passive: true })
-      this._scrollHandler = handler
+      monthEls.forEach((el) => observer.observe(el))
+      this._scrollObserver = observer
+    },
+
+    /** Disconnect and re-initialize the scroll observer after DOM rebuild. */
+    _rebindScrollObserver() {
+      if (this._scrollObserver) {
+        this._scrollObserver.disconnect()
+        this._scrollObserver = null
+      }
+      this._initScrollListener()
     },
 
     /** Smooth scroll a specific month into view inside the scroll container. */
