@@ -52,11 +52,16 @@ export class CalendarDate {
     return new CalendarDate(date.getFullYear(), date.getMonth() + 1, date.getDate())
   }
 
-  /** Create from an ISO string (YYYY-MM-DD). */
+  /** Create from an ISO string (YYYY-MM-DD). Returns null for invalid formats or out-of-range values. */
   static fromISO(iso: string): CalendarDate | null {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
     if (!match) return null
-    return new CalendarDate(Number(match[1]), Number(match[2]), Number(match[3]))
+    const year = Number(match[1])
+    const month = Number(match[2])
+    const day = Number(match[3])
+    if (month < 1 || month > 12) return null
+    if (day < 1 || day > daysInMonth(year, month)) return null
+    return new CalendarDate(year, month, day)
   }
 
   // ---------------------------------------------------------------------------

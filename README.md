@@ -156,8 +156,6 @@ All options are passed via `x-data="calendar({ ... })"`.
 | `name` | `string` | `''` | Input name attribute for form submission |
 | `locale` | `string` | — | BCP 47 locale for month/day names |
 | `timezone` | `string` | — | IANA timezone for resolving "today" |
-| `placement` | `Placement` | `'bottom-start'` | Popup position (`bottom-start`, `bottom-end`, `top-start`, `top-end`) |
-| `popupOffset` | `number` | `4` | Popup offset in pixels |
 | `closeOnSelect` | `boolean` | `true` | Close popup after selection |
 | `wizard` | `boolean \| 'year-month' \| 'month-day'` | `false` | Birth date wizard mode |
 | `beforeSelect` | `(date, ctx) => boolean` | — | Custom validation before selection |

@@ -127,7 +127,7 @@ describe('popup — centered modal (desktop)', () => {
     expect(calendarEl.style.top).toBe('')
   })
 
-  it('stores popup ref on open', () => {
+  it('open/close toggles isOpen state', () => {
     const popupEl = createPopupEl()
     const inputEl = createInputEl()
 
@@ -140,30 +140,13 @@ describe('popup — centered modal (desktop)', () => {
 
     c.open()
     flushNextTick()
-
-    expect(c._popupEl).toBe(popupEl)
-  })
-
-  it('clears popup ref on close', () => {
-    const popupEl = createPopupEl()
-    const inputEl = createInputEl()
-
-    const c = createCalendarData({ display: 'popup', mask: false })
-    const { flushNextTick } = withAlpineMocks(c, {
-      refs: { popup: popupEl, input: inputEl },
-    })
-    c.init()
-    flushNextTick()
-
-    c.open()
-    flushNextTick()
-    expect(c._popupEl).toBe(popupEl)
+    expect(c.isOpen).toBe(true)
 
     c.close()
-    expect(c._popupEl).toBeNull()
+    expect(c.isOpen).toBe(false)
   })
 
-  it('destroy() cleans up popup ref', () => {
+  it('destroy() cleans up state', () => {
     const popupEl = createPopupEl()
     const inputEl = createInputEl()
 
@@ -179,7 +162,7 @@ describe('popup — centered modal (desktop)', () => {
 
     c.destroy()
 
-    expect(c._popupEl).toBeNull()
+    expect(c._inputEl).toBeNull()
   })
 })
 
@@ -202,7 +185,7 @@ describe('popup — no popup element', () => {
     c.open()
     flushNextTick()
 
-    expect(c._popupEl).toBeNull()
+    expect(c.isOpen).toBe(true)
   })
 
   it('handles missing input element gracefully', () => {
@@ -219,6 +202,6 @@ describe('popup — no popup element', () => {
     c.open()
     flushNextTick()
 
-    expect(c._popupEl).toBe(popupEl)
+    expect(c.isOpen).toBe(true)
   })
 })

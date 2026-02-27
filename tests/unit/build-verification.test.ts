@@ -99,8 +99,6 @@ describe('Build & Distribution Verification', () => {
         'formatDate',
         'createMask',
         'attachMask',
-        'computePosition',
-        'autoUpdate',
         'generateMonth',
         'generateMonths',
         'generateMonthGrid',
@@ -358,8 +356,6 @@ describe('Build & Distribution Verification', () => {
       expect(typeof mod.formatDate).toBe('function')
       expect(typeof mod.createMask).toBe('function')
       expect(typeof mod.attachMask).toBe('function')
-      expect(typeof mod.computePosition).toBe('function')
-      expect(typeof mod.autoUpdate).toBe('function')
       expect(typeof mod.generateMonth).toBe('function')
       expect(typeof mod.generateMonths).toBe('function')
       expect(typeof mod.generateMonthGrid).toBe('function')

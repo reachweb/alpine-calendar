@@ -15,7 +15,6 @@ import { formatDate, formatRange, formatMultiple } from '../input/formatter'
 import { parseDate, parseDateRange, parseDateMultiple } from '../input/parser'
 import { attachMask } from '../input/mask'
 import type { RangePreset } from '../core/presets'
-import type { Placement } from '../positioning/popup'
 import { generateCalendarTemplate } from './template'
 
 // ---------------------------------------------------------------------------
@@ -113,10 +112,6 @@ export interface CalendarConfig {
   name?: string
   /** ID attribute for the popup input element. Allows external `<label for="...">` association. */
   inputId?: string
-  /** Preferred popup placement. Default: 'bottom-start'. */
-  placement?: Placement
-  /** Offset in pixels between reference and popup. Default: 4. */
-  popupOffset?: number
   /** Show ISO 8601 week numbers on the left side of the day grid. Default: false. */
   showWeekNumbers?: boolean
   /**
@@ -457,7 +452,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       if (d && !constraints.isDisabledDate(d)) selection.toggle(d)
     } else if (mode === 'range') {
       const range = parseDateRange(config.value, format)
-      if (range) {
+      if (range && !constraints.isDisabledDate(range[0]) && !constraints.isDisabledDate(range[1])) {
         selection.toggle(range[0])
         selection.toggle(range[1])
       }
@@ -544,7 +539,6 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     _inputEl: null as HTMLInputElement | null,
     _detachMask: null as (() => void) | null,
     _syncing: false,
-    _popupEl: null as HTMLElement | null,
     _Alpine: (Alpine ?? null) as { initTree: (el: HTMLElement) => void } | null,
     _autoRendered: false,
 
@@ -716,7 +710,6 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     },
 
     destroy() {
-      this._stopPositioning()
       if (this._scrollHandler && this._scrollContainerEl) {
         this._scrollContainerEl.removeEventListener('scroll', this._scrollHandler)
         this._scrollHandler = null
@@ -727,7 +720,6 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         this._detachMask = null
       }
       this._inputEl = null
-      this._popupEl = null
       if (this._autoRendered) {
         alpine(this).$el.innerHTML = ''
         this._autoRendered = false
@@ -1518,8 +1510,13 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
 
       const [start, end] = preset.value()
 
-      // Use setValue which handles clearing, range validation, navigation, and events
-      this.setValue([start, end])
+      // In single mode, only use the start date — presets return [start, end] pairs
+      // but single mode should not receive an array (avoids toggle-on/toggle-off bug)
+      if (mode === 'single') {
+        this.setValue(start)
+      } else {
+        this.setValue([start, end])
+      }
 
       // Close popup if configured
       if (this.display === 'popup' && closeOnSelect) {
@@ -1638,16 +1635,15 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       this.isOpen = true
       alpine(this).$dispatch('calendar:open')
 
-      // Position the popup on next tick (after Alpine renders it)
+      // CSS handles centered modal layout via `.rc-popup-overlay`
       alpine(this).$nextTick(() => {
-        this._startPositioning()
+        // Focus management after popup renders
       })
     },
 
     close() {
       if (this.display !== 'popup') return
       this.isOpen = false
-      this._stopPositioning()
       alpine(this).$dispatch('calendar:close')
     },
 
@@ -1821,22 +1817,28 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       if (!container) return
       this._scrollContainerEl = container
 
+      let ticking = false
       const handler = () => {
-        const containerTop = container.getBoundingClientRect().top
-        const monthEls = container.querySelectorAll('[data-month-id]')
-        let visibleIndex = 0
-        for (let i = 0; i < monthEls.length; i++) {
-          const el = monthEls[i]
-          if (!el) continue
-          const rect = el.getBoundingClientRect()
-          // The last month whose top is at or above the container top
-          if (rect.top <= containerTop + 10) {
-            visibleIndex = i
+        if (ticking) return
+        ticking = true
+        requestAnimationFrame(() => {
+          const containerTop = container.getBoundingClientRect().top
+          const monthEls = container.querySelectorAll('[data-month-id]')
+          let visibleIndex = 0
+          for (let i = 0; i < monthEls.length; i++) {
+            const el = monthEls[i]
+            if (!el) continue
+            const rect = el.getBoundingClientRect()
+            // The last month whose top is at or above the container top
+            if (rect.top <= containerTop + 10) {
+              visibleIndex = i
+            }
           }
-        }
-        if (this._scrollVisibleIndex !== visibleIndex) {
-          this._scrollVisibleIndex = visibleIndex
-        }
+          if (this._scrollVisibleIndex !== visibleIndex) {
+            this._scrollVisibleIndex = visibleIndex
+          }
+          ticking = false
+        })
       }
 
       container.addEventListener('scroll', handler, { passive: true })
@@ -1852,22 +1854,5 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
     },
 
-    // --- Internal: popup positioning ---
-
-    /**
-     * Start popup positioning.
-     * CSS handles centered modal layout via `.rc-popup-overlay`.
-     * Click-outside dismissal is handled by `@click.self="close()"` on the overlay.
-     */
-    _startPositioning() {
-      const refs = alpine(this).$refs
-      const popupEl = refs['popup'] as HTMLElement | undefined
-      if (popupEl) this._popupEl = popupEl
-    },
-
-    /** Stop positioning and clean up references. */
-    _stopPositioning() {
-      this._popupEl = null
-    },
   }
 }

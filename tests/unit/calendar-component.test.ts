@@ -1996,14 +1996,14 @@ describe('popup positioning', () => {
     expect(dispatchSpy).toHaveBeenCalledWith('calendar:close')
   })
 
-  it('destroy() cleans up auto-update', () => {
+  it('destroy() cleans up state', () => {
     const c = createCalendarData({ display: 'popup' })
     const { flushNextTick } = withAlpineMocks(c)
     c.init()
     flushNextTick()
 
     c.destroy()
-    expect(c._popupEl).toBeNull()
+    expect(c._inputEl).toBeNull()
   })
 })
 
@@ -2090,12 +2090,6 @@ describe('popup config', () => {
     expect(c.display).toBe('popup')
   })
 
-  it('accepts popupOffset config', () => {
-    const c = createCalendarData({ display: 'popup', popupOffset: 8 })
-    withAlpineMocks(c)
-    c.init()
-    expect(c.display).toBe('popup')
-  })
 })
 
 // ---------------------------------------------------------------------------
