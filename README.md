@@ -1,4 +1,4 @@
-# Reach Calendar
+# Alpine Calendar
 
 A lightweight, AlpineJS-native calendar component with inline/popup display, input binding with masking, single/multiple/range selection, month/year pickers, birth-date wizard, TailwindCSS 4 theming, and timezone-safe date handling.
 
@@ -7,15 +7,15 @@ A lightweight, AlpineJS-native calendar component with inline/popup display, inp
 ### npm / pnpm
 
 ```bash
-pnpm add @reachgr/alpine-calendar
+pnpm add @reachweb/alpine-calendar
 # or
-npm install @reachgr/alpine-calendar
+npm install @reachweb/alpine-calendar
 ```
 
 ```js
 import Alpine from 'alpinejs'
-import { calendarPlugin } from '@reachgr/alpine-calendar'
-import '@reachgr/alpine-calendar/css'
+import { calendarPlugin } from '@reachweb/alpine-calendar'
+import '@reachweb/alpine-calendar/css'
 
 Alpine.plugin(calendarPlugin)
 Alpine.start()
@@ -24,9 +24,9 @@ Alpine.start()
 ### CDN (no bundler)
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@reachgr/alpine-calendar/dist/alpine-calendar.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@reachweb/alpine-calendar/dist/alpine-calendar.css">
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@reachgr/alpine-calendar/dist/alpine-calendar.cdn.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@reachweb/alpine-calendar/dist/alpine-calendar.cdn.js"></script>
 ```
 
 The CDN build auto-registers via `alpine:init` — no manual setup needed. Works with Livewire, Statamic, or any server-rendered HTML.
@@ -430,7 +430,7 @@ All classes use the `.rc-` prefix:
 Set defaults that apply to every calendar instance:
 
 ```js
-import { calendarPlugin } from '@reachgr/alpine-calendar'
+import { calendarPlugin } from '@reachweb/alpine-calendar'
 
 calendarPlugin.defaults({ firstDay: 1, locale: 'el' })
 Alpine.plugin(calendarPlugin)
@@ -478,7 +478,7 @@ import {
   presetLastMonth,
   presetThisYear,
   presetLastYear,
-} from '@reachgr/alpine-calendar'
+} from '@reachweb/alpine-calendar'
 ```
 
 All factories accept an optional `label` and `timezone` parameter. `presetThisWeek` and `presetLastWeek` also accept a `firstDay` (default: 1 = Monday).
@@ -574,7 +574,7 @@ import {
   presetLastMonth,
   presetThisYear,
   presetLastYear,
-} from '@reachgr/alpine-calendar'
+} from '@reachweb/alpine-calendar'
 
 import type {
   CalendarConfig,
@@ -592,17 +592,17 @@ import type {
   ConstraintMessages,
   InputMask,
   MaskEventHandlers,
-} from '@reachgr/alpine-calendar'
+} from '@reachweb/alpine-calendar'
 ```
 
 ## Livewire Integration
 
 ```php
 @push('styles')
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@reachgr/alpine-calendar/dist/alpine-calendar.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@reachweb/alpine-calendar/dist/alpine-calendar.css">
 @endpush
 @push('scripts')
-  <script src="https://cdn.jsdelivr.net/npm/@reachgr/alpine-calendar/dist/alpine-calendar.cdn.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@reachweb/alpine-calendar/dist/alpine-calendar.cdn.js"></script>
 @endpush
 ```
 
