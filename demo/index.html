@@ -451,6 +451,8 @@
              role="application"
              aria-label="Calendar">
 
+          <div class="rc-sr-only" role="status" aria-live="polite" aria-atomic="true" x-text="_statusMessage"></div>
+
           <template x-if="view === 'years'">
             <div class="rc-view-enter">
               <div class="rc-header">
@@ -458,9 +460,9 @@
                 <span class="rc-header__label" x-text="decadeLabel"></span>
                 <button class="rc-header__nav" @click="next()" :disabled="!canGoNext" aria-label="Next decade">&#8250;</button>
               </div>
-              <div class="rc-year-grid" role="grid" :aria-label="decadeLabel">
+              <div class="rc-year-grid" role="group" :aria-label="decadeLabel">
                 <template x-for="cell in yearGrid.flat()" :key="cell.year">
-                  <div :class="yearClasses(cell)" :aria-disabled="cell.isDisabled" role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectYear(cell.year)" x-text="cell.label"></div>
+                  <div :class="yearClasses(cell)" :aria-disabled="cell.isDisabled" tabindex="-1" @click="!cell.isDisabled && selectYear(cell.year)" x-text="cell.label"></div>
                 </template>
               </div>
             </div>
@@ -470,12 +472,12 @@
             <div class="rc-view-enter">
               <div class="rc-header">
                 <button class="rc-header__nav" @click="prev()" :disabled="!canGoPrev" aria-label="Previous year">&#8249;</button>
-                <span class="rc-header__label" @click="setView('years')" x-text="yearLabel"></span>
+                <button class="rc-header__label" @click="setView('years')" aria-label="Change view" x-text="yearLabel"></button>
                 <button class="rc-header__nav" @click="next()" :disabled="!canGoNext" aria-label="Next year">&#8250;</button>
               </div>
-              <div class="rc-month-grid" role="grid" :aria-label="yearLabel">
+              <div class="rc-month-grid" role="group" :aria-label="yearLabel">
                 <template x-for="cell in monthGrid.flat()" :key="cell.month">
-                  <div :class="monthClasses(cell)" :aria-disabled="cell.isDisabled" role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectMonth(cell.month)" x-text="cell.label"></div>
+                  <div :class="monthClasses(cell)" :aria-disabled="cell.isDisabled" tabindex="-1" @click="!cell.isDisabled && selectMonth(cell.month)" x-text="cell.label"></div>
                 </template>
               </div>
             </div>
@@ -487,7 +489,7 @@
                 <div>
                   <div class="rc-header">
                     <button class="rc-header__nav" @click="prev()" :disabled="!canGoPrev" aria-label="Previous month">&#8249;</button>
-                    <span class="rc-header__label" @click="setView('months')" x-text="monthYearLabel(gi)"></span>
+                    <button class="rc-header__label" @click="setView('months')" aria-label="Change view" x-text="monthYearLabel(gi)"></button>
                     <button class="rc-header__nav" @click="next()" :disabled="!canGoNext" aria-label="Next month">&#8250;</button>
                   </div>
                   <div class="rc-weekdays">
@@ -499,14 +501,14 @@
                     <div class="rc-grid"
                          :class="{ 'rc-grid--slide-next': _navDirection === 'next', 'rc-grid--slide-prev': _navDirection === 'prev' }"
                          @animationend="_navDirection = ''"
-                         role="grid" :aria-label="monthYearLabel(gi)">
+                         role="listbox" :aria-label="monthYearLabel(gi)">
                       <template x-for="cell in mg.rows.flat()" :key="cell.date.toISO()">
                         <div :class="dayClasses(cell)"
                              :id="'day-' + cell.date.toISO()"
                              :aria-selected="isSelected(cell.date)"
                              :aria-disabled="cell.isDisabled"
                              :title="dayTitle(cell)"
-                             role="gridcell"
+                             role="option"
                              tabindex="-1"
                              @click="!cell.isDisabled && selectDate(cell.date)"
                              @mouseenter="hoverDate = cell.date"
