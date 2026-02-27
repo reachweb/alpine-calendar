@@ -130,6 +130,7 @@ export function computePosition(
 export function autoUpdate(reference: Element, update: () => void, throttleMs = 16): () => void {
   let ticking = false
   let rafId = 0
+  let timerId = 0
 
   const onEvent = () => {
     if (ticking) return
@@ -142,7 +143,7 @@ export function autoUpdate(reference: Element, update: () => void, throttleMs = 
         ticking = false
       })
     } else {
-      setTimeout(() => {
+      timerId = window.setTimeout(() => {
         update()
         ticking = false
       }, throttleMs)
@@ -160,6 +161,7 @@ export function autoUpdate(reference: Element, update: () => void, throttleMs = 
 
   return () => {
     cancelAnimationFrame(rafId)
+    clearTimeout(timerId)
     window.removeEventListener('resize', onEvent)
     for (const parent of scrollParents) {
       parent.removeEventListener('scroll', onEvent)

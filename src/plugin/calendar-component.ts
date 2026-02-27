@@ -396,6 +396,26 @@ function buildConstraints(
   }
 }
 
+/** Constraint-related keys from CalendarConfig. */
+const CONSTRAINT_KEYS = [
+  'minDate', 'maxDate', 'disabledDates', 'disabledDaysOfWeek',
+  'enabledDates', 'enabledDaysOfWeek', 'disabledMonths', 'enabledMonths',
+  'disabledYears', 'enabledYears', 'minRange', 'maxRange', 'rules',
+] as const
+
+type ConstraintConfig = Pick<CalendarConfig, (typeof CONSTRAINT_KEYS)[number]>
+
+/** Extract only the constraint-related properties from a config object. */
+function extractConstraintConfig(cfg: Partial<CalendarConfig>): ConstraintConfig {
+  const result: Partial<ConstraintConfig> = {}
+  for (const key of CONSTRAINT_KEYS) {
+    if (cfg[key] !== undefined) {
+      ;(result as Record<string, unknown>)[key] = cfg[key]
+    }
+  }
+  return result as ConstraintConfig
+}
+
 // ---------------------------------------------------------------------------
 // Component factory
 // ---------------------------------------------------------------------------
@@ -551,6 +571,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     _navDirection: '' as '' | 'next' | 'prev',
     _selection: selection,
     _today: today,
+    _constraintConfig: extractConstraintConfig(config),
     _isDisabledDate: constraints.isDisabledDate,
     _isRangeValid: constraints.isRangeValid,
     _isMonthDisabled: constraints.isMonthDisabled,
@@ -1566,13 +1587,25 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
      * disabledDaysOfWeek, enabledDates, enabledDaysOfWeek, disabledMonths,
      * enabledMonths, disabledYears, enabledYears, minRange, maxRange, rules).
      *
+     * Updates are **merged** with the existing constraint config. To remove a
+     * previously set constraint, pass `undefined` explicitly (e.g.
+     * `{ disabledDaysOfWeek: undefined }`).
+     *
      * Usage:
      * ```js
      * $data.updateConstraints({ minDate: '2025-06-01', disabledDaysOfWeek: [0, 6] })
      * ```
      */
     updateConstraints(updates: Partial<CalendarConfig>) {
-      const c = buildConstraints(updates, constraintMessages)
+      // Merge: explicit undefined removes a key, otherwise overlay on existing
+      const merged = { ...this._constraintConfig }
+      for (const key of CONSTRAINT_KEYS) {
+        if (key in updates) {
+          ;(merged as Record<string, unknown>)[key] = (updates as Record<string, unknown>)[key]
+        }
+      }
+      this._constraintConfig = merged
+      const c = buildConstraints(merged, constraintMessages)
       this._isDisabledDate = c.isDisabledDate
       this._isRangeValid = c.isRangeValid
       this._isMonthDisabled = c.isMonthDisabled

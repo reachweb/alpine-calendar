@@ -343,4 +343,22 @@ describe('autoUpdate', () => {
     vi.advanceTimersByTime(110)
     expect(update).toHaveBeenCalledTimes(1)
   })
+
+  it('cancels pending setTimeout on cleanup (throttleMs > 16)', () => {
+    const reference = mockElement({ left: 0, top: 0, width: 100, height: 40 })
+    Object.assign(reference, { parentElement: null })
+
+    const update = vi.fn()
+    const cleanup = autoUpdate(reference, update, 100)
+
+    // Trigger a throttled event
+    window.dispatchEvent(new Event('resize'))
+
+    // Cleanup before the timeout fires
+    cleanup()
+
+    // Advance past the throttle interval — update should NOT fire
+    vi.advanceTimersByTime(200)
+    expect(update).not.toHaveBeenCalled()
+  })
 })

@@ -331,7 +331,7 @@ describe('updateConstraints', () => {
     expect(c._isRangeValid(start, new CalendarDate(2025, 6, 5))).toBe(true)
   })
 
-  it('replaces constraints entirely (no merging with previous)', () => {
+  it('merges updates with existing constraints', () => {
     const c = createCalendarData({
       mode: 'single',
       disabledDaysOfWeek: [0, 6],
@@ -343,9 +343,46 @@ describe('updateConstraints', () => {
     const sat = new CalendarDate(2025, 1, 4) // Saturday
     expect(c._isDisabledDate(sat)).toBe(true)
 
-    // Update with only minDate — weekday constraint should be gone
+    // Update with only minDate — weekday constraint should persist
     c.updateConstraints({ minDate: '2025-01-01' })
+    expect(c._isDisabledDate(sat)).toBe(true)
+  })
+
+  it('removes a constraint when explicitly set to undefined', () => {
+    const c = createCalendarData({
+      mode: 'single',
+      disabledDaysOfWeek: [0, 6],
+    })
+    const { flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+
+    const sat = new CalendarDate(2025, 1, 4) // Saturday
+    expect(c._isDisabledDate(sat)).toBe(true)
+
+    // Explicitly remove the weekday constraint
+    c.updateConstraints({ disabledDaysOfWeek: undefined })
     expect(c._isDisabledDate(sat)).toBe(false)
+  })
+
+  it('accumulates constraints across multiple updates', () => {
+    const c = createCalendarData({ mode: 'single' })
+    const { flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+
+    const sat = new CalendarDate(2025, 1, 4) // Saturday
+    const jan1 = new CalendarDate(2025, 1, 1) // Wednesday
+
+    // First update: disable weekends
+    c.updateConstraints({ disabledDaysOfWeek: [0, 6] })
+    expect(c._isDisabledDate(sat)).toBe(true)
+    expect(c._isDisabledDate(jan1)).toBe(false)
+
+    // Second update: add minDate, weekends should stay disabled
+    c.updateConstraints({ minDate: '2025-06-01' })
+    expect(c._isDisabledDate(sat)).toBe(true)
+    expect(c._isDisabledDate(jan1)).toBe(true) // now before minDate
   })
 })
 
