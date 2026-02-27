@@ -2,8 +2,6 @@
 
 A lightweight, AlpineJS-native calendar component with inline/popup display, input binding with masking, single/multiple/range selection, month/year pickers, birth-date wizard, TailwindCSS 4 theming, and timezone-safe date handling.
 
-**Zero runtime dependencies.** Alpine.js is a peer dependency — not bundled.
-
 ## Installation
 
 ### npm / pnpm
@@ -35,7 +33,7 @@ The CDN build auto-registers via `alpine:init` — no manual setup needed. Works
 
 ## Quick Start
 
-The calendar auto-renders a complete template when the element is empty — no manual HTML needed:
+You can use x-data in any block element to load the calendar.
 
 ### Inline Single Date
 
@@ -49,7 +47,7 @@ The calendar auto-renders a complete template when the element is empty — no m
 <div x-data="calendar({ mode: 'single', display: 'popup' })"></div>
 ```
 
-Auto-renders an `<input>` with focus/blur handlers and a popup overlay with close button, transitions, and mobile bottom-sheet behavior.
+Auto-renders an `<input>` with focus/blur handlers and a centered popup overlay with close button, transitions, and mobile-responsive sizing.
 
 ### Range Selection (2-Month)
 
@@ -149,7 +147,7 @@ All options are passed via `x-data="calendar({ ... })"`.
 | `mode` | `'single' \| 'multiple' \| 'range'` | `'single'` | Selection mode |
 | `display` | `'inline' \| 'popup'` | `'inline'` | Inline calendar or popup with input |
 | `format` | `string` | `'DD/MM/YYYY'` | Date format (tokens: `DD`, `MM`, `YYYY`, `D`, `M`, `YY`) |
-| `months` | `1 \| 2` | `1` | Number of months to display side-by-side |
+| `months` | `number` | `1` | Months to display (1=single, 2=dual side-by-side, 3+=scrollable) |
 | `firstDay` | `0–6` | `0` | First day of week (0=Sun, 1=Mon, ...) |
 | `mask` | `boolean` | `true` | Enable input masking |
 | `value` | `string` | — | Initial value (ISO or formatted string) |
@@ -159,6 +157,11 @@ All options are passed via `x-data="calendar({ ... })"`.
 | `closeOnSelect` | `boolean` | `true` | Close popup after selection |
 | `wizard` | `boolean \| 'year-month' \| 'month-day'` | `false` | Birth date wizard mode |
 | `beforeSelect` | `(date, ctx) => boolean` | — | Custom validation before selection |
+| `showWeekNumbers` | `boolean` | `false` | Show ISO 8601 week numbers alongside the day grid |
+| `inputId` | `string` | — | ID for the popup input (allows external `<label for="...">`) |
+| `scrollHeight` | `number` | `400` | Max height (px) of scrollable container when `months >= 3` |
+| `presets` | `RangePreset[]` | — | Predefined date range shortcuts (see [Range Presets](#range-presets)) |
+| `constraintMessages` | `ConstraintMessages` | — | Custom tooltip strings for disabled dates |
 | `template` | `boolean` | `true` | Auto-render template when element is empty |
 
 ### Date Constraints
@@ -217,6 +220,9 @@ These properties are available in templates via Alpine's reactivity:
 | `focusedDate` | `CalendarDate \| null` | Keyboard-focused date |
 | `hoverDate` | `CalendarDate \| null` | Mouse-hovered date (for range preview) |
 | `wizardStep` | `number` | Current wizard step (0=off, 1–3) |
+| `showWeekNumbers` | `boolean` | Whether week numbers are displayed |
+| `presets` | `RangePreset[]` | Configured range presets |
+| `isScrollable` | `boolean` | Whether the calendar uses scrollable layout (months >= 3) |
 
 ### Computed Getters
 
@@ -257,6 +263,7 @@ These properties are available in templates via Alpine's reactivity:
 | `isInRange(date, hover?)` | Check if date is within range |
 | `isRangeStart(date)` | Check if date is range start |
 | `isRangeEnd(date)` | Check if date is range end |
+| `applyPreset(index)` | Apply a range preset by index |
 
 ### Programmatic Control
 
@@ -378,7 +385,7 @@ The calendar uses CSS custom properties for all visual styles. Override them in 
 
 ### CSS Class Reference
 
-All classes use the `.rc-` prefix (BEM-like):
+All classes use the `.rc-` prefix:
 
 | Class | Description |
 |-------|-------------|
@@ -398,7 +405,14 @@ All classes use the `.rc-` prefix (BEM-like):
 | `.rc-year-grid` / `.rc-year` | Year picker |
 | `.rc-months--dual` | Two-month side-by-side layout |
 | `.rc-popup-overlay` | Popup backdrop |
+| `.rc-popup-header` / `.rc-popup-header__close` | Popup close header bar |
 | `.rc-calendar--wizard` | Wizard mode container |
+| `.rc-row--week-numbers` / `.rc-week-number` | Week number row and cell |
+| `.rc-grid--week-numbers` | Grid with week number column |
+| `.rc-presets` / `.rc-preset` | Range preset container and buttons |
+| `.rc-months--scroll` | Scrollable multi-month container |
+| `.rc-header--scroll-sticky` | Sticky header in scrollable layout |
+| `.rc-sr-only` | Screen reader only utility |
 
 ## Global Defaults
 
@@ -413,12 +427,97 @@ Alpine.plugin(calendarPlugin)
 
 Instance config overrides global defaults.
 
+## Week Numbers
+
+Display ISO 8601 week numbers alongside the day grid:
+
+```html
+<div x-data="calendar({ mode: 'single', showWeekNumbers: true, firstDay: 1 })"></div>
+```
+
+Week numbers appear in a narrow column to the left of each row.
+
+## Range Presets
+
+Add quick-select buttons for common date ranges. Works with `range` and `single` modes:
+
+```html
+<div x-data="calendar({
+  mode: 'range',
+  presets: [
+    presetToday(),
+    presetLastNDays(7),
+    presetThisWeek(),
+    presetThisMonth(),
+    presetLastMonth()
+  ]
+})"></div>
+```
+
+Import the built-in factories:
+
+```js
+import {
+  presetToday,
+  presetYesterday,
+  presetLastNDays,
+  presetThisWeek,
+  presetLastWeek,
+  presetThisMonth,
+  presetLastMonth,
+  presetThisYear,
+  presetLastYear,
+} from '@reachgr/alpine-calendar'
+```
+
+All factories accept an optional `label` and `timezone` parameter. `presetThisWeek` and `presetLastWeek` also accept a `firstDay` (default: 1 = Monday).
+
+Custom presets:
+
+```js
+const customPreset = {
+  label: 'Next 30 Days',
+  value: () => {
+    const today = CalendarDate.today()
+    return [today, today.addDays(29)]
+  }
+}
+```
+
+## Multi-Month Scrollable Layout
+
+When `months` is 3 or more, the calendar renders as a vertically scrollable container instead of side-by-side panels:
+
+```html
+<div x-data="calendar({ mode: 'range', months: 6 })"></div>
+
+<!-- Custom scroll height -->
+<div x-data="calendar({ mode: 'range', months: 12, scrollHeight: 500 })"></div>
+```
+
+A sticky header tracks the currently visible month as you scroll. Default scroll height is 400px.
+
 ## Responsive Behavior
 
-- **Mobile (<640px):** Popup renders as a bottom sheet with overlay. Touch-friendly targets (min 44px).
-- **Desktop (>=640px):** Popup uses floating positioning with auto-flip.
+- **Mobile (<640px):** Popup renders as a centered fullscreen overlay. Touch-friendly targets (min 44px).
+- **Desktop (>=640px):** Popup renders as a centered modal with scale-in animation.
 - **Two months:** Side-by-side on desktop, stacked on mobile.
+- **Scrollable (3+ months):** Smooth scroll with `-webkit-overflow-scrolling: touch`.
 - **`prefers-reduced-motion`:** All animations are disabled.
+
+## Accessibility
+
+The calendar targets WCAG 2.1 AA compliance:
+
+- Full keyboard navigation (arrow keys, Enter, Escape, Page Up/Down, Home/End)
+- ARIA roles: `application`, `dialog`, `combobox`, `option`, `group`
+- `aria-live="polite"` announcements for navigation and selection changes
+- `aria-activedescendant` for focus management within the grid
+- `aria-modal="true"` on popup overlays
+- `aria-expanded`, `aria-selected`, `aria-disabled` on interactive elements
+- `:focus-visible` outlines on all interactive elements
+- Screen reader support via `.rc-sr-only` utility class
+- Validated with axe-core (no critical or serious violations)
 
 ## Bundle Outputs
 
@@ -437,6 +536,7 @@ Full type definitions are included. Key exports:
 import {
   calendarPlugin,
   CalendarDate,
+  getISOWeekNumber,
   SingleSelection,
   MultipleSelection,
   RangeSelection,
@@ -452,11 +552,23 @@ import {
   generateYearGrid,
   createDateConstraint,
   createRangeValidator,
+  createDisabledReasons,
+  isDateDisabled,
+  presetToday,
+  presetYesterday,
+  presetLastNDays,
+  presetThisWeek,
+  presetLastWeek,
+  presetThisMonth,
+  presetLastMonth,
+  presetThisYear,
+  presetLastYear,
 } from '@reachgr/alpine-calendar'
 
 import type {
   CalendarConfig,
   CalendarConfigRule,
+  RangePreset,
   DayCell,
   MonthCell,
   YearCell,
@@ -464,7 +576,9 @@ import type {
   Placement,
   PositionOptions,
   DateConstraintOptions,
+  DateConstraintProperties,
   DateConstraintRule,
+  ConstraintMessages,
   InputMask,
   MaskEventHandlers,
 } from '@reachgr/alpine-calendar'
