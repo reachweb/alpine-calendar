@@ -1405,11 +1405,11 @@ describe('hiddenInputValues', () => {
 // Input binding — init() auto-bind
 // ---------------------------------------------------------------------------
 
-describe('init() — auto-bind to x-ref="input"', () => {
-  it('auto-binds to x-ref="input" when present', () => {
+describe('init() — auto-bind to x-ref="rc-input"', () => {
+  it('auto-binds to x-ref="rc-input" when present', () => {
     const input = document.createElement('input')
     const c = createCalendarData({ value: '2025-06-15' })
-    const { flushNextTick } = withAlpineMocks(c, { refs: { input } })
+    const { flushNextTick } = withAlpineMocks(c, { refs: { 'rc-input': input } })
     c.init()
     flushNextTick()
 
@@ -1417,7 +1417,7 @@ describe('init() — auto-bind to x-ref="input"', () => {
     expect(input.value).toBe('15/06/2025')
   })
 
-  it('does not bind when x-ref="input" is absent', () => {
+  it('does not bind when x-ref="rc-input" is absent', () => {
     const c = createCalendarData()
     const { flushNextTick } = withAlpineMocks(c, { refs: {} })
     c.init()
@@ -1429,7 +1429,7 @@ describe('init() — auto-bind to x-ref="input"', () => {
   it('does not bind when ref is not an HTMLInputElement', () => {
     const div = document.createElement('div')
     const c = createCalendarData()
-    const { flushNextTick } = withAlpineMocks(c, { refs: { input: div } })
+    const { flushNextTick } = withAlpineMocks(c, { refs: { 'rc-input': div } })
     c.init()
     flushNextTick()
 
@@ -1439,7 +1439,7 @@ describe('init() — auto-bind to x-ref="input"', () => {
   it('sets placeholder on auto-bound input', () => {
     const input = document.createElement('input')
     const c = createCalendarData({ format: 'DD/MM/YYYY' })
-    const { flushNextTick } = withAlpineMocks(c, { refs: { input } })
+    const { flushNextTick } = withAlpineMocks(c, { refs: { 'rc-input': input } })
     c.init()
     flushNextTick()
 
@@ -1450,11 +1450,46 @@ describe('init() — auto-bind to x-ref="input"', () => {
     const input = document.createElement('input')
     input.placeholder = 'Enter date'
     const c = createCalendarData()
-    const { flushNextTick } = withAlpineMocks(c, { refs: { input } })
+    const { flushNextTick } = withAlpineMocks(c, { refs: { 'rc-input': input } })
     c.init()
     flushNextTick()
 
     expect(input.placeholder).toBe('Enter date')
+  })
+
+  it('auto-binds to custom inputRef name', () => {
+    const input = document.createElement('input')
+    const c = createCalendarData({ value: '2025-06-15', inputRef: 'dateField' })
+    const { flushNextTick } = withAlpineMocks(c, { refs: { dateField: input } })
+    c.init()
+    flushNextTick()
+
+    expect(c._inputEl).toBe(input)
+    expect(input.value).toBe('15/06/2025')
+  })
+
+  it('warns when popup has no input ref', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const c = createCalendarData({ display: 'popup' })
+    const { flushNextTick } = withAlpineMocks(c, { refs: {} })
+    c.init()
+    flushNextTick()
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[reach-calendar] Popup mode requires an <input x-ref="rc-input">'),
+    )
+    warnSpy.mockRestore()
+  })
+
+  it('does not warn for inline mode without input ref', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const c = createCalendarData({ display: 'inline' })
+    const { flushNextTick } = withAlpineMocks(c, { refs: {} })
+    c.init()
+    flushNextTick()
+
+    expect(warnSpy).not.toHaveBeenCalled()
+    warnSpy.mockRestore()
   })
 })
 
@@ -1517,8 +1552,8 @@ describe('bindInput()', () => {
 
     // bindInput sets el.value = inputValue, then attachMask reformats through mask
     expect(input.value).toBe('15/06/2025')
-    // _detachMask should be set (mask + sync listener cleanup)
-    expect(c._detachMask).not.toBeNull()
+    // _detachInput should be set (mask + sync listener cleanup)
+    expect(c._detachInput).not.toBeNull()
   })
 
   it('does not apply mask when mask is disabled', () => {
@@ -1532,6 +1567,133 @@ describe('bindInput()', () => {
     // With mask disabled, input value is set to inputValue (empty or formatted)
     // The existing value gets replaced with the component's inputValue
     expect(input.value).toBe('')
+  })
+
+  it('attaches focus handler that opens popup', () => {
+    const input = document.createElement('input')
+    const c = createCalendarData({ display: 'popup', mask: false })
+    const { dispatchSpy } = withAlpineMocks(c)
+    c.init()
+    c.bindInput(input)
+
+    expect(c.isOpen).toBe(false)
+    input.dispatchEvent(new Event('focus'))
+    expect(c.isOpen).toBe(true)
+    expect(dispatchSpy).toHaveBeenCalledWith('calendar:open')
+  })
+
+  it('attaches blur handler that parses input', () => {
+    const input = document.createElement('input')
+    const c = createCalendarData({ display: 'popup', mask: false })
+    withAlpineMocks(c)
+    c.init()
+    c.bindInput(input)
+
+    input.value = '15/06/2025'
+    input.dispatchEvent(new Event('blur'))
+    expect(c.selectedDates).toHaveLength(1)
+    expect(c.selectedDates[0].toISO()).toBe('2025-06-15')
+  })
+
+  it('sets aria attributes on popup input', () => {
+    const input = document.createElement('input')
+    const c = createCalendarData({ display: 'popup', mask: false })
+    withAlpineMocks(c)
+    c.init()
+    c.bindInput(input)
+
+    expect(input.getAttribute('role')).toBe('combobox')
+    expect(input.getAttribute('aria-haspopup')).toBe('dialog')
+    expect(input.getAttribute('aria-expanded')).toBe('false')
+    expect(input.getAttribute('autocomplete')).toBe('off')
+  })
+
+  it('does not set aria attributes on inline input', () => {
+    const input = document.createElement('input')
+    const c = createCalendarData({ display: 'inline', mask: false })
+    withAlpineMocks(c)
+    c.init()
+    c.bindInput(input)
+
+    expect(input.getAttribute('role')).toBeNull()
+    expect(input.getAttribute('aria-haspopup')).toBeNull()
+  })
+
+  it('sets inputId on popup input without existing id', () => {
+    const input = document.createElement('input')
+    const c = createCalendarData({ display: 'popup', inputId: 'date-field', mask: false })
+    withAlpineMocks(c)
+    c.init()
+    c.bindInput(input)
+
+    expect(input.id).toBe('date-field')
+  })
+
+  it('does not override existing input id', () => {
+    const input = document.createElement('input')
+    input.id = 'existing-id'
+    const c = createCalendarData({ display: 'popup', inputId: 'date-field', mask: false })
+    withAlpineMocks(c)
+    c.init()
+    c.bindInput(input)
+
+    expect(input.id).toBe('existing-id')
+  })
+
+  it('does not override existing aria-label', () => {
+    const input = document.createElement('input')
+    input.setAttribute('aria-label', 'Custom label')
+    const c = createCalendarData({ display: 'popup', mask: false })
+    withAlpineMocks(c)
+    c.init()
+    c.bindInput(input)
+
+    expect(input.getAttribute('aria-label')).toBe('Custom label')
+  })
+
+  it('removes aria attributes on detach', () => {
+    const input = document.createElement('input')
+    const c = createCalendarData({ display: 'popup', mask: false })
+    withAlpineMocks(c)
+    c.init()
+    c.bindInput(input)
+
+    expect(input.getAttribute('role')).toBe('combobox')
+    c._detachInput!()
+    expect(input.getAttribute('role')).toBeNull()
+    expect(input.getAttribute('aria-haspopup')).toBeNull()
+    expect(input.getAttribute('aria-expanded')).toBeNull()
+    expect(input.getAttribute('autocomplete')).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Input binding — aria-expanded sync
+// ---------------------------------------------------------------------------
+
+describe('aria-expanded sync', () => {
+  it('open() sets aria-expanded="true" on bound input', () => {
+    const input = document.createElement('input')
+    const c = createCalendarData({ display: 'popup', mask: false })
+    withAlpineMocks(c)
+    c.init()
+    c.bindInput(input)
+
+    c.open()
+    expect(input.getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('close() sets aria-expanded="false" on bound input', () => {
+    const input = document.createElement('input')
+    const c = createCalendarData({ display: 'popup', mask: false })
+    withAlpineMocks(c)
+    c.init()
+    c.bindInput(input)
+
+    c.open()
+    expect(input.getAttribute('aria-expanded')).toBe('true')
+    c.close()
+    expect(input.getAttribute('aria-expanded')).toBe('false')
   })
 })
 
@@ -1991,9 +2153,9 @@ describe('destroy()', () => {
     c.init()
     c.bindInput(input)
 
-    expect(c._detachMask).not.toBeNull()
+    expect(c._detachInput).not.toBeNull()
     c.destroy()
-    expect(c._detachMask).toBeNull()
+    expect(c._detachInput).toBeNull()
   })
 
   it('is safe to call multiple times', () => {
@@ -2004,7 +2166,7 @@ describe('destroy()', () => {
     c.destroy()
     c.destroy() // should not throw
     expect(c._inputEl).toBeNull()
-    expect(c._detachMask).toBeNull()
+    expect(c._detachInput).toBeNull()
   })
 })
 

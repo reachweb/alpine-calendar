@@ -282,9 +282,7 @@ ${calendarInner}
 </div>`
 
   if (isPopup) {
-    // For popup: input + popup overlay wrapper
-    const inputEl = '<input x-ref="input" type="text" class="rc-input" role="combobox" :id="inputId" :aria-label="inputAriaLabel" aria-haspopup="dialog" :aria-expanded="isOpen" autocomplete="off" @focus="handleFocus()" @blur="handleBlur()">'
-    return inputEl + '\n' + popupWrapper(calendarEl)
+    return popupWrapper(calendarEl)
   }
 
   return calendarEl

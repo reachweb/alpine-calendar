@@ -302,20 +302,17 @@ describe('Template ARIA attributes', () => {
     expect(html).toContain('x-text="_statusMessage"')
   })
 
-  it('popup input has :aria-label, aria-haspopup="dialog", :aria-expanded', () => {
-    const html = generateCalendarTemplate({
-      display: 'popup',
-      isDualMonth: false,
-      isWizard: false,
-      hasName: false,
-      showWeekNumbers: false,
-      hasPresets: false,
-      isScrollable: false,
-      scrollHeight: 300,
-    })
-    expect(html).toContain(':aria-label="inputAriaLabel"')
-    expect(html).toContain('aria-haspopup="dialog"')
-    expect(html).toContain(':aria-expanded="isOpen"')
+  it('bindInput sets aria-haspopup="dialog" and aria-expanded on popup input', () => {
+    const input = document.createElement('input')
+    const c = createCalendarData({ display: 'popup' })
+    const { flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+    c.bindInput(input)
+
+    expect(input.getAttribute('aria-haspopup')).toBe('dialog')
+    expect(input.getAttribute('aria-expanded')).toBe('false')
+    expect(input.getAttribute('aria-label')).toBe('Select date')
   })
 
   it('popup wrapper has role="dialog" and aria-modal="true"', () => {
@@ -551,33 +548,51 @@ describe('Gridcell tabindex', () => {
 // Popup input attributes
 // ===========================================================================
 
-describe('Popup input attributes', () => {
-  it('popup input has autocomplete="off"', () => {
-    const html = generateCalendarTemplate({
-      display: 'popup',
-      isDualMonth: false,
-      isWizard: false,
-      hasName: false,
-      showWeekNumbers: false,
-      hasPresets: false,
-      isScrollable: false,
-      scrollHeight: 300,
-    })
-    expect(html).toContain('autocomplete="off"')
+describe('Popup input attributes (set by bindInput)', () => {
+  it('bindInput sets autocomplete="off" on popup input', () => {
+    const input = document.createElement('input')
+    const c = createCalendarData({ display: 'popup' })
+    const { flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+    c.bindInput(input)
+
+    expect(input.getAttribute('autocomplete')).toBe('off')
   })
 
-  it('popup input has :id="inputId" binding', () => {
-    const html = generateCalendarTemplate({
-      display: 'popup',
-      isDualMonth: false,
-      isWizard: false,
-      hasName: false,
-      showWeekNumbers: false,
-      hasPresets: false,
-      isScrollable: false,
-      scrollHeight: 300,
-    })
-    expect(html).toContain(':id="inputId"')
+  it('bindInput sets role="combobox" on popup input', () => {
+    const input = document.createElement('input')
+    const c = createCalendarData({ display: 'popup' })
+    const { flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+    c.bindInput(input)
+
+    expect(input.getAttribute('role')).toBe('combobox')
+  })
+
+  it('bindInput sets inputId as id on popup input', () => {
+    const input = document.createElement('input')
+    const c = createCalendarData({ display: 'popup', inputId: 'my-date' })
+    const { flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+    c.bindInput(input)
+
+    expect(input.id).toBe('my-date')
+  })
+
+  it('bindInput does not set aria attributes on inline input', () => {
+    const input = document.createElement('input')
+    const c = createCalendarData({ display: 'inline' })
+    const { flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+    c.bindInput(input)
+
+    expect(input.getAttribute('role')).toBeNull()
+    expect(input.getAttribute('aria-haspopup')).toBeNull()
+    expect(input.getAttribute('autocomplete')).toBeNull()
   })
 })
 
@@ -693,7 +708,7 @@ describe('Focus management', () => {
     const inputEl = document.createElement('input')
     inputEl.focus = vi.fn()
     const c = createCalendarData({ display: 'popup' })
-    const { flushNextTick } = withAlpineMocks(c, { refs: { input: inputEl } })
+    const { flushNextTick } = withAlpineMocks(c, { refs: { 'rc-input': inputEl } })
     c.init()
     flushNextTick()
 

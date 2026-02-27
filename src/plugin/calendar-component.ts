@@ -112,6 +112,8 @@ export interface CalendarConfig {
   name?: string
   /** ID attribute for the popup input element. Allows external `<label for="...">` association. */
   inputId?: string
+  /** Alpine x-ref name for the input element. Default: 'rc-input'. */
+  inputRef?: string
   /** Show ISO 8601 week numbers on the left side of the day grid. Default: false. */
   showWeekNumbers?: boolean
   /**
@@ -464,6 +466,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
   const presets: RangePreset[] = config.presets ?? []
   const inputName = config.name ?? ''
   const inputId = config.inputId ?? null
+  const inputRef = config.inputRef ?? 'rc-input'
   const locale = config.locale
   const closeOnSelect = config.closeOnSelect ?? true
   const beforeSelectCb = config.beforeSelect ?? null
@@ -578,7 +581,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     _isYearDisabled: constraints.isYearDisabled,
     _getDisabledReasons: constraints.getDisabledReasons,
     _inputEl: null as HTMLInputElement | null,
-    _detachMask: null as (() => void) | null,
+    _detachInput: null as (() => void) | null,
     _syncing: false,
     _Alpine: (Alpine ?? null) as { initTree: (el: HTMLElement) => void } | null,
     _autoRendered: false,
@@ -693,24 +696,28 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     // --- Lifecycle ---
 
     init() {
-      // Auto-template injection: if element is empty, inject default template
+      // Auto-template injection: append calendar template if not already present
       const el = alpine(this).$el
-      const hasContent = Array.from(el.childNodes).some(
-        (n) => n.nodeType === 1 || (n.nodeType === 3 && n.textContent?.trim()),
-      )
-      if (!hasContent && config.template !== false && this._Alpine?.initTree) {
-        el.innerHTML = generateCalendarTemplate({
-          display: this.display,
-          isDualMonth: this.monthCount === 2,
-          isWizard: this.wizardMode !== 'none',
-          hasName: !!this.inputName,
-          showWeekNumbers: this.showWeekNumbers,
-          hasPresets: this.presets.length > 0,
-          isScrollable: this.isScrollable,
-          scrollHeight: this._scrollHeight,
-        })
-        for (const child of Array.from(el.children)) {
-          this._Alpine.initTree(child as HTMLElement)
+      const hasCalendar = el.querySelector('.rc-calendar') !== null
+      if (!hasCalendar && config.template !== false && this._Alpine?.initTree) {
+        const fragment = document.createRange().createContextualFragment(
+          generateCalendarTemplate({
+            display: this.display,
+            isDualMonth: this.monthCount === 2,
+            isWizard: this.wizardMode !== 'none',
+            hasName: !!this.inputName,
+            showWeekNumbers: this.showWeekNumbers,
+            hasPresets: this.presets.length > 0,
+            isScrollable: this.isScrollable,
+            scrollHeight: this._scrollHeight,
+          }),
+        )
+        const newElements = Array.from(fragment.children).filter(
+          (c): c is HTMLElement => c instanceof HTMLElement,
+        )
+        el.appendChild(fragment)
+        for (const child of newElements) {
+          this._Alpine.initTree(child)
         }
         this._autoRendered = true
       }
@@ -743,11 +750,15 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         this._announceViewChange()
       })
 
-      // Auto-bind to x-ref="input" if present
+      // Auto-bind to x-ref input if present
       alpine(this).$nextTick(() => {
         const refs = alpine(this).$refs
-        if (refs && refs['input'] && refs['input'] instanceof HTMLInputElement) {
-          this.bindInput(refs['input'])
+        if (refs && refs[inputRef] && refs[inputRef] instanceof HTMLInputElement) {
+          this.bindInput(refs[inputRef])
+        } else if (this.display === 'popup') {
+          console.warn(
+            `[reach-calendar] Popup mode requires an <input x-ref="${inputRef}"> inside the x-data container.`,
+          )
         }
         // Init scroll listener for scrollable multi-month
         if (this.isScrollable) {
@@ -762,13 +773,15 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         this._scrollObserver = null
       }
       this._scrollContainerEl = null
-      if (this._detachMask) {
-        this._detachMask()
-        this._detachMask = null
+      if (this._detachInput) {
+        this._detachInput()
+        this._detachInput = null
       }
       this._inputEl = null
       if (this._autoRendered) {
-        alpine(this).$el.innerHTML = ''
+        const el = alpine(this).$el
+        el.querySelector('.rc-popup-overlay')?.remove()
+        el.querySelector('.rc-calendar')?.remove()
         this._autoRendered = false
       }
     },
@@ -1001,18 +1014,20 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
      * Sets up input masking (if enabled), syncs the initial value, and
      * attaches an input listener to keep `inputValue` in sync.
      *
-     * Usage in Alpine template:
+     * Usage:
      * ```html
-     * <input x-ref="input" @focus="handleFocus()" @blur="handleBlur()">
+     * <div x-data="calendar({ display: 'popup' })">
+     *   <input x-ref="rc-input" type="text">
+     * </div>
      * ```
-     * The component auto-binds to `x-ref="input"` during init().
-     * For custom refs, call `bindInput($refs.myInput)` explicitly.
+     * The component auto-binds to `x-ref="${inputRef}"` during init().
+     * For custom refs, set `inputRef` in config or call `bindInput($refs.myInput)` explicitly.
      */
     bindInput(el: HTMLInputElement) {
       // Clean up previous binding
-      if (this._detachMask) {
-        this._detachMask()
-        this._detachMask = null
+      if (this._detachInput) {
+        this._detachInput()
+        this._detachInput = null
       }
 
       this._inputEl = el
@@ -1022,7 +1037,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
 
       // Attach mask if enabled
       if (useMask) {
-        this._detachMask = attachMask(el, format)
+        this._detachInput = attachMask(el, format)
         // attachMask reformats the existing value through the mask
         this.inputValue = el.value
       }
@@ -1035,11 +1050,39 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       }
       el.addEventListener('input', syncHandler)
 
-      // Extend detach to include our sync listener
-      const prevDetach = this._detachMask
-      this._detachMask = () => {
+      // Attach focus/blur handlers for popup mode
+      const focusHandler = () => this.handleFocus()
+      const blurHandler = () => this.handleBlur()
+      el.addEventListener('focus', focusHandler)
+      el.addEventListener('blur', blurHandler)
+
+      // Set aria attributes for popup combobox pattern
+      if (display === 'popup') {
+        el.setAttribute('role', 'combobox')
+        el.setAttribute('aria-haspopup', 'dialog')
+        el.setAttribute('aria-expanded', String(this.isOpen))
+        el.setAttribute('autocomplete', 'off')
+        if (inputId && !el.id) {
+          el.id = inputId
+        }
+        if (!el.getAttribute('aria-label')) {
+          el.setAttribute('aria-label', this.inputAriaLabel)
+        }
+      }
+
+      // Extend detach to include all listeners and aria attributes
+      const prevDetach = this._detachInput
+      this._detachInput = () => {
         prevDetach?.()
         el.removeEventListener('input', syncHandler)
+        el.removeEventListener('focus', focusHandler)
+        el.removeEventListener('blur', blurHandler)
+        if (display === 'popup') {
+          el.removeAttribute('role')
+          el.removeAttribute('aria-haspopup')
+          el.removeAttribute('aria-expanded')
+          el.removeAttribute('autocomplete')
+        }
       }
 
       // Set placeholder if not already set
@@ -1701,6 +1744,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       }
 
       this.isOpen = true
+      this._inputEl?.setAttribute('aria-expanded', 'true')
       alpine(this).$dispatch('calendar:open')
 
       // CSS handles centered modal layout via `.rc-popup-overlay`
@@ -1712,6 +1756,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     close() {
       if (this.display !== 'popup') return
       this.isOpen = false
+      this._inputEl?.setAttribute('aria-expanded', 'false')
       alpine(this).$dispatch('calendar:close')
     },
 
