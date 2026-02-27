@@ -92,7 +92,7 @@ When `name` is set, hidden `<input>` elements are auto-generated for form submis
 
 ### Disabling Auto-Rendering
 
-Set `template: false` to require a manual template, or simply add child elements — the calendar skips auto-rendering when the element has content:
+Set `template: false` to require a manual template, or provide your own `.rc-calendar` element — the calendar skips auto-rendering when it detects an existing `.rc-calendar`:
 
 ```html
 <!-- Manual template (auto-rendering skipped) -->
@@ -173,7 +173,7 @@ All options are passed via `x-data="calendar({ ... })"`.
 | `scrollHeight` | `number` | `400` | Max height (px) of scrollable container when `months >= 3` |
 | `presets` | `RangePreset[]` | — | Predefined date range shortcuts (see [Range Presets](#range-presets)) |
 | `constraintMessages` | `ConstraintMessages` | — | Custom tooltip strings for disabled dates |
-| `template` | `boolean` | `true` | Auto-render template when element is empty |
+| `template` | `boolean` | `true` | Auto-render template when no `.rc-calendar` exists |
 
 ### Date Constraints
 

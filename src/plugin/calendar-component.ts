@@ -153,7 +153,7 @@ export interface CalendarConfig {
   ) => boolean | undefined
   /** Custom messages for disabled-date tooltips. Overrides default English strings. */
   constraintMessages?: ConstraintMessages
-  /** Auto-render template when element is empty. Default: true. Set false to require manual template. */
+  /** Auto-render template when no `.rc-calendar` exists in the container. Default: true. Set false to require manual template. */
   template?: boolean
 }
 
@@ -583,6 +583,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     _inputEl: null as HTMLInputElement | null,
     _detachInput: null as (() => void) | null,
     _syncing: false,
+    _suppressFocusOpen: false,
     _Alpine: (Alpine ?? null) as { initTree: (el: HTMLElement) => void } | null,
     _autoRendered: false,
 
@@ -757,7 +758,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
           this.bindInput(refs[inputRef])
         } else if (this.display === 'popup') {
           console.warn(
-            `[reach-calendar] Popup mode requires an <input x-ref="${inputRef}"> inside the x-data container.`,
+            `[reach-calendar] Popup mode requires an <input x-ref="${inputRef}"> inside the component container.`,
           )
         }
         // Init scroll listener for scrollable multi-month
@@ -1016,11 +1017,10 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
      *
      * Usage:
      * ```html
-     * <div x-data="calendar({ display: 'popup' })">
+     * <!-- Alpine component root with calendar() -->
      *   <input x-ref="rc-input" type="text">
-     * </div>
      * ```
-     * The component auto-binds to `x-ref="${inputRef}"` during init().
+     * The component auto-binds to the ref named by `config.inputRef` (default: `rc-input`) during init().
      * For custom refs, set `inputRef` in config or call `bindInput($refs.myInput)` explicitly.
      */
     bindInput(el: HTMLInputElement) {
@@ -1105,6 +1105,10 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
      * Opens the calendar popup in popup display mode.
      */
     handleFocus() {
+      if (this._suppressFocusOpen) {
+        this._suppressFocusOpen = false
+        return
+      }
       this.open()
     },
 
@@ -1808,6 +1812,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         if (display === 'popup' && this.isOpen) {
           this.close()
           if (this._inputEl) {
+            this._suppressFocusOpen = true
             this._inputEl.focus()
           }
         }

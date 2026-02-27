@@ -1722,6 +1722,23 @@ describe('handleFocus()', () => {
     expect(c.isOpen).toBe(true) // was already true
     expect(dispatchSpy).not.toHaveBeenCalled()
   })
+
+  it('skips open when _suppressFocusOpen is set (avoids close/reopen loop)', () => {
+    const c = createCalendarData({ display: 'popup' })
+    const { dispatchSpy } = withAlpineMocks(c)
+    c.init()
+
+    // Simulate: popup was open, Escape closed it and set suppression flag
+    c._suppressFocusOpen = true
+    c.handleFocus()
+    expect(c.isOpen).toBe(false)
+    expect(dispatchSpy).not.toHaveBeenCalled()
+
+    // Flag is consumed — next focus opens normally
+    c.handleFocus()
+    expect(c.isOpen).toBe(true)
+    expect(dispatchSpy).toHaveBeenCalledWith('calendar:open')
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -2323,6 +2340,29 @@ describe('handleKeydown', () => {
 
     c.handleKeydown(new KeyboardEvent('keydown', { key: 'Escape' }))
     expect(focusSpy).toHaveBeenCalled()
+  })
+
+  it('sets _suppressFocusOpen before focusing input on Escape', () => {
+    const input = document.createElement('input')
+
+    const c = createCalendarData({ display: 'popup', mask: false })
+    const { flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+    c.bindInput(input)
+
+    c.open()
+    flushNextTick()
+
+    // Verify the flag is set after Escape
+    c.handleKeydown(new KeyboardEvent('keydown', { key: 'Escape' }))
+    // Flag should still be true (consumed only by handleFocus)
+    expect(c._suppressFocusOpen).toBe(true)
+
+    // Calling handleFocus should NOT reopen
+    c.handleFocus()
+    expect(c.isOpen).toBe(false)
+    expect(c._suppressFocusOpen).toBe(false)
   })
 
   it('does nothing for unhandled keys', () => {
