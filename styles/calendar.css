@@ -195,11 +195,21 @@
  * ------------------------------------------------------------------------- */
 
 .rc-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 1px;
   overflow: hidden;
   position: relative;
+}
+
+.rc-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+}
+
+.rc-row--week-numbers {
+  grid-template-columns: 2rem repeat(7, 1fr);
 }
 
 .rc-day {
@@ -461,10 +471,7 @@
   /* intentionally blank */
 }
 
-/* Day grid with week number column */
-.rc-grid--week-numbers {
-  grid-template-columns: 2rem repeat(7, 1fr);
-}
+/* Day grid with week number column (layout on .rc-row--week-numbers) */
 
 /* Week number cell */
 .rc-week-number {

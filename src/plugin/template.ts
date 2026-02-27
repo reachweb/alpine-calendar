@@ -17,6 +17,40 @@ export interface TemplateOptions {
 const closeSvg = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>'
 
 // ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+/** A calendar grid always has 6 rows (weeks). */
+const GRID_ROWS = 6
+
+// ---------------------------------------------------------------------------
+// Helpers: unrolled day-grid rows
+// ---------------------------------------------------------------------------
+
+/**
+ * Generate a layout-only row div for a specific row index.
+ * No ARIA role — the row is transparent to the accessibility tree.
+ * The parent listbox directly owns the option children through these wrappers.
+ */
+function dayRow(ri: number, showWeekNumbers: boolean): string {
+  const rowClass = showWeekNumbers ? 'rc-row rc-row--week-numbers' : 'rc-row'
+  const weekNumCell = showWeekNumbers
+    ? `<div class="rc-week-number" x-text="mg.weekNumbers[${ri}]"></div>`
+    : ''
+
+  return `<div class="${rowClass}" x-show="mg.rows.length > ${ri}">
+                ${weekNumCell}<template x-for="cell in (mg.rows[${ri}] || [])" :key="cell.date.toISO()">
+                  <div :class="dayClasses(cell)" :id="'day-' + cell.date.toISO()" :aria-selected="isSelected(cell.date)" :aria-disabled="cell.isDisabled" :title="dayTitle(cell)" role="option" tabindex="-1" @click="!cell.isDisabled && selectDate(cell.date)" @mouseenter="hoverDate = cell.date" @mouseleave="hoverDate = null" x-text="cell.date.day"></div>
+                </template>
+              </div>`
+}
+
+/** Generate all 6 unrolled row templates. */
+function dayRows(showWeekNumbers: boolean): string {
+  return Array.from({ length: GRID_ROWS }, (_, ri) => dayRow(ri, showWeekNumbers)).join('\n            ')
+}
+
+// ---------------------------------------------------------------------------
 // View fragments
 // ---------------------------------------------------------------------------
 
@@ -28,13 +62,9 @@ function yearPickerView(): string {
       <span class="rc-header__label" x-text="decadeLabel"></span>
       <button class="rc-header__nav" @click="next()" :disabled="!canGoNext" aria-label="Next decade">&#8250;</button>
     </div>
-    <div class="rc-year-grid" role="grid" :aria-label="decadeLabel">
-      <template x-for="(row, ri) in yearGrid" :key="ri">
-        <div role="row" style="display:contents">
-          <template x-for="cell in row" :key="cell.year">
-            <div :class="yearClasses(cell)" :aria-disabled="cell.isDisabled" role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectYear(cell.year)" x-text="cell.label"></div>
-          </template>
-        </div>
+    <div class="rc-year-grid" role="group" :aria-label="decadeLabel">
+      <template x-for="cell in yearGrid.flat()" :key="cell.year">
+        <div :class="yearClasses(cell)" :aria-disabled="cell.isDisabled" tabindex="-1" @click="!cell.isDisabled && selectYear(cell.year)" x-text="cell.label"></div>
       </template>
     </div>
   </div>
@@ -49,13 +79,9 @@ function monthPickerView(): string {
       <button class="rc-header__label" @click="setView('years')" aria-label="Change view" x-text="yearLabel"></button>
       <button class="rc-header__nav" @click="next()" :disabled="!canGoNext" aria-label="Next year">&#8250;</button>
     </div>
-    <div class="rc-month-grid" role="grid" :aria-label="yearLabel">
-      <template x-for="(row, ri) in monthGrid" :key="ri">
-        <div role="row" style="display:contents">
-          <template x-for="cell in row" :key="cell.month">
-            <div :class="monthClasses(cell)" :aria-disabled="cell.isDisabled" role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectMonth(cell.month)" x-text="cell.label"></div>
-          </template>
-        </div>
+    <div class="rc-month-grid" role="group" :aria-label="yearLabel">
+      <template x-for="cell in monthGrid.flat()" :key="cell.month">
+        <div :class="monthClasses(cell)" :aria-disabled="cell.isDisabled" tabindex="-1" @click="!cell.isDisabled && selectMonth(cell.month)" x-text="cell.label"></div>
       </template>
     </div>
   </div>
@@ -68,7 +94,9 @@ function dayView(isDual: boolean, showWeekNumbers: boolean): string {
   const nextStyle = isDual ? ' :style="gi < grid.length - 1 ? \'visibility:hidden\' : \'\'"' : ''
   const monthsClass = isDual ? ' :class="{ \'rc-months--dual\': monthCount === 2 }"' : ''
 
-  // Weekday headers: optional week number label column
+  const gridClassBinding = `:class="{ 'rc-grid--slide-next': _navDirection === 'next', 'rc-grid--slide-prev': _navDirection === 'prev' }"`
+
+  // Weekday headers
   const weekdayBlock = showWeekNumbers
     ? `<div class="rc-weekdays rc-weekdays--week-numbers">
           <span class="rc-weekday rc-week-label"></span>
@@ -82,28 +110,10 @@ function dayView(isDual: boolean, showWeekNumbers: boolean): string {
           </template>
         </div>`
 
-  // Grid: row-wrapped gridcells for ARIA compliance (role="grid" > role="row" > role="gridcell")
-  const gridClass = showWeekNumbers
-    ? `"rc-grid rc-grid--week-numbers"`
-    : `"rc-grid"`
-  const gridClassBinding = `:class="{ 'rc-grid--slide-next': _navDirection === 'next', 'rc-grid--slide-prev': _navDirection === 'prev' }"`
+  const gridClass = showWeekNumbers ? '"rc-grid rc-grid--week-numbers"' : '"rc-grid"'
 
-  const cellsBlock = showWeekNumbers
-    ? `<template x-for="(row, ri) in mg.rows" :key="ri">
-              <div role="row" style="display:contents">
-                <div class="rc-week-number" x-text="mg.weekNumbers[ri]"></div>
-                <template x-for="cell in row" :key="cell.date.toISO()">
-                  <div :class="dayClasses(cell)" :id="'day-' + cell.date.toISO()" :aria-selected="isSelected(cell.date)" :aria-disabled="cell.isDisabled" :title="dayTitle(cell)" role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectDate(cell.date)" @mouseenter="hoverDate = cell.date" @mouseleave="hoverDate = null" x-text="cell.date.day"></div>
-                </template>
-              </div>
-            </template>`
-    : `<template x-for="(row, ri) in mg.rows" :key="ri">
-              <div role="row" style="display:contents">
-                <template x-for="cell in row" :key="cell.date.toISO()">
-                  <div :class="dayClasses(cell)" :id="'day-' + cell.date.toISO()" :aria-selected="isSelected(cell.date)" :aria-disabled="cell.isDisabled" :title="dayTitle(cell)" role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectDate(cell.date)" @mouseenter="hoverDate = cell.date" @mouseleave="hoverDate = null" x-text="cell.date.day"></div>
-                </template>
-              </div>
-            </template>`
+  // Unrolled rows — each row is a static DOM element with its own x-for
+  const rows = dayRows(showWeekNumbers)
 
   return `<template x-if="view === 'days'">
   <div class="rc-months${isDual ? '' : ' rc-view-enter'}"${monthsClass}${isDual ? '' : ''}>
@@ -116,8 +126,8 @@ function dayView(isDual: boolean, showWeekNumbers: boolean): string {
         </div>
         ${weekdayBlock}
         <div class="rc-grid-wrapper">
-          <div class=${gridClass} ${gridClassBinding} @animationend="_navDirection = ''" role="grid" :aria-label="monthYearLabel(gi)">
-            ${cellsBlock}
+          <div class=${gridClass} ${gridClassBinding} @animationend="_navDirection = ''" role="listbox" :aria-label="monthYearLabel(gi)">
+            ${rows}
           </div>
         </div>
       </div>
@@ -140,24 +150,10 @@ function scrollableDayView(showWeekNumbers: boolean, scrollHeight: number): stri
           </template>
         </div>`
 
-  const gridClass = showWeekNumbers ? `"rc-grid rc-grid--week-numbers"` : `"rc-grid"`
+  const gridClass = showWeekNumbers ? '"rc-grid rc-grid--week-numbers"' : '"rc-grid"'
 
-  const cellsBlock = showWeekNumbers
-    ? `<template x-for="(row, ri) in mg.rows" :key="ri">
-              <div role="row" style="display:contents">
-                <div class="rc-week-number" x-text="mg.weekNumbers[ri]"></div>
-                <template x-for="cell in row" :key="cell.date.toISO()">
-                  <div :class="dayClasses(cell)" :id="'day-' + cell.date.toISO()" :aria-selected="isSelected(cell.date)" :aria-disabled="cell.isDisabled" :title="dayTitle(cell)" role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectDate(cell.date)" @mouseenter="hoverDate = cell.date" @mouseleave="hoverDate = null" x-text="cell.date.day"></div>
-                </template>
-              </div>
-            </template>`
-    : `<template x-for="(row, ri) in mg.rows" :key="ri">
-              <div role="row" style="display:contents">
-                <template x-for="cell in row" :key="cell.date.toISO()">
-                  <div :class="dayClasses(cell)" :id="'day-' + cell.date.toISO()" :aria-selected="isSelected(cell.date)" :aria-disabled="cell.isDisabled" :title="dayTitle(cell)" role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectDate(cell.date)" @mouseenter="hoverDate = cell.date" @mouseleave="hoverDate = null" x-text="cell.date.day"></div>
-                </template>
-              </div>
-            </template>`
+  // Unrolled rows
+  const rows = dayRows(showWeekNumbers)
 
   return `<template x-if="view === 'days'">
   <div>
@@ -171,8 +167,8 @@ function scrollableDayView(showWeekNumbers: boolean, scrollHeight: number): stri
           <div class="rc-header rc-header--scroll" x-show="gi > 0">
             <span class="rc-header__label rc-header__label--scroll" x-text="monthYearLabel(gi)"></span>
           </div>
-          <div class=${gridClass} role="grid" :aria-label="monthYearLabel(gi)">
-            ${cellsBlock}
+          <div class=${gridClass} role="listbox" :aria-label="monthYearLabel(gi)">
+            ${rows}
           </div>
         </div>
       </template>

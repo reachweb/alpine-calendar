@@ -35,8 +35,8 @@ async function runAxe(options: TemplateOptions): Promise<axe.AxeResults> {
     .replace(/:disabled="[^"]+"/g, '')
     // :tabindex → tabindex
     .replace(/:tabindex="[^"]+"/g, 'tabindex="-1"')
-    // :role bindings → role="gridcell"
-    .replace(/:role="[^"]+"/g, 'role="gridcell"')
+    // :role bindings → remove (row divs have no ARIA role; cells have static role="option")
+    .replace(/:role="[^"]+"/g, '')
     // :title bindings → title
     .replace(/:title="[^"]+"/g, 'title="Date"')
     // :style bindings → remove
@@ -47,7 +47,8 @@ async function runAxe(options: TemplateOptions): Promise<axe.AxeResults> {
     .replace(/x-ref="[^"]+"/g, '')
     .replace(/x-show="[^"]+"/g, '')
     // x-text → inject placeholder text content into element
-    .replace(/x-text="[^"]+">([\s]*)<\//g, '>Label</')
+    // Handle x-text anywhere in attribute list (not just as last attr before >)
+    .replace(/(<[^>]*?)x-text="[^"]+"([^>]*>)\s*(<\/)/g, '$1$2Label$3')
     .replace(/x-text="[^"]+"/g, '')
     .replace(/x-if="[^"]+"/g, '')
     .replace(/x-for="[^"]+"/g, '')
@@ -84,11 +85,10 @@ async function runAxe(options: TemplateOptions): Promise<axe.AxeResults> {
       'duplicate-id': { enabled: false },
       'duplicate-id-active': { enabled: false },
       'duplicate-id-aria': { enabled: false },
-      // Grid uses flat CSS grid layout, not semantic table rows.
-      // gridcells are direct children of role="grid" without role="row" wrappers.
-      // This is a deliberate architectural choice matching many popular date pickers.
-      'aria-required-children': { enabled: false },
-      'aria-required-parent': { enabled: false },
+      // Day grid uses role="listbox" > role="option" (flat, no row wrappers).
+      // Row layout divs have no ARIA role and are transparent to the a11y tree.
+      'aria-required-children': { enabled: true },
+      'aria-required-parent': { enabled: true },
     },
   })
 

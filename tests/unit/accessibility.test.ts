@@ -453,7 +453,7 @@ describe('Preset ARIA roles', () => {
 // ===========================================================================
 
 describe('Gridcell tabindex', () => {
-  it('year gridcells have tabindex="-1"', () => {
+  it('year cells have tabindex="-1"', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
       isDualMonth: false,
@@ -464,11 +464,12 @@ describe('Gridcell tabindex', () => {
       isScrollable: false,
       scrollHeight: 300,
     })
-    // Year picker gridcells
-    expect(html).toContain('role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectYear')
+    // Year picker uses role="group" (no grid/gridcell)
+    expect(html).toContain('tabindex="-1" @click="!cell.isDisabled && selectYear')
+    expect(html).toContain('role="group"')
   })
 
-  it('month gridcells have tabindex="-1"', () => {
+  it('month cells have tabindex="-1"', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
       isDualMonth: false,
@@ -479,10 +480,12 @@ describe('Gridcell tabindex', () => {
       isScrollable: false,
       scrollHeight: 300,
     })
-    expect(html).toContain('role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectMonth')
+    // Month picker uses role="group" (no grid/gridcell)
+    expect(html).toContain('tabindex="-1" @click="!cell.isDisabled && selectMonth')
+    expect(html).toContain('role="group"')
   })
 
-  it('day gridcells have tabindex="-1"', () => {
+  it('day options have tabindex="-1"', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
       isDualMonth: false,
@@ -493,10 +496,12 @@ describe('Gridcell tabindex', () => {
       isScrollable: false,
       scrollHeight: 300,
     })
-    expect(html).toContain('role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectDate')
+    // Day grid uses role="listbox" > role="option" (no row wrappers needed)
+    expect(html).toContain('role="listbox"')
+    expect(html).toContain('role="option" tabindex="-1"')
   })
 
-  it('week-number grid wraps cells in role="row"', () => {
+  it('week-number grid uses listbox with options', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
       isDualMonth: false,
@@ -507,11 +512,11 @@ describe('Gridcell tabindex', () => {
       isScrollable: false,
       scrollHeight: 300,
     })
-    expect(html).toContain('role="row" style="display:contents"')
-    expect(html).toContain('role="gridcell" tabindex="-1"')
+    expect(html).toContain('role="listbox"')
+    expect(html).toContain('role="option" tabindex="-1"')
   })
 
-  it('scrollable day gridcells have tabindex="-1"', () => {
+  it('scrollable day options have tabindex="-1"', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
       isDualMonth: false,
@@ -522,10 +527,11 @@ describe('Gridcell tabindex', () => {
       isScrollable: true,
       scrollHeight: 300,
     })
-    expect(html).toContain('role="gridcell" tabindex="-1" @click="!cell.isDisabled && selectDate')
+    expect(html).toContain('role="listbox"')
+    expect(html).toContain('role="option" tabindex="-1"')
   })
 
-  it('scrollable week-number grid wraps cells in role="row"', () => {
+  it('scrollable week-number grid uses listbox with options', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
       isDualMonth: false,
@@ -536,8 +542,8 @@ describe('Gridcell tabindex', () => {
       isScrollable: true,
       scrollHeight: 300,
     })
-    expect(html).toContain('role="row" style="display:contents"')
-    expect(html).toContain('role="gridcell" tabindex="-1"')
+    expect(html).toContain('role="listbox"')
+    expect(html).toContain('role="option" tabindex="-1"')
   })
 })
 
