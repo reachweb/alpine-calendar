@@ -1,6 +1,6 @@
 {
   "name": "@reachweb/alpine-calendar",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "A lightweight, AlpineJS-native calendar component with inline/popup display, input binding with masking, and TailwindCSS 4 theming.",
   "main": "dist/alpine-calendar.umd.js",
