@@ -79,7 +79,7 @@ describe('popup — centered modal (mobile)', () => {
 
     const c = createCalendarData({ display: 'popup', mask: false })
     const { flushNextTick } = withAlpineMocks(c, {
-      refs: { popup: popupEl, input: inputEl },
+      refs: { popup: popupEl, 'rc-input': inputEl },
     })
     c.init()
     flushNextTick()
@@ -112,7 +112,7 @@ describe('popup — centered modal (desktop)', () => {
 
     const c = createCalendarData({ display: 'popup', mask: false })
     const { flushNextTick } = withAlpineMocks(c, {
-      refs: { popup: popupEl, input: inputEl },
+      refs: { popup: popupEl, 'rc-input': inputEl },
     })
     c.init()
     flushNextTick()
@@ -133,7 +133,7 @@ describe('popup — centered modal (desktop)', () => {
 
     const c = createCalendarData({ display: 'popup', mask: false })
     const { flushNextTick } = withAlpineMocks(c, {
-      refs: { popup: popupEl, input: inputEl },
+      refs: { popup: popupEl, 'rc-input': inputEl },
     })
     c.init()
     flushNextTick()
@@ -152,7 +152,7 @@ describe('popup — centered modal (desktop)', () => {
 
     const c = createCalendarData({ display: 'popup', mask: false })
     const { flushNextTick } = withAlpineMocks(c, {
-      refs: { popup: popupEl, input: inputEl },
+      refs: { popup: popupEl, 'rc-input': inputEl },
     })
     c.init()
     flushNextTick()
@@ -176,7 +176,7 @@ describe('popup — no popup element', () => {
 
     const c = createCalendarData({ display: 'popup', mask: false })
     const { flushNextTick } = withAlpineMocks(c, {
-      refs: { input: inputEl },
+      refs: { 'rc-input': inputEl },
     })
     c.init()
     flushNextTick()

@@ -44,10 +44,20 @@ You can use x-data in any block element to load the calendar.
 ### Popup with Input
 
 ```html
-<div x-data="calendar({ mode: 'single', display: 'popup' })"></div>
+<div x-data="calendar({ mode: 'single', display: 'popup' })">
+  <input x-ref="rc-input" type="text" class="rc-input">
+</div>
 ```
 
-Auto-renders an `<input>` with focus/blur handlers and a centered popup overlay with close button, transitions, and mobile-responsive sizing.
+Provide your own `<input>` with `x-ref="rc-input"` — the calendar binds to it automatically, attaching focus/blur handlers, input masking, and ARIA attributes. The popup overlay with close button, transitions, and mobile-responsive sizing is auto-rendered alongside the input.
+
+To use a custom ref name:
+
+```html
+<div x-data="calendar({ display: 'popup', inputRef: 'dateField' })">
+  <input x-ref="dateField" type="text" class="my-custom-input">
+</div>
+```
 
 ### Range Selection (2-Month)
 
@@ -82,7 +92,7 @@ When `name` is set, hidden `<input>` elements are auto-generated for form submis
 
 ### Disabling Auto-Rendering
 
-Set `template: false` to require a manual template, or simply add child elements — the calendar skips auto-rendering when the element has content:
+Set `template: false` to require a manual template, or provide your own `.rc-calendar` element — the calendar skips auto-rendering when it detects an existing `.rc-calendar`:
 
 ```html
 <!-- Manual template (auto-rendering skipped) -->
@@ -159,10 +169,11 @@ All options are passed via `x-data="calendar({ ... })"`.
 | `beforeSelect` | `(date, ctx) => boolean` | — | Custom validation before selection |
 | `showWeekNumbers` | `boolean` | `false` | Show ISO 8601 week numbers alongside the day grid |
 | `inputId` | `string` | — | ID for the popup input (allows external `<label for="...">`) |
+| `inputRef` | `string` | `'rc-input'` | Alpine `x-ref` name for the input element |
 | `scrollHeight` | `number` | `400` | Max height (px) of scrollable container when `months >= 3` |
 | `presets` | `RangePreset[]` | — | Predefined date range shortcuts (see [Range Presets](#range-presets)) |
 | `constraintMessages` | `ConstraintMessages` | — | Custom tooltip strings for disabled dates |
-| `template` | `boolean` | `true` | Auto-render template when element is empty |
+| `template` | `boolean` | `true` | Auto-render template when no `.rc-calendar` exists |
 
 ### Date Constraints
 
@@ -601,6 +612,7 @@ Use `wire:ignore` on the calendar container to prevent Livewire from morphing it
 <div wire:ignore>
   <div x-data="calendar({ mode: 'single', display: 'popup' })"
        @calendar:change="$wire.set('date', $event.detail.value)">
+    <input x-ref="rc-input" type="text" class="rc-input">
   </div>
 </div>
 ```
