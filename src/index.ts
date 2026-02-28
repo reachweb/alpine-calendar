@@ -82,6 +82,8 @@ export type {
   ConstraintMessages,
 } from './core/constraints'
 export type { CalendarConfigRule, RangePreset } from './plugin/calendar-component'
+export { normalizeDateMeta } from './core/metadata'
+export type { DateMeta, DateMetaProvider } from './core/metadata'
 export {
   presetToday,
   presetYesterday,

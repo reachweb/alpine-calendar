@@ -46,6 +46,11 @@
   --color-calendar-today-ring: var(--color-blue-400);
   --color-calendar-focus-ring: var(--color-blue-600);
 
+  /* Metadata / availability states */
+  --color-calendar-available: oklch(0.65 0.2 145);
+  --color-calendar-available-bg: oklch(0.95 0.05 145);
+  --color-calendar-unavailable: var(--color-gray-400);
+
   /* Layout tokens */
   --radius-calendar: var(--radius-lg);
   --shadow-calendar: var(--shadow-lg);
@@ -296,6 +301,71 @@
 /* Focused (keyboard navigation) */
 .rc-day--focused:not(.rc-day--selected):not(.rc-day--range-start):not(.rc-day--range-end) {
   box-shadow: 0 0 0 2px var(--color-calendar-focus-ring);
+}
+
+/* ---------------------------------------------------------------------------
+ * Per-date metadata: labels, dots, availability states
+ * ------------------------------------------------------------------------- */
+
+/* Day cell with a label needs vertical flex layout */
+.rc-day--has-label {
+  flex-direction: column;
+  gap: 0;
+  padding: 0.125rem 0;
+}
+
+/* Day number inside structured day cell */
+.rc-day__number {
+  line-height: 1.2;
+}
+
+/* Label text below day number */
+.rc-day__label {
+  font-size: 0.5625rem;
+  line-height: 1;
+  color: var(--color-calendar-day-meta, inherit);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Availability dot (shown when available + no label) */
+.rc-day__dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background-color: var(--color-calendar-day-meta, var(--color-calendar-available));
+  flex-shrink: 0;
+}
+
+/* Available state — no background change, dot is the indicator */
+.rc-day--available {
+  /* Indicator handled by .rc-day__dot or .rc-day__label */
+}
+
+/* Unavailable state — strikethrough + muted + not-allowed */
+.rc-day--unavailable {
+  text-decoration: line-through;
+  color: var(--color-calendar-unavailable);
+  cursor: not-allowed;
+}
+
+.rc-day--unavailable:hover {
+  background-color: transparent;
+}
+
+/* Selected overrides for label/dot colors — white text on primary bg */
+.rc-day--selected .rc-day__label,
+.rc-day--range-start .rc-day__label,
+.rc-day--range-end .rc-day__label {
+  color: var(--color-calendar-primary-text);
+}
+
+.rc-day--selected .rc-day__dot,
+.rc-day--range-start .rc-day__dot,
+.rc-day--range-end .rc-day__dot {
+  background-color: var(--color-calendar-primary-text);
 }
 
 /* ---------------------------------------------------------------------------

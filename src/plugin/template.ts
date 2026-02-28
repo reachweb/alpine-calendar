@@ -40,7 +40,7 @@ function dayRow(ri: number, showWeekNumbers: boolean): string {
 
   return `<div class="${rowClass}" x-show="mg.rows.length > ${ri}">
                 ${weekNumCell}<template x-for="cell in (mg.rows[${ri}] || [])" :key="cell.date.toISO()">
-                  <div :class="dayClasses(cell)" :id="'day-' + cell.date.toISO()" :aria-selected="isSelected(cell.date)" :aria-disabled="cell.isDisabled" :title="dayTitle(cell)" role="option" tabindex="-1" @click="!cell.isDisabled && selectDate(cell.date)" @mouseenter="hoverDate = cell.date" @mouseleave="hoverDate = null" x-text="cell.date.day"></div>
+                  <div :class="dayClasses(cell)" :style="dayStyle(cell)" :id="'day-' + cell.date.toISO()" :aria-selected="isSelected(cell.date)" :aria-disabled="cell.isDisabled" :title="dayTitle(cell)" role="option" tabindex="-1" @click="!cell.isDisabled && selectDate(cell.date)" @mouseenter="hoverDate = cell.date" @mouseleave="hoverDate = null"><span class="rc-day__number" x-text="cell.date.day"></span><template x-if="dayMeta(cell)?.label"><span class="rc-day__label" x-text="dayMeta(cell).label"></span></template><template x-if="dayMeta(cell)?.availability === 'available' && !dayMeta(cell)?.label"><span class="rc-day__dot" aria-hidden="true"></span></template></div>
                 </template>
               </div>`
 }

@@ -26,6 +26,7 @@
     "build": "pnpm build:lib && pnpm build:cdn && tsc --emitDeclarationOnly",
     "build:lib": "vite build --config vite.config.lib.ts",
     "build:cdn": "vite build --config vite.config.cdn.ts",
+    "build:demo": "vite build --config vite.config.demo.ts",
     "preview": "vite preview",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",

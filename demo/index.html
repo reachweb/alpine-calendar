@@ -3,371 +3,752 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Reach Calendar — Dev Playground</title>
+  <title>Reach Calendar — Alpine.js Calendar Component</title>
+  <meta name="description" content="A lightweight, feature-rich calendar component for Alpine.js with inline/popup display, range selection, date constraints, and TailwindCSS 4 theming.">
   <style>
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      max-width: 960px;
-      margin: 2rem auto;
-      padding: 0 1rem;
-      color: #1a1a1a;
-      background: #f8fafc;
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --demo-bg: #f8fafc;
+      --demo-surface: #ffffff;
+      --demo-border: #e2e8f0;
+      --demo-text: #0f172a;
+      --demo-text-muted: #64748b;
+      --demo-accent: #3b82f6;
+      --demo-accent-soft: #eff6ff;
+      --demo-code-bg: #f1f5f9;
+      --demo-radius: 12px;
+      --demo-shadow: 0 1px 3px rgb(0 0 0 / 0.06), 0 1px 2px rgb(0 0 0 / 0.04);
+      --demo-shadow-lg: 0 4px 16px rgb(0 0 0 / 0.08);
     }
-    h1 { margin-bottom: 0.5rem; }
-    h2 { margin-top: 2rem; color: #4b5563; }
-    .example { border: 1px solid #e5e7eb; border-radius: 8px; padding: 1.5rem; margin: 1rem 0; background: white; }
-    .status { font-size: 0.85rem; color: #666; margin-bottom: 0.75rem; }
-    details.custom-template { margin-top: 3rem; border-top: 2px solid #e5e7eb; padding-top: 1rem; }
-    details.custom-template > summary { cursor: pointer; font-weight: 600; color: #6b7280; }
-    .example details { margin-top: 0.75rem; border-top: 1px solid #e5e7eb; padding-top: 0; }
-    .example summary { cursor: pointer; font-size: 0.8rem; color: #6b7280; padding: 0.5rem 0; }
-    .example pre { margin: 0; padding: 0.75rem; background: #f1f5f9; border-radius: 6px; overflow-x: auto; font-size: 0.8rem; line-height: 1.5; }
-    .example code { font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; }
+
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      color: var(--demo-text);
+      background: var(--demo-bg);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* --- Hero --- */
+    .hero {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 50%, #3b82f6 100%);
+      color: white;
+      padding: 4rem 1.5rem 3rem;
+      text-align: center;
+    }
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.5rem;
+    }
+    .hero p {
+      font-size: 1.1rem;
+      opacity: 0.9;
+      max-width: 600px;
+      margin: 0 auto 2rem;
+    }
+    .hero-badges {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.3rem 0.75rem;
+      border-radius: 100px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      background: rgb(255 255 255 / 0.15);
+      backdrop-filter: blur(4px);
+    }
+    .hero-install {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: rgb(0 0 0 / 0.25);
+      backdrop-filter: blur(8px);
+      padding: 0.6rem 1.25rem;
+      border-radius: 8px;
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.15s;
+      border: 1px solid rgb(255 255 255 / 0.1);
+    }
+    .hero-install:hover { background: rgb(0 0 0 / 0.35); }
+    .hero-install .copy-icon { opacity: 0.6; font-size: 0.85rem; }
+    .hero-links {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      margin-top: 1.5rem;
+    }
+    .hero-links a {
+      color: rgb(255 255 255 / 0.85);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: color 0.15s;
+    }
+    .hero-links a:hover { color: white; }
+
+    /* --- Layout --- */
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+    .section {
+      padding: 3rem 0;
+    }
+    .section-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin-bottom: 0.5rem;
+    }
+    .section-desc {
+      color: var(--demo-text-muted);
+      margin-bottom: 2rem;
+      font-size: 0.95rem;
+    }
+
+    /* --- Examples grid --- */
+    .examples {
+      display: grid;
+      gap: 2rem;
+    }
+
+    /* --- Card --- */
+    .card {
+      background: var(--demo-surface);
+      border: 1px solid var(--demo-border);
+      border-radius: var(--demo-radius);
+      box-shadow: var(--demo-shadow);
+      overflow: hidden;
+      transition: box-shadow 0.2s;
+    }
+    .card:hover {
+      box-shadow: var(--demo-shadow-lg);
+    }
+    .card-header {
+      padding: 1.25rem 1.5rem 0;
+    }
+    .card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+    .card-desc {
+      font-size: 0.85rem;
+      color: var(--demo-text-muted);
+      line-height: 1.5;
+    }
+    .card-body {
+      padding: 1.25rem 1.5rem;
+    }
+    .card-body .rc-calendar {
+      margin: 0 auto;
+    }
+
+    /* --- Code toggle --- */
+    .card-code {
+      border-top: 1px solid var(--demo-border);
+    }
+    .card-code summary {
+      padding: 0.6rem 1.5rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--demo-text-muted);
+      cursor: pointer;
+      user-select: none;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: color 0.15s;
+    }
+    .card-code summary::-webkit-details-marker { display: none; }
+    .card-code summary::before {
+      content: '>';
+      font-family: monospace;
+      font-size: 0.8rem;
+      transition: transform 0.15s;
+      display: inline-block;
+    }
+    .card-code[open] summary::before { transform: rotate(90deg); }
+    .card-code summary:hover { color: var(--demo-accent); }
+    .card-code pre {
+      margin: 0;
+      padding: 1rem 1.5rem 1.25rem;
+      background: var(--demo-code-bg);
+      overflow-x: auto;
+      font-size: 0.78rem;
+      line-height: 1.7;
+      color: #334155;
+    }
+    .card-code code {
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Fira Code', monospace;
+    }
+
+    /* --- Feature pills --- */
+    .features {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 2rem;
+    }
+    .feature-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.5rem 1rem;
+      border-radius: 100px;
+      background: var(--demo-surface);
+      border: 1px solid var(--demo-border);
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--demo-text-muted);
+      box-shadow: var(--demo-shadow);
+    }
+    .feature-pill .icon { font-size: 1rem; }
+
+    /* --- Status bar --- */
+    .status-bar {
+      font-size: 0.8rem;
+      color: var(--demo-text-muted);
+      background: var(--demo-accent-soft);
+      padding: 0.4rem 0.75rem;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      display: inline-block;
+    }
+
+    /* --- Buttons for dynamic demo --- */
+    .demo-btn {
+      padding: 0.4rem 0.85rem;
+      border: 1px solid var(--demo-border);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 500;
+      background: var(--demo-surface);
+      color: var(--demo-text);
+      transition: all 0.15s;
+    }
+    .demo-btn:hover {
+      border-color: var(--demo-accent);
+      color: var(--demo-accent);
+      background: var(--demo-accent-soft);
+    }
+
+    /* --- Footer --- */
+    .footer {
+      border-top: 1px solid var(--demo-border);
+      padding: 2rem 1.5rem;
+      text-align: center;
+      color: var(--demo-text-muted);
+      font-size: 0.85rem;
+    }
+    .footer a {
+      color: var(--demo-accent);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .footer a:hover { text-decoration: underline; }
+
+    /* --- Responsive --- */
+    @media (min-width: 768px) {
+      .examples-grid-2 {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .examples-grid-2 .card--wide {
+        grid-column: 1 / -1;
+      }
+    }
+
+    /* scrollable demo constraint */
+    .card-body--scroll {
+      max-height: 500px;
+      overflow: hidden;
+    }
+
+    /* input styling in demo context */
+    .card-body .rc-input {
+      width: 100%;
+      max-width: 260px;
+    }
+
+    /* Divider */
+    .divider {
+      height: 1px;
+      background: var(--demo-border);
+      margin: 1rem 0;
+    }
+
+    /* Anchor offset for nav */
+    [id] {
+      scroll-margin-top: 1rem;
+    }
+
+    /* Inline nav */
+    .nav-bar {
+      background: var(--demo-surface);
+      border-bottom: 1px solid var(--demo-border);
+      padding: 0.65rem 1.5rem;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      gap: 1.5rem;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .nav-bar a {
+      color: var(--demo-text-muted);
+      text-decoration: none;
+      font-size: 0.82rem;
+      font-weight: 500;
+      white-space: nowrap;
+      transition: color 0.15s;
+    }
+    .nav-bar a:hover { color: var(--demo-accent); }
   </style>
 </head>
 <body>
-  <h1>Reach Calendar — Dev Playground</h1>
-  <p>Visual test bed for development. Hot-reloads on TS and CSS changes.</p>
 
-  <!-- ===================================================================
-       Inline — Single Date
-       =================================================================== -->
-  <h2>Inline — Single Date</h2>
-  <div class="example">
-    <div x-data="calendar({ mode: 'single', firstDay: 1 })"></div>
-    <details>
-      <summary>View Code</summary>
-      <pre><code>&lt;div x-data="calendar({ mode: 'single', firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
-    </details>
-  </div>
+  <!-- ===== Hero ===== -->
+  <div class="hero">
+    <h1>Reach Calendar</h1>
+    <p>A lightweight, feature-rich calendar component for Alpine.js. Inline &amp; popup display, range selection, date constraints, input masking, and TailwindCSS 4 theming.</p>
 
-  <!-- ===================================================================
-       Inline — Range Selection
-       =================================================================== -->
-  <h2>Inline — Range Selection</h2>
-  <div class="example">
-    <div x-data="calendar({ mode: 'range', firstDay: 1 })"></div>
-    <details>
-      <summary>View Code</summary>
-      <pre><code>&lt;div x-data="calendar({ mode: 'range', firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
-    </details>
-  </div>
-
-  <!-- ===================================================================
-       Inline — 2-Month Range
-       =================================================================== -->
-  <h2>Inline — 2-Month Range</h2>
-  <div class="example">
-    <div x-data="calendar({ mode: 'range', months: 2, firstDay: 1 })"></div>
-    <details>
-      <summary>View Code</summary>
-      <pre><code>&lt;div x-data="calendar({ mode: 'range', months: 2, firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
-    </details>
-  </div>
-
-  <!-- ===================================================================
-       Popup — Single Date with Input
-       =================================================================== -->
-  <h2>Popup — Single Date</h2>
-  <div class="example">
-    <div x-data="calendar({ mode: 'single', display: 'popup', firstDay: 1 })">
-      <input x-ref="rc-input" type="text" class="rc-input">
+    <div class="hero-badges">
+      <span class="badge">Alpine.js 3+</span>
+      <span class="badge">TailwindCSS 4</span>
+      <span class="badge">Zero Dependencies</span>
+      <span class="badge">WCAG 2.1 AA</span>
+      <span class="badge">Livewire Ready</span>
     </div>
-    <details>
-      <summary>View Code</summary>
-      <pre><code>&lt;div x-data="calendar({ mode: 'single', display: 'popup', firstDay: 1 })"&gt;
-  &lt;input x-ref="rc-input" type="text" class="rc-input"&gt;
+
+    <div class="hero-install" onclick="navigator.clipboard.writeText('npm i @reachweb/alpine-calendar')" title="Click to copy">
+      <span>npm i @reachweb/alpine-calendar</span>
+      <span class="copy-icon">&#x2398;</span>
+    </div>
+
+    <div class="hero-links">
+      <a href="https://github.com/reachweb/alpine-calendar" target="_blank" rel="noopener">
+        GitHub &rarr;
+      </a>
+      <a href="https://github.com/reachweb/alpine-calendar#readme" target="_blank" rel="noopener">
+        Documentation &rarr;
+      </a>
+    </div>
+  </div>
+
+  <!-- ===== Nav ===== -->
+  <nav class="nav-bar">
+    <a href="#basics">Basics</a>
+    <a href="#popup">Popup</a>
+    <a href="#presets">Presets</a>
+    <a href="#constraints">Constraints</a>
+    <a href="#rules">Rules</a>
+    <a href="#wizard">Wizard</a>
+    <a href="#metadata">Metadata</a>
+    <a href="#scrollable">Scrollable</a>
+    <a href="#theming">Theming</a>
+  </nav>
+
+  <!-- ===== Features ===== -->
+  <div class="container">
+    <div class="features">
+      <div class="feature-pill"><span class="icon">&#128197;</span> Single / Range / Multiple</div>
+      <div class="feature-pill"><span class="icon">&#9889;</span> Inline &amp; Popup</div>
+      <div class="feature-pill"><span class="icon">&#128274;</span> Date Constraints</div>
+      <div class="feature-pill"><span class="icon">&#127912;</span> Full Theming</div>
+      <div class="feature-pill"><span class="icon">&#9000;</span> Keyboard Nav</div>
+      <div class="feature-pill"><span class="icon">&#128176;</span> Date Metadata</div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       BASICS
+       ============================================================ -->
+  <div class="container section" id="basics">
+    <h2 class="section-title">Basic Selection Modes</h2>
+    <p class="section-desc">Single date, range, and multiple selection — all inline with zero config.</p>
+
+    <div class="examples examples-grid-2">
+
+      <!-- Single Date -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Single Date</div>
+          <div class="card-desc">Click to select one date. The simplest configuration.</div>
+        </div>
+        <div class="card-body">
+          <div x-data="calendar({ mode: 'single', firstDay: 1 })"></div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({ mode: 'single', firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
+        </details>
+      </div>
+
+      <!-- Range -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Range Selection</div>
+          <div class="card-desc">Select a start and end date. Hover to preview the range.</div>
+        </div>
+        <div class="card-body">
+          <div x-data="calendar({ mode: 'range', firstDay: 1 })"></div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({ mode: 'range', firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
+        </details>
+      </div>
+
+      <!-- Multiple -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Multiple Selection</div>
+          <div class="card-desc">Toggle multiple individual dates on and off.</div>
+        </div>
+        <div class="card-body">
+          <div x-data="calendar({ mode: 'multiple', firstDay: 1 })"></div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({ mode: 'multiple', firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
+        </details>
+      </div>
+
+      <!-- 2-Month Range -->
+      <div class="card card--wide">
+        <div class="card-header">
+          <div class="card-title">2-Month Range</div>
+          <div class="card-desc">Display two months side-by-side for easier range picking.</div>
+        </div>
+        <div class="card-body">
+          <div x-data="calendar({ mode: 'range', months: 2, firstDay: 1 })"></div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({ mode: 'range', months: 2, firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
+        </details>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============================================================
+       POPUP
+       ============================================================ -->
+  <div class="container section" id="popup">
+    <h2 class="section-title">Popup with Input</h2>
+    <p class="section-desc">Bind to an input with auto-masking. Calendar opens on focus, closes on outside click.</p>
+
+    <div class="examples examples-grid-2">
+
+      <!-- Popup Single -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Popup — Single Date</div>
+          <div class="card-desc">Click the input to open the calendar dropdown.</div>
+        </div>
+        <div class="card-body">
+          <div x-data="calendar({ mode: 'single', display: 'popup', firstDay: 1 })">
+            <input x-ref="rc-input" type="text" class="rc-input" placeholder="Pick a date...">
+          </div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({ mode: 'single', display: 'popup', firstDay: 1 })"&gt;
+  &lt;input x-ref="rc-input" type="text" class="rc-input"
+         placeholder="Pick a date..."&gt;
 &lt;/div&gt;</code></pre>
-    </details>
+        </details>
+      </div>
+
+      <!-- Popup Range -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Popup — Range</div>
+          <div class="card-desc">Popup range picker with 3 scrollable months.</div>
+        </div>
+        <div class="card-body">
+          <div x-data="calendar({ mode: 'range', months: 3, display: 'popup', firstDay: 1 })">
+            <input x-ref="rc-input" type="text" class="rc-input" placeholder="Check-in — Check-out">
+          </div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({
+  mode: 'range',
+  months: 3,
+  display: 'popup',
+  firstDay: 1
+})"&gt;
+  &lt;input x-ref="rc-input" type="text" class="rc-input"
+         placeholder="Check-in — Check-out"&gt;
+&lt;/div&gt;</code></pre>
+        </details>
+      </div>
+
+    </div>
   </div>
 
-  <!-- ===================================================================
-       Multiple Selection
-       =================================================================== -->
-  <h2>Inline — Multiple Selection</h2>
-  <div class="example">
-    <div x-data="calendar({ mode: 'multiple', firstDay: 1 })"></div>
-    <details>
-      <summary>View Code</summary>
-      <pre><code>&lt;div x-data="calendar({ mode: 'multiple', firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
-    </details>
-  </div>
+  <!-- ============================================================
+       PRESETS
+       ============================================================ -->
+  <div class="container section" id="presets">
+    <h2 class="section-title">Presets &amp; Programmatic Control</h2>
+    <p class="section-desc">Pre-select dates via config or change them dynamically with setValue() and clear().</p>
 
-  <!-- ===================================================================
-       Preset — Single Date
-       =================================================================== -->
-  <h2>Preset — Single Date</h2>
-  <div class="example">
-    <div class="status">
-      Pre-selected: 2026-03-15
-    </div>
-    <div x-data="calendar({ mode: 'single', firstDay: 1, value: '2026-03-15' })"></div>
-    <details>
-      <summary>View Code</summary>
-      <pre><code>&lt;div x-data="calendar({ mode: 'single', firstDay: 1, value: '2026-03-15' })"&gt;&lt;/div&gt;</code></pre>
-    </details>
-  </div>
+    <div class="examples examples-grid-2">
 
-  <!-- ===================================================================
-       Preset — Range
-       =================================================================== -->
-  <h2>Preset — Range</h2>
-  <div class="example">
-    <div class="status">
-      Pre-selected range: 2026-03-10 to 2026-03-20
-    </div>
-    <div x-data="calendar({ mode: 'range', firstDay: 1, value: '2026-03-10 - 2026-03-20' })"></div>
-    <details>
-      <summary>View Code</summary>
-      <pre><code>&lt;div x-data="calendar({ mode: 'range', firstDay: 1, value: '2026-03-10 - 2026-03-20' })"&gt;&lt;/div&gt;</code></pre>
-    </details>
-  </div>
+      <!-- Preset Single -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Pre-selected Date</div>
+          <div class="card-desc">Calendar opens with March 15, 2026 already selected.</div>
+        </div>
+        <div class="card-body">
+          <div class="status-bar">Pre-selected: 2026-03-15</div>
+          <div x-data="calendar({ mode: 'single', firstDay: 1, value: '2026-03-15' })"></div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({
+  mode: 'single',
+  firstDay: 1,
+  value: '2026-03-15'
+})"&gt;&lt;/div&gt;</code></pre>
+        </details>
+      </div>
 
-  <!-- ===================================================================
-       Preset — Multiple Dates
-       =================================================================== -->
-  <h2>Preset — Multiple Dates</h2>
-  <div class="example">
-    <div class="status">
-      Pre-selected: 2026-03-10, 2026-03-15, 2026-03-20
-    </div>
-    <div x-data="calendar({ mode: 'multiple', firstDay: 1, value: '2026-03-10, 2026-03-15, 2026-03-20' })"></div>
-    <details>
-      <summary>View Code</summary>
-      <pre><code>&lt;div x-data="calendar({ mode: 'multiple', firstDay: 1, value: '2026-03-10, 2026-03-15, 2026-03-20' })"&gt;&lt;/div&gt;</code></pre>
-    </details>
-  </div>
-
-  <!-- ===================================================================
-       Preset — Dynamic setValue()
-       =================================================================== -->
-  <h2>Preset — Dynamic setValue()</h2>
-  <div class="example">
-    <div class="status">
-      Use buttons below to set or clear the selected date programmatically.
-    </div>
-    <div x-data="calendar({ mode: 'single', firstDay: 1 })" id="dynamic-demo"></div>
-    <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
-      <button onclick="document.getElementById('dynamic-demo')._x_dataStack[0].setValue('2026-06-15')" style="padding: 0.4rem 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Set June 15</button>
-      <button onclick="document.getElementById('dynamic-demo')._x_dataStack[0].setValue('2026-12-25')" style="padding: 0.4rem 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Set Dec 25</button>
-      <button onclick="document.getElementById('dynamic-demo')._x_dataStack[0].clear()" style="padding: 0.4rem 0.75rem; border: 1px solid #d1d5db; border-radius: 6px; cursor: pointer; font-size: 0.85rem;">Clear</button>
-    </div>
-    <details>
-      <summary>View Code</summary>
-      <pre><code>&lt;!-- With x-ref (inside a custom template or parent scope) --&gt;
-&lt;div x-data="calendar({ mode: 'single' })" x-ref="cal"&gt;
-  &lt;!-- custom template here --&gt;
-&lt;/div&gt;
+      <!-- Dynamic setValue -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Dynamic setValue()</div>
+          <div class="card-desc">Set or clear the selection programmatically.</div>
+        </div>
+        <div class="card-body">
+          <div x-data="calendar({ mode: 'single', firstDay: 1 })" id="dynamic-demo"></div>
+          <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button class="demo-btn" onclick="document.getElementById('dynamic-demo')._x_dataStack[0].setValue('2026-06-15')">Set June 15</button>
+            <button class="demo-btn" onclick="document.getElementById('dynamic-demo')._x_dataStack[0].setValue('2026-12-25')">Set Dec 25</button>
+            <button class="demo-btn" onclick="document.getElementById('dynamic-demo')._x_dataStack[0].clear()">Clear</button>
+          </div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({ mode: 'single' })" x-ref="cal"&gt;&lt;/div&gt;
 &lt;button @click="$refs.cal.setValue('2026-06-15')"&gt;Set June 15&lt;/button&gt;
 &lt;button @click="$refs.cal.setValue('2026-12-25')"&gt;Set Dec 25&lt;/button&gt;
 &lt;button @click="$refs.cal.clear()"&gt;Clear&lt;/button&gt;</code></pre>
-    </details>
-  </div>
+        </details>
+      </div>
 
-  <!-- ===================================================================
-       Wizard — Birth Date (full)
-       =================================================================== -->
-  <h2>Wizard — Birth Date</h2>
-  <div class="example">
-    <div x-data="calendar({ mode: 'single', wizard: true, firstDay: 1 })"></div>
-    <details>
-      <summary>View Code</summary>
-      <pre><code>&lt;div x-data="calendar({ mode: 'single', wizard: true, firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
-    </details>
-  </div>
+      <!-- Preset Range -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Pre-selected Range</div>
+          <div class="card-desc">Initialize with a date range already chosen.</div>
+        </div>
+        <div class="card-body">
+          <div class="status-bar">Range: 2026-03-10 to 2026-03-20</div>
+          <div x-data="calendar({ mode: 'range', firstDay: 1, value: '2026-03-10 - 2026-03-20' })"></div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({
+  mode: 'range',
+  firstDay: 1,
+  value: '2026-03-10 - 2026-03-20'
+})"&gt;&lt;/div&gt;</code></pre>
+        </details>
+      </div>
 
-  <!-- ===================================================================
-       Wizard — Year-Month (Half Wizard)
-       =================================================================== -->
-  <h2>Wizard — Year-Month</h2>
-  <div class="example">
-    <div x-data="calendar({ mode: 'single', wizard: 'year-month', firstDay: 1 })"></div>
-    <details>
-      <summary>View Code</summary>
-      <pre><code>&lt;div x-data="calendar({ mode: 'single', wizard: 'year-month', firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
-    </details>
-  </div>
+      <!-- Form Submission -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Form Submission</div>
+          <div class="card-desc">Hidden inputs are created automatically for form submission.</div>
+        </div>
+        <div class="card-body">
+          <form @submit.prevent="$dispatch('notify', { message: 'Submitted: ' + new FormData($el).getAll('appointment') })">
+            <div x-data="calendar({ mode: 'single', firstDay: 1, name: 'appointment' })"></div>
+            <button type="submit" class="demo-btn" style="margin-top: 0.75rem;">Submit Form</button>
+          </form>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;form @submit.prevent="handleSubmit"&gt;
+  &lt;div x-data="calendar({
+    mode: 'single',
+    firstDay: 1,
+    name: 'appointment'
+  })"&gt;&lt;/div&gt;
+  &lt;button type="submit"&gt;Submit&lt;/button&gt;
+&lt;/form&gt;</code></pre>
+        </details>
+      </div>
 
-  <!-- ===================================================================
-       Wizard — Month-Day (Half Wizard)
-       =================================================================== -->
-  <h2>Wizard — Month-Day</h2>
-  <div class="example">
-    <div x-data="calendar({ mode: 'single', wizard: 'month-day', firstDay: 1 })"></div>
-    <details>
-      <summary>View Code</summary>
-      <pre><code>&lt;div x-data="calendar({ mode: 'single', wizard: 'month-day', firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
-    </details>
-  </div>
-
-  <!-- ===================================================================
-       Popup — Full Wizard
-       =================================================================== -->
-  <h2>Popup — Full Wizard</h2>
-  <div class="example">
-    <div x-data="calendar({ mode: 'single', wizard: true, display: 'popup', firstDay: 1 })">
-      <input x-ref="rc-input" type="text" class="rc-input">
     </div>
-    <details>
-      <summary>View Code</summary>
-      <pre><code>&lt;div x-data="calendar({ mode: 'single', wizard: true, display: 'popup', firstDay: 1 })"&gt;
-  &lt;input x-ref="rc-input" type="text" class="rc-input"&gt;
-&lt;/div&gt;</code></pre>
-    </details>
   </div>
 
-  <!-- ===================================================================
-       Popup — Year-Month Wizard
-       =================================================================== -->
-  <h2>Popup — Year-Month Wizard</h2>
-  <div class="example">
-    <div x-data="calendar({ mode: 'single', wizard: 'year-month', display: 'popup', firstDay: 1 })">
-      <input x-ref="rc-input" type="text" class="rc-input">
-    </div>
-    <details>
-      <summary>View Code</summary>
-      <pre><code>&lt;div x-data="calendar({ mode: 'single', wizard: 'year-month', display: 'popup', firstDay: 1 })"&gt;
-  &lt;input x-ref="rc-input" type="text" class="rc-input"&gt;
-&lt;/div&gt;</code></pre>
-    </details>
-  </div>
+  <!-- ============================================================
+       CONSTRAINTS
+       ============================================================ -->
+  <div class="container section" id="constraints">
+    <h2 class="section-title">Date Constraints</h2>
+    <p class="section-desc">Restrict selection with min/max dates, disabled weekdays, specific dates, and range limits.</p>
 
-  <!-- ===================================================================
-       Popup — Month-Day Wizard
-       =================================================================== -->
-  <h2>Popup — Month-Day Wizard</h2>
-  <div class="example">
-    <div x-data="calendar({ mode: 'single', wizard: 'month-day', display: 'popup', firstDay: 1 })">
-      <input x-ref="rc-input" type="text" class="rc-input">
-    </div>
-    <details>
-      <summary>View Code</summary>
-      <pre><code>&lt;div x-data="calendar({ mode: 'single', wizard: 'month-day', display: 'popup', firstDay: 1 })"&gt;
-  &lt;input x-ref="rc-input" type="text" class="rc-input"&gt;
-&lt;/div&gt;</code></pre>
-    </details>
-  </div>
+    <div class="examples examples-grid-2">
 
-  <!-- ===================================================================
-       Constraints — Min/Max Date & Disabled Weekends
-       =================================================================== -->
-  <h2>Constraints — Min/Max Date & No Weekends</h2>
-  <div class="example">
-    <div class="status">
-      Min: 2026-02-01 | Max: 2026-04-30 | Weekends disabled
-    </div>
-    <div x-data="calendar({
-      mode: 'single',
-      firstDay: 1,
-      minDate: '2026-02-01',
-      maxDate: '2026-04-30',
-      disabledDaysOfWeek: [0, 6],
-    })"></div>
-    <details>
-      <summary>View Code</summary>
-      <pre><code>&lt;div x-data="calendar({
+      <!-- Min/Max + No Weekends -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Min/Max &amp; No Weekends</div>
+          <div class="card-desc">Only weekdays between Feb 1 and Apr 30, 2026.</div>
+        </div>
+        <div class="card-body">
+          <div class="status-bar">Feb 1 – Apr 30 | Weekdays only</div>
+          <div x-data="calendar({
+            mode: 'single',
+            firstDay: 1,
+            minDate: '2026-02-01',
+            maxDate: '2026-04-30',
+            disabledDaysOfWeek: [0, 6],
+          })"></div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({
   mode: 'single',
   firstDay: 1,
   minDate: '2026-02-01',
   maxDate: '2026-04-30',
   disabledDaysOfWeek: [0, 6],
 })"&gt;&lt;/div&gt;</code></pre>
-    </details>
-  </div>
+        </details>
+      </div>
 
-  <!-- ===================================================================
-       Constraints — Disabled Specific Dates + Enabled Exceptions
-       =================================================================== -->
-  <h2>Constraints — Disabled Dates with Exceptions</h2>
-  <div class="example">
-    <div class="status">
-      Weekends disabled, but Mar 7–8 (Sat–Sun) force-enabled |
-      Mar 9–11 (Mon–Wed) explicitly disabled
-    </div>
-    <div x-data="calendar({
-      mode: 'single',
-      firstDay: 1,
-      disabledDaysOfWeek: [0, 6],
-      enabledDates: ['2026-03-07', '2026-03-08'],
-      disabledDates: ['2026-03-09', '2026-03-10', '2026-03-11'],
-    })"></div>
-    <details>
-      <summary>View Code</summary>
-      <pre><code>&lt;div x-data="calendar({
+      <!-- Exceptions -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Disabled Dates with Exceptions</div>
+          <div class="card-desc">Weekends off, but Mar 7-8 force-enabled. Mar 9-11 force-disabled.</div>
+        </div>
+        <div class="card-body">
+          <div x-data="calendar({
+            mode: 'single',
+            firstDay: 1,
+            disabledDaysOfWeek: [0, 6],
+            enabledDates: ['2026-03-07', '2026-03-08'],
+            disabledDates: ['2026-03-09', '2026-03-10', '2026-03-11'],
+          })"></div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({
   mode: 'single',
   firstDay: 1,
   disabledDaysOfWeek: [0, 6],
   enabledDates: ['2026-03-07', '2026-03-08'],
   disabledDates: ['2026-03-09', '2026-03-10', '2026-03-11'],
 })"&gt;&lt;/div&gt;</code></pre>
-    </details>
-  </div>
+        </details>
+      </div>
 
-  <!-- ===================================================================
-       Range — Min/Max Range with Hover Preview
-       =================================================================== -->
-  <h2>Range — Min/Max Range (3–10 days) with Hover Preview</h2>
-  <div class="example">
-    <div class="status">
-      Range mode | Min: 3 days | Max: 10 days
-    </div>
-    <p style="font-size: 0.8rem; color: #6b7280; margin: 0 0 0.5rem;">
-      Select a start date, then hover over other dates — invalid range endpoints appear dimmed.
-    </p>
-    <div x-data="calendar({
-      mode: 'range',
-      firstDay: 1,
-      minRange: 3,
-      maxRange: 10,
-    })"></div>
-    <details>
-      <summary>View Code</summary>
-      <pre><code>&lt;div x-data="calendar({
+      <!-- Range Limits -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Range with Min/Max Days</div>
+          <div class="card-desc">Range must be 3-10 days. Invalid endpoints are dimmed on hover.</div>
+        </div>
+        <div class="card-body">
+          <div class="status-bar">Min: 3 days | Max: 10 days</div>
+          <div x-data="calendar({
+            mode: 'range',
+            firstDay: 1,
+            minRange: 3,
+            maxRange: 10,
+          })"></div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({
   mode: 'range',
   firstDay: 1,
   minRange: 3,
   maxRange: 10,
 })"&gt;&lt;/div&gt;</code></pre>
-    </details>
+        </details>
+      </div>
+
+    </div>
   </div>
 
-  <!-- ===================================================================
-       Rules — Period-Specific Constraints (Summer vs Winter)
-       =================================================================== -->
-  <h2>Rules — Summer vs Winter Booking (Period Rules)</h2>
-  <div class="example">
-    <div style="font-size: 0.8rem; color: #6b7280; margin: 0 0 0.75rem; line-height: 1.5;">
-      <strong>Global:</strong> 2–14 days, Sundays disabled<br>
-      <strong>Summer (Jun–Aug):</strong> 7–21 days, all days enabled<br>
-      <strong>Holidays (Dec 20–Jan 5):</strong> 3–7 days, all days enabled
-    </div>
-    <div x-data="calendar({
-      mode: 'range',
-      months: 2,
-      firstDay: 1,
-      minRange: 2,
-      maxRange: 14,
-      disabledDaysOfWeek: [0],
-      rules: [
-        {
-          from: '2026-06-01',
-          to: '2026-08-31',
-          minRange: 7,
-          maxRange: 21,
-          disabledDaysOfWeek: [],
-        },
-        {
-          from: '2026-12-20',
-          to: '2027-01-05',
-          minRange: 3,
-          maxRange: 7,
-          enabledDaysOfWeek: [1, 2, 3, 4, 5, 6, 0],
-        }
-      ],
-    })"></div>
-    <details>
-      <summary>View Code</summary>
-      <pre><code>&lt;div x-data="calendar({
+  <!-- ============================================================
+       RULES
+       ============================================================ -->
+  <div class="container section" id="rules">
+    <h2 class="section-title">Period Rules</h2>
+    <p class="section-desc">Apply different constraint rules for specific date periods — perfect for seasonal booking systems.</p>
+
+    <div class="examples">
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Summer vs Winter Booking</div>
+          <div class="card-desc">
+            Global: 2-14 days, Sundays disabled.
+            Summer (Jun-Aug): 7-21 days, all days open.
+            Holidays (Dec 20-Jan 5): 3-7 days, all days open.
+          </div>
+        </div>
+        <div class="card-body">
+          <div x-data="calendar({
+            mode: 'range',
+            months: 2,
+            firstDay: 1,
+            minRange: 2,
+            maxRange: 14,
+            disabledDaysOfWeek: [0],
+            rules: [
+              {
+                from: '2026-06-01',
+                to: '2026-08-31',
+                minRange: 7,
+                maxRange: 21,
+                disabledDaysOfWeek: [],
+              },
+              {
+                from: '2026-12-20',
+                to: '2027-01-05',
+                minRange: 3,
+                maxRange: 7,
+                enabledDaysOfWeek: [1, 2, 3, 4, 5, 6, 0],
+              }
+            ],
+          })"></div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({
   mode: 'range',
   months: 2,
   firstDay: 1,
@@ -376,176 +757,339 @@
   disabledDaysOfWeek: [0],
   rules: [
     {
-      from: '2026-06-01',
-      to: '2026-08-31',
-      minRange: 7,
-      maxRange: 21,
+      from: '2026-06-01', to: '2026-08-31',
+      minRange: 7, maxRange: 21,
       disabledDaysOfWeek: [],
     },
     {
-      from: '2026-12-20',
-      to: '2027-01-05',
-      minRange: 3,
-      maxRange: 7,
+      from: '2026-12-20', to: '2027-01-05',
+      minRange: 3, maxRange: 7,
       enabledDaysOfWeek: [1, 2, 3, 4, 5, 6, 0],
     }
   ],
 })"&gt;&lt;/div&gt;</code></pre>
-    </details>
-  </div>
-
-  <!-- ===================================================================
-       Form Submission with Hidden Inputs
-       =================================================================== -->
-  <h2>Form Submission — Hidden Inputs</h2>
-  <div class="example">
-    <form @submit.prevent="alert('Submitted: ' + new FormData($el).getAll('appointment'))">
-      <div x-data="calendar({ mode: 'single', firstDay: 1, name: 'appointment' })"></div>
-      <button type="submit" style="margin-top: 0.5rem; padding: 0.4rem 1rem; border: 1px solid #d1d5db; border-radius: 6px; cursor: pointer;">Submit</button>
-    </form>
-    <details>
-      <summary>View Code</summary>
-      <pre><code>&lt;form @submit.prevent="alert('Submitted: ' + new FormData($el).getAll('appointment'))"&gt;
-  &lt;div x-data="calendar({ mode: 'single', firstDay: 1, name: 'appointment' })"&gt;&lt;/div&gt;
-  &lt;button type="submit"&gt;Submit&lt;/button&gt;
-&lt;/form&gt;</code></pre>
-    </details>
-  </div>
-
-  <!-- ===================================================================
-       Multi-Month Scrollable (3+ months)
-       =================================================================== -->
-  <h2>Scrollable — 3 Months (Single)</h2>
-  <div class="example">
-    <div class="status">Inline 3-month scrollable calendar with single selection.</div>
-    <div x-data="calendar({ mode: 'single', months: 3, firstDay: 1 })"></div>
-    <details>
-      <summary>View Code</summary>
-      <pre><code>&lt;div x-data="calendar({ mode: 'single', months: 3, firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
-    </details>
-  </div>
-
-  <h2>Scrollable — 36 Months Range (3 Years)</h2>
-  <div class="example">
-    <div class="status">36-month scrollable range picker — tests performance with many months.</div>
-    <div x-data="calendar({ mode: 'range', months: 36, firstDay: 1, scrollHeight: 500 })"></div>
-    <details>
-      <summary>View Code</summary>
-      <pre><code>&lt;div x-data="calendar({ mode: 'range', months: 36, firstDay: 1, scrollHeight: 500 })"&gt;&lt;/div&gt;</code></pre>
-    </details>
-  </div>
-
-  <h2>Scrollable — Popup 3 Months (Range)</h2>
-  <div class="example">
-    <div class="status">Popup with 3-month scrollable range selection.</div>
-    <div x-data="calendar({ mode: 'range', months: 3, display: 'popup', firstDay: 1 })">
-      <input x-ref="rc-input" type="text" class="rc-input">
-    </div>
-    <details>
-      <summary>View Code</summary>
-      <pre><code>&lt;div x-data="calendar({ mode: 'range', months: 3, display: 'popup', firstDay: 1 })"&gt;
-  &lt;input x-ref="rc-input" type="text" class="rc-input"&gt;
-&lt;/div&gt;</code></pre>
-    </details>
-  </div>
-
-  <!-- ===================================================================
-       Custom Template (manual, auto-rendering skipped)
-       =================================================================== -->
-  <details class="custom-template">
-    <summary>Advanced: Custom Template (manual)</summary>
-    <p style="font-size: 0.85rem; color: #666; margin: 0.5rem 0;">
-      When the element has children, auto-rendering is skipped. Full template control.
-    </p>
-    <div class="example">
-      <div x-data="calendar({ mode: 'single', display: 'inline', firstDay: 1 })">
-        <div class="status">
-          Mode: <span x-text="mode"></span> |
-          Selected: <span x-text="formattedValue || 'none'"></span>
-        </div>
-
-        <div class="rc-calendar"
-             @keydown="handleKeydown($event)"
-             tabindex="0"
-             :aria-activedescendant="focusedDateISO ? 'day-' + focusedDateISO : null"
-             role="application"
-             aria-label="Calendar">
-
-          <div class="rc-sr-only" role="status" aria-live="polite" aria-atomic="true" x-text="_statusMessage"></div>
-
-          <template x-if="view === 'years'">
-            <div class="rc-view-enter">
-              <div class="rc-header">
-                <button class="rc-header__nav" @click="prev()" :disabled="!canGoPrev" aria-label="Previous decade">&#8249;</button>
-                <span class="rc-header__label" x-text="decadeLabel"></span>
-                <button class="rc-header__nav" @click="next()" :disabled="!canGoNext" aria-label="Next decade">&#8250;</button>
-              </div>
-              <div class="rc-year-grid" role="group" :aria-label="decadeLabel">
-                <template x-for="cell in yearGrid.flat()" :key="cell.year">
-                  <div :class="yearClasses(cell)" :aria-disabled="cell.isDisabled" tabindex="-1" @click="!cell.isDisabled && selectYear(cell.year)" x-text="cell.label"></div>
-                </template>
-              </div>
-            </div>
-          </template>
-
-          <template x-if="view === 'months'">
-            <div class="rc-view-enter">
-              <div class="rc-header">
-                <button class="rc-header__nav" @click="prev()" :disabled="!canGoPrev" aria-label="Previous year">&#8249;</button>
-                <button class="rc-header__label" @click="setView('years')" aria-label="Change view" x-text="yearLabel"></button>
-                <button class="rc-header__nav" @click="next()" :disabled="!canGoNext" aria-label="Next year">&#8250;</button>
-              </div>
-              <div class="rc-month-grid" role="group" :aria-label="yearLabel">
-                <template x-for="cell in monthGrid.flat()" :key="cell.month">
-                  <div :class="monthClasses(cell)" :aria-disabled="cell.isDisabled" tabindex="-1" @click="!cell.isDisabled && selectMonth(cell.month)" x-text="cell.label"></div>
-                </template>
-              </div>
-            </div>
-          </template>
-
-          <template x-if="view === 'days'">
-            <div class="rc-months rc-view-enter">
-              <template x-for="(mg, gi) in grid" :key="mg.year + '-' + mg.month">
-                <div>
-                  <div class="rc-header">
-                    <button class="rc-header__nav" @click="prev()" :disabled="!canGoPrev" aria-label="Previous month">&#8249;</button>
-                    <button class="rc-header__label" @click="setView('months')" aria-label="Change view" x-text="monthYearLabel(gi)"></button>
-                    <button class="rc-header__nav" @click="next()" :disabled="!canGoNext" aria-label="Next month">&#8250;</button>
-                  </div>
-                  <div class="rc-weekdays">
-                    <template x-for="wd in weekdayHeaders" :key="wd">
-                      <span class="rc-weekday" x-text="wd"></span>
-                    </template>
-                  </div>
-                  <div class="rc-grid-wrapper">
-                    <div class="rc-grid"
-                         :class="{ 'rc-grid--slide-next': _navDirection === 'next', 'rc-grid--slide-prev': _navDirection === 'prev' }"
-                         @animationend="_navDirection = ''"
-                         role="listbox" :aria-label="monthYearLabel(gi)">
-                      <template x-for="cell in mg.rows.flat()" :key="cell.date.toISO()">
-                        <div :class="dayClasses(cell)"
-                             :id="'day-' + cell.date.toISO()"
-                             :aria-selected="isSelected(cell.date)"
-                             :aria-disabled="cell.isDisabled"
-                             :title="dayTitle(cell)"
-                             role="option"
-                             tabindex="-1"
-                             @click="!cell.isDisabled && selectDate(cell.date)"
-                             @mouseenter="hoverDate = cell.date"
-                             @mouseleave="hoverDate = null"
-                             x-text="cell.date.day">
-                        </div>
-                      </template>
-                    </div>
-                  </div>
-                </div>
-              </template>
-            </div>
-          </template>
-        </div>
+        </details>
       </div>
+
     </div>
-  </details>
+  </div>
+
+  <!-- ============================================================
+       WIZARD
+       ============================================================ -->
+  <div class="container section" id="wizard">
+    <h2 class="section-title">Wizard Mode</h2>
+    <p class="section-desc">Step-by-step date selection: Year &rarr; Month &rarr; Day. Great for birth dates and historical dates.</p>
+
+    <div class="examples examples-grid-2">
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Full Wizard (Birth Date)</div>
+          <div class="card-desc">Year &rarr; Month &rarr; Day step flow.</div>
+        </div>
+        <div class="card-body">
+          <div x-data="calendar({ mode: 'single', wizard: true, firstDay: 1 })"></div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({
+  mode: 'single',
+  wizard: true,
+  firstDay: 1
+})"&gt;&lt;/div&gt;</code></pre>
+        </details>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Year-Month Wizard</div>
+          <div class="card-desc">Start from year view, skip to month, then days.</div>
+        </div>
+        <div class="card-body">
+          <div x-data="calendar({ mode: 'single', wizard: 'year-month', firstDay: 1 })"></div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({
+  mode: 'single',
+  wizard: 'year-month',
+  firstDay: 1
+})"&gt;&lt;/div&gt;</code></pre>
+        </details>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Month-Day Wizard</div>
+          <div class="card-desc">Start from month view, then pick a day.</div>
+        </div>
+        <div class="card-body">
+          <div x-data="calendar({ mode: 'single', wizard: 'month-day', firstDay: 1 })"></div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({
+  mode: 'single',
+  wizard: 'month-day',
+  firstDay: 1
+})"&gt;&lt;/div&gt;</code></pre>
+        </details>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Popup Wizard</div>
+          <div class="card-desc">Full wizard inside a popup dropdown.</div>
+        </div>
+        <div class="card-body">
+          <div x-data="calendar({ mode: 'single', wizard: true, display: 'popup', firstDay: 1 })">
+            <input x-ref="rc-input" type="text" class="rc-input" placeholder="Birth date...">
+          </div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({
+  mode: 'single',
+  wizard: true,
+  display: 'popup',
+  firstDay: 1
+})"&gt;
+  &lt;input x-ref="rc-input" type="text" class="rc-input"
+         placeholder="Birth date..."&gt;
+&lt;/div&gt;</code></pre>
+        </details>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============================================================
+       METADATA
+       ============================================================ -->
+  <div class="container section" id="metadata">
+    <h2 class="section-title">Date Metadata</h2>
+    <p class="section-desc">Attach labels, pricing, availability, and custom colors to individual dates. Uses a static map or dynamic callback.</p>
+
+    <div class="examples examples-grid-2">
+
+      <!-- Static Metadata -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Room Pricing (Static)</div>
+          <div class="card-desc">Labels show nightly price. Green dots = available, strikethrough = unavailable.</div>
+        </div>
+        <div class="card-body">
+          <div x-data="calendar({
+            mode: 'single',
+            firstDay: 1,
+            dateMetadata: {
+              '2026-03-01': { label: '$120', availability: 'available' },
+              '2026-03-02': { label: '$120', availability: 'available' },
+              '2026-03-03': { label: '$150', availability: 'available', color: '#16a34a' },
+              '2026-03-04': { label: '$150', availability: 'available', color: '#16a34a' },
+              '2026-03-05': { label: '$180', availability: 'available', color: '#ea580c' },
+              '2026-03-06': { availability: 'unavailable' },
+              '2026-03-07': { label: 'Sold', availability: 'unavailable' },
+              '2026-03-08': { availability: 'available' },
+              '2026-03-09': { label: '$99', availability: 'available', color: '#2563eb' },
+              '2026-03-10': { label: '$99', availability: 'available', color: '#2563eb' },
+            }
+          })"></div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({
+  mode: 'single',
+  firstDay: 1,
+  dateMetadata: {
+    '2026-03-01': { label: '$120', availability: 'available' },
+    '2026-03-03': { label: '$150', availability: 'available', color: '#16a34a' },
+    '2026-03-05': { label: '$180', availability: 'available', color: '#ea580c' },
+    '2026-03-06': { availability: 'unavailable' },
+    '2026-03-07': { label: 'Sold', availability: 'unavailable' },
+    '2026-03-09': { label: '$99', availability: 'available', color: '#2563eb' },
+  }
+})"&gt;&lt;/div&gt;</code></pre>
+        </details>
+      </div>
+
+      <!-- Dynamic Metadata -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Dynamic Pricing (Callback)</div>
+          <div class="card-desc">Weekdays available with computed price, weekends unavailable.</div>
+        </div>
+        <div class="card-body">
+          <div x-data="calendar({
+            mode: 'range',
+            firstDay: 1,
+            dateMetadata: (date) => {
+              const d = date.toNativeDate().getDay()
+              if (d === 0 || d === 6) return { availability: 'unavailable' }
+              return { label: '$' + (100 + date.day * 3), availability: 'available' }
+            }
+          })"></div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({
+  mode: 'range',
+  firstDay: 1,
+  dateMetadata: (date) =&gt; {
+    const d = date.toNativeDate().getDay()
+    if (d === 0 || d === 6)
+      return { availability: 'unavailable' }
+    return {
+      label: '$' + (100 + date.day * 3),
+      availability: 'available'
+    }
+  }
+})"&gt;&lt;/div&gt;</code></pre>
+        </details>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============================================================
+       SCROLLABLE
+       ============================================================ -->
+  <div class="container section" id="scrollable">
+    <h2 class="section-title">Multi-Month Scrollable</h2>
+    <p class="section-desc">Display 3+ months in a scrollable container. Great for long-range booking flows.</p>
+
+    <div class="examples examples-grid-2">
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">3-Month Single</div>
+          <div class="card-desc">Scroll through three months inline.</div>
+        </div>
+        <div class="card-body">
+          <div x-data="calendar({ mode: 'single', months: 3, firstDay: 1 })"></div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({
+  mode: 'single',
+  months: 3,
+  firstDay: 1
+})"&gt;&lt;/div&gt;</code></pre>
+        </details>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">12-Month Range</div>
+          <div class="card-desc">A full year of scrollable range selection.</div>
+        </div>
+        <div class="card-body">
+          <div x-data="calendar({ mode: 'range', months: 12, firstDay: 1, scrollHeight: 400 })"></div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({
+  mode: 'range',
+  months: 12,
+  firstDay: 1,
+  scrollHeight: 400
+})"&gt;&lt;/div&gt;</code></pre>
+        </details>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============================================================
+       THEMING
+       ============================================================ -->
+  <div class="container section" id="theming">
+    <h2 class="section-title">Theming</h2>
+    <p class="section-desc">Fully customizable via CSS custom properties. Override any <code>--color-calendar-*</code> variable.</p>
+
+    <div class="examples examples-grid-2">
+
+      <!-- Dark Theme -->
+      <div class="card" style="background: #1e293b;">
+        <div class="card-header">
+          <div class="card-title" style="color: #f1f5f9;">Dark Theme</div>
+          <div class="card-desc" style="color: #94a3b8;">Override surface, text, and border colors.</div>
+        </div>
+        <div class="card-body">
+          <div style="
+            --color-calendar-bg: #1e293b;
+            --color-calendar-text: #f1f5f9;
+            --color-calendar-border: #334155;
+            --color-calendar-hover: #334155;
+            --color-calendar-disabled: #475569;
+            --color-calendar-other-month: #475569;
+            --color-calendar-weekday: #94a3b8;
+            --color-calendar-primary: #818cf8;
+            --color-calendar-primary-text: #1e293b;
+            --color-calendar-today-ring: #818cf8;
+            --color-calendar-range: #312e81;
+            --color-calendar-focus-ring: #818cf8;
+          ">
+            <div x-data="calendar({ mode: 'range', firstDay: 1 })"></div>
+          </div>
+        </div>
+        <details class="card-code" style="border-color: #334155;">
+          <summary style="color: #94a3b8;">View Code</summary>
+          <pre style="background: #0f172a; color: #cbd5e1;"><code>.dark-calendar {
+  --color-calendar-bg: #1e293b;
+  --color-calendar-text: #f1f5f9;
+  --color-calendar-border: #334155;
+  --color-calendar-hover: #334155;
+  --color-calendar-primary: #818cf8;
+  --color-calendar-primary-text: #1e293b;
+  --color-calendar-today-ring: #818cf8;
+  --color-calendar-range: #312e81;
+}</code></pre>
+        </details>
+      </div>
+
+      <!-- Custom accent -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Custom Accent</div>
+          <div class="card-desc">Change the primary color to match your brand.</div>
+        </div>
+        <div class="card-body">
+          <div style="
+            --color-calendar-primary: #059669;
+            --color-calendar-primary-text: #ffffff;
+            --color-calendar-today-ring: #34d399;
+            --color-calendar-range: #ecfdf5;
+            --color-calendar-focus-ring: #059669;
+          ">
+            <div x-data="calendar({ mode: 'range', firstDay: 1 })"></div>
+          </div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>.green-theme {
+  --color-calendar-primary: #059669;
+  --color-calendar-primary-text: #ffffff;
+  --color-calendar-today-ring: #34d399;
+  --color-calendar-range: #ecfdf5;
+}</code></pre>
+        </details>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== Footer ===== -->
+  <footer class="footer">
+    <p>
+      <strong>Reach Calendar</strong> &mdash; MIT License
+      &nbsp;&middot;&nbsp;
+      <a href="https://github.com/reachweb/alpine-calendar" target="_blank" rel="noopener">GitHub</a>
+      &nbsp;&middot;&nbsp;
+      <a href="https://github.com/reachweb/alpine-calendar#readme" target="_blank" rel="noopener">Docs</a>
+    </p>
+  </footer>
 
   <script type="module">
     import Alpine from 'alpinejs'

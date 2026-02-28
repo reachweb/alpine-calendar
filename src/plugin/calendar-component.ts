@@ -15,6 +15,8 @@ import { formatDate, formatRange, formatMultiple } from '../input/formatter'
 import { parseDate, parseDateRange, parseDateMultiple } from '../input/parser'
 import { attachMask } from '../input/mask'
 import type { RangePreset } from '../core/presets'
+import { normalizeDateMeta } from '../core/metadata'
+import type { DateMeta, DateMetaProvider } from '../core/metadata'
 import { generateCalendarTemplate } from './template'
 
 // ---------------------------------------------------------------------------
@@ -151,6 +153,8 @@ export interface CalendarConfig {
       action: 'select' | 'deselect'
     },
   ) => boolean | undefined
+  /** Per-date metadata (labels, availability, colors). Static map or callback. */
+  dateMetadata?: DateMetaProvider
   /** Custom messages for disabled-date tooltips. Overrides default English strings. */
   constraintMessages?: ConstraintMessages
   /** Auto-render template when no `.rc-calendar` exists in the container. Default: true. Set false to require manual template. */
@@ -475,6 +479,9 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
   const constraintMessages = config.constraintMessages
   const constraints = buildConstraints(config, constraintMessages)
 
+  // --- Normalize date metadata provider ---
+  const initialGetDateMeta = normalizeDateMeta(config.dateMetadata)
+
   // --- Create selection model ---
   function buildSelection(): Selection {
     if (mode === 'multiple') return new MultipleSelection()
@@ -485,16 +492,19 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
   const selection = buildSelection()
 
   // --- Parse initial value ---
+  const isInitDisabled = (d: CalendarDate) =>
+    constraints.isDisabledDate(d) || initialGetDateMeta(d)?.availability === 'unavailable'
+
   if (config.value) {
     if (mode === 'single') {
       const d = parseDate(config.value, format) ?? CalendarDate.fromISO(config.value)
-      if (d && !constraints.isDisabledDate(d)) selection.toggle(d)
+      if (d && !isInitDisabled(d)) selection.toggle(d)
     } else if (mode === 'range') {
       const range = parseDateRange(config.value, format)
       if (range) {
         let [start, end] = range
         if (end.isBefore(start)) { const tmp = start; start = end; end = tmp }
-        if (!constraints.isDisabledDate(start) && !constraints.isDisabledDate(end) && constraints.isRangeValid(start, end)) {
+        if (!isInitDisabled(start) && !isInitDisabled(end) && constraints.isRangeValid(start, end)) {
           selection.toggle(start)
           selection.toggle(end)
         }
@@ -502,7 +512,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     } else if (mode === 'multiple') {
       const dates = parseDateMultiple(config.value, format)
       for (const d of dates) {
-        if (!constraints.isDisabledDate(d)) selection.toggle(d)
+        if (!isInitDisabled(d)) selection.toggle(d)
       }
     }
   }
@@ -599,6 +609,16 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
      * re-evaluates class bindings without needing a full grid rebuild.
      */
     _selectionRev: 0,
+
+    // --- Date metadata ---
+    _getDateMeta: initialGetDateMeta,
+    _metadataRev: 0,
+
+    /** Check if a date is effectively disabled (constraint OR metadata unavailability). */
+    _isEffectivelyDisabled(d: CalendarDate): boolean {
+      if (this._isDisabledDate(d)) return true
+      return this._getDateMeta(d)?.availability === 'unavailable'
+    },
 
     // --- Accessibility: live region ---
     _statusMessage: '' as string,
@@ -796,7 +816,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         this.monthCount,
         this.firstDay,
         this._today,
-        this._isDisabledDate,
+        (d: CalendarDate) => this._isEffectivelyDisabled(d),
       )
     },
 
@@ -958,10 +978,9 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     dayClasses(
       cell: { date: CalendarDate; isCurrentMonth: boolean; isToday: boolean; isDisabled: boolean },
     ): Record<string, boolean> {
-      // Read _selectionRev to register it as an Alpine dependency.
-      // This lets Alpine re-evaluate class bindings when selection changes
-      // without needing a full grid rebuild (important for large month counts).
+      // Read _selectionRev and _metadataRev to register them as Alpine dependencies.
       void this._selectionRev
+      void this._metadataRev
       const d = cell.date
       const selected = this.isSelected(d)
       const rangeStart = this.isRangeStart(d)
@@ -981,7 +1000,13 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         rangeInvalid = !this.isDateSelectableForRange(d)
       }
 
-      return {
+      // Metadata-driven classes
+      const meta = this._getDateMeta(d)
+      const hasLabel = !!(meta?.label)
+      const isAvailable = meta?.availability === 'available'
+      const isUnavailable = meta?.availability === 'unavailable'
+
+      const classes: Record<string, boolean> = {
         'rc-day': true,
         'rc-day--today': cell.isToday,
         'rc-day--selected': selected,
@@ -993,7 +1018,19 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         'rc-day--hidden': isOtherMonth && this.monthCount > 1,
         'rc-day--focused': this.focusedDate !== null && this.focusedDate.isSame(d),
         'rc-day--range-invalid': rangeInvalid,
+        'rc-day--available': isAvailable,
+        'rc-day--unavailable': isUnavailable,
+        'rc-day--has-label': hasLabel,
       }
+
+      // Apply custom cssClass from metadata
+      if (meta?.cssClass) {
+        for (const cls of meta.cssClass.split(/\s+/)) {
+          if (cls) classes[cls] = true
+        }
+      }
+
+      return classes
     },
 
     /**
@@ -1003,8 +1040,50 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     dayTitle(
       cell: { date: CalendarDate; isDisabled: boolean },
     ): string {
-      if (!cell.isDisabled) return ''
-      return this._getDisabledReasons(cell.date).join('; ')
+      void this._metadataRev
+      const meta = this._getDateMeta(cell.date)
+      const parts: string[] = []
+
+      if (cell.isDisabled) {
+        const reasons = this._getDisabledReasons(cell.date)
+        if (reasons.length > 0) {
+          parts.push(reasons.join('; '))
+        } else if (meta?.availability === 'unavailable') {
+          parts.push('Unavailable')
+        }
+      }
+
+      if (meta?.label) {
+        parts.push(meta.label)
+      }
+
+      return parts.join(' — ')
+    },
+
+    /**
+     * Get metadata for a day cell. Returns `DateMeta | undefined`.
+     * Reads `_metadataRev` for Alpine reactivity.
+     */
+    dayMeta(
+      cell: { date: CalendarDate },
+    ): DateMeta | undefined {
+      void this._metadataRev
+      return this._getDateMeta(cell.date)
+    },
+
+    /**
+     * Get inline style string for a day cell.
+     * Sets `--color-calendar-day-meta` when the metadata has a custom color.
+     */
+    dayStyle(
+      cell: { date: CalendarDate },
+    ): string {
+      void this._metadataRev
+      const meta = this._getDateMeta(cell.date)
+      if (meta?.color) {
+        return `--color-calendar-day-meta: ${meta.color};`
+      }
+      return ''
     },
 
     // --- Input binding ---
@@ -1135,7 +1214,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
 
       if (mode === 'single') {
         const parsed = parseDate(value, format) ?? CalendarDate.fromISO(value)
-        if (parsed && !this._isDisabledDate(parsed)) {
+        if (parsed && !this._isEffectivelyDisabled(parsed)) {
           this._selection.clear()
           this._selection.toggle(parsed)
           this.month = parsed.month
@@ -1148,8 +1227,8 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
           let [start, end] = range
           if (end.isBefore(start)) { const tmp = start; start = end; end = tmp }
           if (
-            !this._isDisabledDate(start) &&
-            !this._isDisabledDate(end) &&
+            !this._isEffectivelyDisabled(start) &&
+            !this._isEffectivelyDisabled(end) &&
             this._isRangeValid(start, end)
           ) {
             this._selection.clear()
@@ -1162,7 +1241,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         }
       } else if (mode === 'multiple') {
         const dates = parseDateMultiple(value, format)
-        const valid = dates.filter((d) => !this._isDisabledDate(d))
+        const valid = dates.filter((d) => !this._isEffectivelyDisabled(d))
         if (valid.length > 0) {
           this._selection.clear()
           for (const d of valid) {
@@ -1305,7 +1384,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     selectDate(dateOrISO: CalendarDate | string) {
       const date = typeof dateOrISO === 'string' ? CalendarDate.fromISO(dateOrISO) : dateOrISO
       if (!date) return
-      if (this._isDisabledDate(date)) return
+      if (this._isEffectivelyDisabled(date)) return
 
       // Range validation: when about to complete a range, check min/max range
       if (mode === 'range') {
@@ -1417,7 +1496,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
      */
     isDateSelectableForRange(date: CalendarDate): boolean {
       if (mode !== 'range') return false
-      if (this._isDisabledDate(date)) return false
+      if (this._isEffectivelyDisabled(date)) return false
 
       const range = this._selection as RangeSelection
 
@@ -1492,18 +1571,18 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       if (typeof value === 'string') {
         // Single ISO string
         const d = CalendarDate.fromISO(value) ?? parseDate(value, format)
-        if (d && !this._isDisabledDate(d)) {
+        if (d && !this._isEffectivelyDisabled(d)) {
           dates.push(d)
         }
       } else if (Array.isArray(value)) {
         for (const v of value) {
           const d = typeof v === 'string' ? (CalendarDate.fromISO(v) ?? parseDate(v, format)) : v
-          if (d && !this._isDisabledDate(d)) {
+          if (d && !this._isEffectivelyDisabled(d)) {
             dates.push(d)
           }
         }
       } else if (value instanceof CalendarDate) {
-        if (!this._isDisabledDate(value)) {
+        if (!this._isEffectivelyDisabled(value)) {
           dates.push(value)
         }
       }
@@ -1661,6 +1740,28 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       this._rebuildGrid()
       this._rebuildMonthGrid()
       this._rebuildYearGrid()
+      if (this.isScrollable) {
+        alpine(this).$nextTick(() => { this._rebindScrollObserver() })
+      }
+    },
+
+    /**
+     * Update the date metadata provider at runtime.
+     *
+     * Normalizes the provider, bumps the reactive counter, and rebuilds
+     * the day grid (since unavailability affects disabled state).
+     *
+     * Usage:
+     * ```js
+     * $data.updateDateMetadata({
+     *   '2026-03-15': { label: '$150', availability: 'available' },
+     * })
+     * ```
+     */
+    updateDateMetadata(provider: DateMetaProvider | undefined | null) {
+      this._getDateMeta = normalizeDateMeta(provider)
+      this._metadataRev++
+      this._rebuildGrid()
       if (this.isScrollable) {
         alpine(this).$nextTick(() => { this._rebindScrollObserver() })
       }
@@ -1878,13 +1979,13 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
 
       // Skip disabled dates (up to 31 attempts to avoid infinite loops)
       let attempts = 0
-      while (this._isDisabledDate(candidate) && attempts < 31) {
+      while (this._isEffectivelyDisabled(candidate) && attempts < 31) {
         candidate = candidate.addDays(deltaDays > 0 ? 1 : -1)
         attempts++
       }
 
       // If all candidates were disabled, don't move
-      if (this._isDisabledDate(candidate)) return
+      if (this._isEffectivelyDisabled(candidate)) return
 
       this._setFocusedDate(candidate)
     },
