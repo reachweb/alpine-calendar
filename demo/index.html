@@ -396,11 +396,11 @@
           <div class="card-desc">Click to select one date. The simplest configuration.</div>
         </div>
         <div class="card-body">
-          <div x-data="calendar({ mode: 'single', firstDay: 1 })"></div>
+          <div x-data="calendar({ mode: 'single' })"></div>
         </div>
         <details class="card-code">
           <summary>View Code</summary>
-          <pre><code>&lt;div x-data="calendar({ mode: 'single', firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
+          <pre><code>&lt;div x-data="calendar({ mode: 'single' })"&gt;&lt;/div&gt;</code></pre>
         </details>
       </div>
 
@@ -411,11 +411,11 @@
           <div class="card-desc">Select a start and end date. Hover to preview the range.</div>
         </div>
         <div class="card-body">
-          <div x-data="calendar({ mode: 'range', firstDay: 1 })"></div>
+          <div x-data="calendar({ mode: 'range' })"></div>
         </div>
         <details class="card-code">
           <summary>View Code</summary>
-          <pre><code>&lt;div x-data="calendar({ mode: 'range', firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
+          <pre><code>&lt;div x-data="calendar({ mode: 'range' })"&gt;&lt;/div&gt;</code></pre>
         </details>
       </div>
 
@@ -426,11 +426,26 @@
           <div class="card-desc">Toggle multiple individual dates on and off.</div>
         </div>
         <div class="card-body">
-          <div x-data="calendar({ mode: 'multiple', firstDay: 1 })"></div>
+          <div x-data="calendar({ mode: 'multiple' })"></div>
         </div>
         <details class="card-code">
           <summary>View Code</summary>
-          <pre><code>&lt;div x-data="calendar({ mode: 'multiple', firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
+          <pre><code>&lt;div x-data="calendar({ mode: 'multiple' })"&gt;&lt;/div&gt;</code></pre>
+        </details>
+      </div>
+
+      <!-- Sunday Start -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Sunday Start</div>
+          <div class="card-desc">Override the default Monday start with <code>firstDay: 0</code>.</div>
+        </div>
+        <div class="card-body">
+          <div x-data="calendar({ mode: 'single', firstDay: 0 })"></div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({ mode: 'single', firstDay: 0 })"&gt;&lt;/div&gt;</code></pre>
         </details>
       </div>
 
@@ -441,11 +456,11 @@
           <div class="card-desc">Display two months side-by-side for easier range picking.</div>
         </div>
         <div class="card-body">
-          <div x-data="calendar({ mode: 'range', months: 2, firstDay: 1 })"></div>
+          <div x-data="calendar({ mode: 'range', months: 2 })"></div>
         </div>
         <details class="card-code">
           <summary>View Code</summary>
-          <pre><code>&lt;div x-data="calendar({ mode: 'range', months: 2, firstDay: 1 })"&gt;&lt;/div&gt;</code></pre>
+          <pre><code>&lt;div x-data="calendar({ mode: 'range', months: 2 })"&gt;&lt;/div&gt;</code></pre>
         </details>
       </div>
 
@@ -468,13 +483,13 @@
           <div class="card-desc">Click the input to open the calendar dropdown.</div>
         </div>
         <div class="card-body">
-          <div x-data="calendar({ mode: 'single', display: 'popup', firstDay: 1 })">
+          <div x-data="calendar({ mode: 'single', display: 'popup' })">
             <input x-ref="rc-input" type="text" class="rc-input" placeholder="Pick a date...">
           </div>
         </div>
         <details class="card-code">
           <summary>View Code</summary>
-          <pre><code>&lt;div x-data="calendar({ mode: 'single', display: 'popup', firstDay: 1 })"&gt;
+          <pre><code>&lt;div x-data="calendar({ mode: 'single', display: 'popup' })"&gt;
   &lt;input x-ref="rc-input" type="text" class="rc-input"
          placeholder="Pick a date..."&gt;
 &lt;/div&gt;</code></pre>
@@ -488,7 +503,7 @@
           <div class="card-desc">Popup range picker with 3 scrollable months.</div>
         </div>
         <div class="card-body">
-          <div x-data="calendar({ mode: 'range', months: 3, display: 'popup', firstDay: 1 })">
+          <div x-data="calendar({ mode: 'range', months: 3, display: 'popup' })">
             <input x-ref="rc-input" type="text" class="rc-input" placeholder="Check-in — Check-out">
           </div>
         </div>
@@ -497,9 +512,7 @@
           <pre><code>&lt;div x-data="calendar({
   mode: 'range',
   months: 3,
-  display: 'popup',
-  firstDay: 1
-})"&gt;
+  display: 'popup'})"&gt;
   &lt;input x-ref="rc-input" type="text" class="rc-input"
          placeholder="Check-in — Check-out"&gt;
 &lt;/div&gt;</code></pre>
@@ -526,13 +539,12 @@
         </div>
         <div class="card-body">
           <div class="status-bar">Pre-selected: 2026-03-15</div>
-          <div x-data="calendar({ mode: 'single', firstDay: 1, value: '2026-03-15' })"></div>
+          <div x-data="calendar({ mode: 'single', value: '2026-03-15' })"></div>
         </div>
         <details class="card-code">
           <summary>View Code</summary>
           <pre><code>&lt;div x-data="calendar({
   mode: 'single',
-  firstDay: 1,
   value: '2026-03-15'
 })"&gt;&lt;/div&gt;</code></pre>
         </details>
@@ -545,7 +557,7 @@
           <div class="card-desc">Set or clear the selection programmatically.</div>
         </div>
         <div class="card-body">
-          <div x-data="calendar({ mode: 'single', firstDay: 1 })" id="dynamic-demo"></div>
+          <div x-data="calendar({ mode: 'single' })" id="dynamic-demo"></div>
           <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
             <button class="demo-btn" onclick="document.getElementById('dynamic-demo')._x_dataStack[0].setValue('2026-06-15')">Set June 15</button>
             <button class="demo-btn" onclick="document.getElementById('dynamic-demo')._x_dataStack[0].setValue('2026-12-25')">Set Dec 25</button>
@@ -569,13 +581,12 @@
         </div>
         <div class="card-body">
           <div class="status-bar">Range: 2026-03-10 to 2026-03-20</div>
-          <div x-data="calendar({ mode: 'range', firstDay: 1, value: '2026-03-10 - 2026-03-20' })"></div>
+          <div x-data="calendar({ mode: 'range', value: '2026-03-10 - 2026-03-20' })"></div>
         </div>
         <details class="card-code">
           <summary>View Code</summary>
           <pre><code>&lt;div x-data="calendar({
   mode: 'range',
-  firstDay: 1,
   value: '2026-03-10 - 2026-03-20'
 })"&gt;&lt;/div&gt;</code></pre>
         </details>
@@ -589,7 +600,7 @@
         </div>
         <div class="card-body">
           <form @submit.prevent="$dispatch('notify', { message: 'Submitted: ' + new FormData($el).getAll('appointment') })">
-            <div x-data="calendar({ mode: 'single', firstDay: 1, name: 'appointment' })"></div>
+            <div x-data="calendar({ mode: 'single', name: 'appointment' })"></div>
             <button type="submit" class="demo-btn" style="margin-top: 0.75rem;">Submit Form</button>
           </form>
         </div>
@@ -598,7 +609,6 @@
           <pre><code>&lt;form @submit.prevent="handleSubmit"&gt;
   &lt;div x-data="calendar({
     mode: 'single',
-    firstDay: 1,
     name: 'appointment'
   })"&gt;&lt;/div&gt;
   &lt;button type="submit"&gt;Submit&lt;/button&gt;
@@ -628,7 +638,6 @@
           <div class="status-bar">Feb 1 – Apr 30 | Weekdays only</div>
           <div x-data="calendar({
             mode: 'single',
-            firstDay: 1,
             minDate: '2026-02-01',
             maxDate: '2026-04-30',
             disabledDaysOfWeek: [0, 6],
@@ -638,7 +647,6 @@
           <summary>View Code</summary>
           <pre><code>&lt;div x-data="calendar({
   mode: 'single',
-  firstDay: 1,
   minDate: '2026-02-01',
   maxDate: '2026-04-30',
   disabledDaysOfWeek: [0, 6],
@@ -655,7 +663,6 @@
         <div class="card-body">
           <div x-data="calendar({
             mode: 'single',
-            firstDay: 1,
             disabledDaysOfWeek: [0, 6],
             enabledDates: ['2026-03-07', '2026-03-08'],
             disabledDates: ['2026-03-09', '2026-03-10', '2026-03-11'],
@@ -665,7 +672,6 @@
           <summary>View Code</summary>
           <pre><code>&lt;div x-data="calendar({
   mode: 'single',
-  firstDay: 1,
   disabledDaysOfWeek: [0, 6],
   enabledDates: ['2026-03-07', '2026-03-08'],
   disabledDates: ['2026-03-09', '2026-03-10', '2026-03-11'],
@@ -683,7 +689,6 @@
           <div class="status-bar">Min: 3 days | Max: 10 days</div>
           <div x-data="calendar({
             mode: 'range',
-            firstDay: 1,
             minRange: 3,
             maxRange: 10,
           })"></div>
@@ -692,7 +697,6 @@
           <summary>View Code</summary>
           <pre><code>&lt;div x-data="calendar({
   mode: 'range',
-  firstDay: 1,
   minRange: 3,
   maxRange: 10,
 })"&gt;&lt;/div&gt;</code></pre>
@@ -724,7 +728,6 @@
           <div x-data="calendar({
             mode: 'range',
             months: 2,
-            firstDay: 1,
             minRange: 2,
             maxRange: 14,
             disabledDaysOfWeek: [0],
@@ -751,7 +754,6 @@
           <pre><code>&lt;div x-data="calendar({
   mode: 'range',
   months: 2,
-  firstDay: 1,
   minRange: 2,
   maxRange: 14,
   disabledDaysOfWeek: [0],
@@ -789,15 +791,13 @@
           <div class="card-desc">Year &rarr; Month &rarr; Day step flow.</div>
         </div>
         <div class="card-body">
-          <div x-data="calendar({ mode: 'single', wizard: true, firstDay: 1 })"></div>
+          <div x-data="calendar({ mode: 'single', wizard: true })"></div>
         </div>
         <details class="card-code">
           <summary>View Code</summary>
           <pre><code>&lt;div x-data="calendar({
   mode: 'single',
-  wizard: true,
-  firstDay: 1
-})"&gt;&lt;/div&gt;</code></pre>
+  wizard: true})"&gt;&lt;/div&gt;</code></pre>
         </details>
       </div>
 
@@ -807,15 +807,13 @@
           <div class="card-desc">Start from year view, skip to month, then days.</div>
         </div>
         <div class="card-body">
-          <div x-data="calendar({ mode: 'single', wizard: 'year-month', firstDay: 1 })"></div>
+          <div x-data="calendar({ mode: 'single', wizard: 'year-month' })"></div>
         </div>
         <details class="card-code">
           <summary>View Code</summary>
           <pre><code>&lt;div x-data="calendar({
   mode: 'single',
-  wizard: 'year-month',
-  firstDay: 1
-})"&gt;&lt;/div&gt;</code></pre>
+  wizard: 'year-month'})"&gt;&lt;/div&gt;</code></pre>
         </details>
       </div>
 
@@ -825,15 +823,13 @@
           <div class="card-desc">Start from month view, then pick a day.</div>
         </div>
         <div class="card-body">
-          <div x-data="calendar({ mode: 'single', wizard: 'month-day', firstDay: 1 })"></div>
+          <div x-data="calendar({ mode: 'single', wizard: 'month-day' })"></div>
         </div>
         <details class="card-code">
           <summary>View Code</summary>
           <pre><code>&lt;div x-data="calendar({
   mode: 'single',
-  wizard: 'month-day',
-  firstDay: 1
-})"&gt;&lt;/div&gt;</code></pre>
+  wizard: 'month-day'})"&gt;&lt;/div&gt;</code></pre>
         </details>
       </div>
 
@@ -843,7 +839,7 @@
           <div class="card-desc">Full wizard inside a popup dropdown.</div>
         </div>
         <div class="card-body">
-          <div x-data="calendar({ mode: 'single', wizard: true, display: 'popup', firstDay: 1 })">
+          <div x-data="calendar({ mode: 'single', wizard: true, display: 'popup' })">
             <input x-ref="rc-input" type="text" class="rc-input" placeholder="Birth date...">
           </div>
         </div>
@@ -852,9 +848,7 @@
           <pre><code>&lt;div x-data="calendar({
   mode: 'single',
   wizard: true,
-  display: 'popup',
-  firstDay: 1
-})"&gt;
+  display: 'popup'})"&gt;
   &lt;input x-ref="rc-input" type="text" class="rc-input"
          placeholder="Birth date..."&gt;
 &lt;/div&gt;</code></pre>
@@ -882,7 +876,6 @@
         <div class="card-body">
           <div x-data="calendar({
             mode: 'single',
-            firstDay: 1,
             dateMetadata: {
               '2026-03-01': { label: '$120', availability: 'available' },
               '2026-03-02': { label: '$120', availability: 'available' },
@@ -901,7 +894,6 @@
           <summary>View Code</summary>
           <pre><code>&lt;div x-data="calendar({
   mode: 'single',
-  firstDay: 1,
   dateMetadata: {
     '2026-03-01': { label: '$120', availability: 'available' },
     '2026-03-03': { label: '$150', availability: 'available', color: '#16a34a' },
@@ -923,7 +915,6 @@
         <div class="card-body">
           <div x-data="calendar({
             mode: 'range',
-            firstDay: 1,
             dateMetadata: (date) => {
               const d = date.toNativeDate().getDay()
               if (d === 0 || d === 6) return { availability: 'unavailable' }
@@ -935,7 +926,6 @@
           <summary>View Code</summary>
           <pre><code>&lt;div x-data="calendar({
   mode: 'range',
-  firstDay: 1,
   dateMetadata: (date) =&gt; {
     const d = date.toNativeDate().getDay()
     if (d === 0 || d === 6)
@@ -967,15 +957,13 @@
           <div class="card-desc">Scroll through three months inline.</div>
         </div>
         <div class="card-body">
-          <div x-data="calendar({ mode: 'single', months: 3, firstDay: 1 })"></div>
+          <div x-data="calendar({ mode: 'single', months: 3 })"></div>
         </div>
         <details class="card-code">
           <summary>View Code</summary>
           <pre><code>&lt;div x-data="calendar({
   mode: 'single',
-  months: 3,
-  firstDay: 1
-})"&gt;&lt;/div&gt;</code></pre>
+  months: 3})"&gt;&lt;/div&gt;</code></pre>
         </details>
       </div>
 
@@ -985,14 +973,13 @@
           <div class="card-desc">A full year of scrollable range selection.</div>
         </div>
         <div class="card-body">
-          <div x-data="calendar({ mode: 'range', months: 12, firstDay: 1, scrollHeight: 400 })"></div>
+          <div x-data="calendar({ mode: 'range', months: 12, scrollHeight: 400 })"></div>
         </div>
         <details class="card-code">
           <summary>View Code</summary>
           <pre><code>&lt;div x-data="calendar({
   mode: 'range',
   months: 12,
-  firstDay: 1,
   scrollHeight: 400
 })"&gt;&lt;/div&gt;</code></pre>
         </details>
@@ -1031,7 +1018,7 @@
             --color-calendar-range: #312e81;
             --color-calendar-focus-ring: #818cf8;
           ">
-            <div x-data="calendar({ mode: 'range', firstDay: 1 })"></div>
+            <div x-data="calendar({ mode: 'range' })"></div>
           </div>
         </div>
         <details class="card-code" style="border-color: #334155;">
@@ -1063,7 +1050,7 @@
             --color-calendar-range: #ecfdf5;
             --color-calendar-focus-ring: #059669;
           ">
-            <div x-data="calendar({ mode: 'range', firstDay: 1 })"></div>
+            <div x-data="calendar({ mode: 'range' })"></div>
           </div>
         </div>
         <details class="card-code">

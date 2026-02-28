@@ -72,7 +72,7 @@ export interface CalendarConfig {
   months?: number
   /** Max height of the scrollable container in px (only used when months >= 3). Default: 400. */
   scrollHeight?: number
-  /** First day of the week (0=Sun, 1=Mon, …, 6=Sat). Default: 0. */
+  /** First day of the week (0=Sun, 1=Mon, …, 6=Sat). Default: 1. */
   firstDay?: number
   /** Minimum selectable date (ISO string). */
   minDate?: string
@@ -440,7 +440,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
   const mode = config.mode ?? 'single'
   const display = config.display ?? 'inline'
   const format = config.format ?? 'DD/MM/YYYY'
-  const firstDay = config.firstDay ?? 0
+  const firstDay = config.firstDay ?? 1
   let timezone = config.timezone
   if (timezone) {
     try {

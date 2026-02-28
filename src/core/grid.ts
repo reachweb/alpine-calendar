@@ -29,7 +29,7 @@ export interface MonthGrid {
 export function generateMonth(
   year: number,
   month: number,
-  firstDayOfWeek = 0,
+  firstDayOfWeek = 1,
   today?: CalendarDate,
   isDisabled?: (date: CalendarDate) => boolean,
 ): MonthGrid {
@@ -199,7 +199,7 @@ export function generateMonths(
   year: number,
   month: number,
   count: number,
-  firstDayOfWeek = 0,
+  firstDayOfWeek = 1,
   today?: CalendarDate,
   isDisabled?: (date: CalendarDate) => boolean,
 ): MonthGrid[] {

@@ -160,7 +160,7 @@ All options are passed via `x-data="calendar({ ... })"`.
 | `display` | `'inline' \| 'popup'` | `'inline'` | Inline calendar or popup with input |
 | `format` | `string` | `'DD/MM/YYYY'` | Date format (tokens: `DD`, `MM`, `YYYY`, `D`, `M`, `YY`) |
 | `months` | `number` | `1` | Months to display (1=single, 2=dual side-by-side, 3+=scrollable) |
-| `firstDay` | `0–6` | `0` | First day of week (0=Sun, 1=Mon, ...) |
+| `firstDay` | `0–6` | `1` | First day of week (0=Sun, 1=Mon, ...) |
 | `mask` | `boolean` | `true` | Enable input masking |
 | `value` | `string` | — | Initial value (ISO or formatted string) |
 | `name` | `string` | `''` | Input name attribute for form submission |

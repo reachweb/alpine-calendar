@@ -47,7 +47,7 @@ describe('createCalendarData — defaults', () => {
     expect(c.display).toBe('inline')
     expect(c.format).toBe('DD/MM/YYYY')
     expect(c.monthCount).toBe(1)
-    expect(c.firstDay).toBe(0)
+    expect(c.firstDay).toBe(1)
     expect(c.wizard).toBe(false)
   })
 
