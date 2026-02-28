@@ -2,7 +2,7 @@
   "name": "@reachweb/alpine-calendar",
   "version": "0.3.0",
   "type": "module",
-  "description": "A lightweight, AlpineJS-native calendar component with inline/popup display, input binding with masking, and TailwindCSS 4 theming.",
+  "description": "A lightweight, AlpineJS-native calendar component with inline/popup display, input binding with masking, and CSS custom property theming.",
   "main": "dist/alpine-calendar.umd.js",
   "module": "dist/alpine-calendar.es.js",
   "types": "dist/index.d.ts",
@@ -44,7 +44,6 @@
     "alpinejs",
     "calendar",
     "datepicker",
-    "tailwindcss",
     "livewire"
   ],
   "license": "MIT",
@@ -54,7 +53,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.3",
-    "@tailwindcss/vite": "^4.2.1",
     "@types/alpinejs": "^3.13.11",
     "@vitest/coverage-v8": "^4.0.18",
     "alpinejs": "^3.15.8",
@@ -65,7 +63,6 @@
     "lint-staged": "^16.2.7",
     "prettier": "^3.8.1",
     "simple-git-hooks": "^2.13.1",
-    "tailwindcss": "^4.2.1",
     "terser": "^5.46.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.1",

@@ -1,6 +1,6 @@
 # Alpine Calendar
 
-A lightweight, AlpineJS-native calendar component with inline/popup display, input binding with masking, single/multiple/range selection, month/year pickers, birth-date wizard, TailwindCSS 4 theming, and timezone-safe date handling.
+A lightweight, AlpineJS-native calendar component with inline/popup display, input binding with masking, single/multiple/range selection, month/year pickers, birth-date wizard, CSS custom property theming, and timezone-safe date handling.
 
 **[Live Demo](https://reachweb.github.io/alpine-calendar/)**
 
@@ -175,6 +175,7 @@ All options are passed via `x-data="calendar({ ... })"`.
 | `scrollHeight` | `number` | `400` | Max height (px) of scrollable container when `months >= 3` |
 | `presets` | `RangePreset[]` | — | Predefined date range shortcuts (see [Range Presets](#range-presets)) |
 | `constraintMessages` | `ConstraintMessages` | — | Custom tooltip strings for disabled dates |
+| `dateMetadata` | `DateMetaProvider` | — | Per-date metadata: labels, availability, colors (see [Date Metadata](#date-metadata)) |
 | `template` | `boolean` | `true` | Auto-render template when no `.rc-calendar` exists |
 
 ### Date Constraints
@@ -297,12 +298,15 @@ Access these via `$refs`:
 | `open()` / `close()` / `toggle()` | Popup lifecycle |
 | `getSelection()` | Get current selection as `CalendarDate[]` |
 | `updateConstraints(options)` | Update constraints at runtime |
+| `updateDateMetadata(provider)` | Replace metadata at runtime (static map, callback, or `null` to clear) |
 
 ### Template Helpers
 
 | Method | Description |
 |--------|-------------|
 | `dayClasses(cell)` | CSS class object for day cells |
+| `dayMeta(cell)` | Get `DateMeta` for a day cell (label, availability, color, cssClass) |
+| `dayStyle(cell)` | Inline style string for metadata color (`--color-calendar-day-meta`) |
 | `monthClasses(cell)` | CSS class object for month cells |
 | `yearClasses(cell)` | CSS class object for year cells |
 | `monthYearLabel(index)` | Formatted "Month Year" label for grid at index |
@@ -350,30 +354,7 @@ Listen with Alpine's `@` syntax on the calendar container:
 
 The calendar uses CSS custom properties for all visual styles. Override them in your CSS:
 
-### With TailwindCSS 4
-
-```css
-@theme {
-  --color-calendar-bg: var(--color-white);
-  --color-calendar-text: var(--color-gray-900);
-  --color-calendar-primary: var(--color-indigo-600);
-  --color-calendar-primary-text: var(--color-white);
-  --color-calendar-hover: var(--color-gray-100);
-  --color-calendar-disabled: var(--color-gray-300);
-  --color-calendar-range: var(--color-indigo-50);
-  --color-calendar-today-ring: var(--color-indigo-400);
-  --color-calendar-border: var(--color-gray-200);
-  --color-calendar-other-month: var(--color-gray-400);
-  --color-calendar-weekday: var(--color-gray-500);
-  --color-calendar-focus-ring: var(--color-indigo-600);
-  --color-calendar-overlay: oklch(0 0 0 / 0.2);
-  --radius-calendar: var(--radius-lg);
-  --shadow-calendar: var(--shadow-lg);
-  --font-calendar: system-ui, -apple-system, sans-serif;
-}
-```
-
-### Without Tailwind (plain CSS)
+### Override variables
 
 ```css
 :root {
@@ -414,6 +395,9 @@ All classes use the `.rc-` prefix:
 | `.rc-day--disabled` | Disabled date |
 | `.rc-day--other-month` | Leading/trailing days |
 | `.rc-day--focused` | Keyboard-focused date |
+| `.rc-day--available` / `.rc-day--unavailable` | Metadata availability states |
+| `.rc-day--has-label` | Day cell with a metadata label |
+| `.rc-day__number` / `.rc-day__label` / `.rc-day__dot` | Day cell inner elements (number, label text, availability dot) |
 | `.rc-month-grid` / `.rc-month` | Month picker |
 | `.rc-year-grid` / `.rc-year` | Year picker |
 | `.rc-months--dual` | Two-month side-by-side layout |
@@ -497,6 +481,67 @@ const customPreset = {
 }
 ```
 
+## Date Metadata
+
+Attach labels, pricing, availability indicators, and custom colors to individual dates. Useful for booking calendars, event schedules, and pricing displays.
+
+### Static Map
+
+Pass an object keyed by ISO date strings:
+
+```html
+<div x-data="calendar({
+  mode: 'single',
+  dateMetadata: {
+    '2026-03-01': { label: '$120', availability: 'available' },
+    '2026-03-05': { label: '$180', availability: 'available', color: '#ea580c' },
+    '2026-03-06': { availability: 'unavailable' },
+    '2026-03-07': { label: 'Sold', availability: 'unavailable' },
+  }
+})"></div>
+```
+
+### Dynamic Callback
+
+Use a function for computed metadata. Called for each visible date:
+
+```html
+<div x-data="calendar({
+  mode: 'range',
+  dateMetadata: (date) => {
+    const d = date.toNativeDate().getDay()
+    if (d === 0 || d === 6) return { availability: 'unavailable' }
+    return { label: '$' + (100 + date.day * 3), availability: 'available' }
+  }
+})"></div>
+```
+
+### DateMeta Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `label` | `string` | Text below the day number (e.g., price, event name) |
+| `availability` | `'available' \| 'unavailable'` | `'available'` shows a green dot, `'unavailable'` disables selection with strikethrough |
+| `color` | `string` | CSS color for the label and dot (e.g., `'#16a34a'`) |
+| `cssClass` | `string` | Custom CSS class(es) added to the day cell |
+
+All properties are optional and work independently. Dates with `availability: 'unavailable'` cannot be selected regardless of constraint settings.
+
+### Runtime Updates
+
+Replace metadata after initialization with `updateDateMetadata()`:
+
+```js
+// Update with new data (e.g., after fetching availability)
+$refs.cal.updateDateMetadata({
+  '2026-03-15': { label: '$200', availability: 'available' },
+  '2026-03-20': { availability: 'unavailable' },
+})
+
+// Clear all metadata
+$refs.cal.updateDateMetadata(null)
+```
+
 ## Multi-Month Scrollable Layout
 
 When `months` is 3 or more, the calendar renders as a vertically scrollable container instead of side-by-side panels:
@@ -567,6 +612,7 @@ import {
   createRangeValidator,
   createDisabledReasons,
   isDateDisabled,
+  normalizeDateMeta,
   presetToday,
   presetYesterday,
   presetLastNDays,
@@ -592,6 +638,8 @@ import type {
   DateConstraintProperties,
   DateConstraintRule,
   ConstraintMessages,
+  DateMeta,
+  DateMetaProvider,
   InputMask,
   MaskEventHandlers,
 } from '@reachweb/alpine-calendar'

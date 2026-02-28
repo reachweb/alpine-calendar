@@ -762,16 +762,20 @@ describe('CSS regression guards', () => {
   const cssPath = resolve(__dirname, '../../styles/calendar.css')
   const css = readFileSync(cssPath, 'utf-8')
 
-  it('disabled text uses --color-gray-600 for sufficient contrast', () => {
-    expect(css).toContain('--color-calendar-disabled: var(--color-gray-600)')
+  it('muted base color uses gray-600 equivalent for sufficient contrast', () => {
+    expect(css).toContain('--color-calendar-muted: oklch(44.6% .03 256.802)')
   })
 
-  it('other-month text uses --color-gray-600 for sufficient contrast', () => {
-    expect(css).toContain('--color-calendar-other-month: var(--color-gray-600)')
+  it('disabled text inherits muted color', () => {
+    expect(css).toContain('--color-calendar-disabled: var(--color-calendar-muted)')
   })
 
-  it('weekday text uses --color-gray-600 for sufficient contrast', () => {
-    expect(css).toContain('--color-calendar-weekday: var(--color-gray-600)')
+  it('other-month text inherits muted color', () => {
+    expect(css).toContain('--color-calendar-other-month: var(--color-calendar-muted)')
+  })
+
+  it('weekday text inherits muted color', () => {
+    expect(css).toContain('--color-calendar-weekday: var(--color-calendar-muted)')
   })
 
   it('header label has :focus-visible style', () => {

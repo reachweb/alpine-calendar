@@ -1,59 +1,48 @@
-@import "tailwindcss";
-
 /* ---------------------------------------------------------------------------
  * Theme Variables
  *
- * All visual properties are defined here as CSS custom properties via
- * Tailwind CSS 4's @theme directive. Override any variable in your own CSS
- * to customize the calendar's appearance:
- *
- *   @import "@reachgr/alpine-calendar/css";
- *
- *   @theme {
- *     --color-calendar-primary: var(--color-indigo-600);
- *     --color-calendar-primary-text: var(--color-white);
- *     --color-calendar-today-ring: var(--color-indigo-400);
- *     --color-calendar-range: var(--color-indigo-50);
- *     --radius-calendar: var(--radius-md);
- *   }
- *
- * Or use plain CSS custom properties for non-Tailwind projects:
+ * All visual properties are defined here as CSS custom properties.
+ * Override any variable in your own CSS to customize the calendar:
  *
  *   :root {
  *     --color-calendar-primary: #4f46e5;
  *     --color-calendar-primary-text: #ffffff;
+ *     --color-calendar-today-ring: #818cf8;
+ *     --color-calendar-range: #eef2ff;
+ *     --radius-calendar: 0.375rem;
  *   }
  *
  * ------------------------------------------------------------------------- */
 
-@theme {
+:root {
   /* Surface colors */
-  --color-calendar-bg: var(--color-white);
-  --color-calendar-text: var(--color-gray-900);
-  --color-calendar-border: var(--color-gray-200);
-  --color-calendar-hover: var(--color-gray-100);
+  --color-calendar-bg: #fff;
+  --color-calendar-text: oklch(21% .034 264.665);
+  --color-calendar-border: oklch(92.8% .006 264.531);
+  --color-calendar-hover: oklch(96.7% .003 264.542);
   --color-calendar-overlay: oklch(0 0 0 / 0.2);
 
   /* Primary accent (selected, active states) */
-  --color-calendar-primary: var(--color-blue-600);
-  --color-calendar-primary-text: var(--color-white);
+  --color-calendar-primary: oklch(54.6% .245 262.881);
+  --color-calendar-primary-text: #fff;
 
   /* Semantic colors */
-  --color-calendar-disabled: var(--color-gray-600);
-  --color-calendar-other-month: var(--color-gray-600);
-  --color-calendar-weekday: var(--color-gray-600);
-  --color-calendar-range: var(--color-blue-50);
-  --color-calendar-today-ring: var(--color-blue-400);
-  --color-calendar-focus-ring: var(--color-blue-600);
+  --color-calendar-muted: oklch(44.6% .03 256.802);
+  --color-calendar-disabled: var(--color-calendar-muted);
+  --color-calendar-other-month: var(--color-calendar-muted);
+  --color-calendar-weekday: var(--color-calendar-muted);
+  --color-calendar-range: oklch(97% .014 254.604);
+  --color-calendar-today-ring: oklch(70.7% .165 254.624);
+  --color-calendar-focus-ring: var(--color-calendar-primary);
 
   /* Metadata / availability states */
   --color-calendar-available: oklch(0.65 0.2 145);
   --color-calendar-available-bg: oklch(0.95 0.05 145);
-  --color-calendar-unavailable: var(--color-gray-400);
+  --color-calendar-unavailable: oklch(70.7% .022 261.325);
 
   /* Layout tokens */
-  --radius-calendar: var(--radius-lg);
-  --shadow-calendar: var(--shadow-lg);
+  --radius-calendar: 0.5rem;
+  --shadow-calendar: 0 10px 15px -3px #0000001a, 0 4px 6px -4px #0000001a;
 
   /* Typography */
   --font-calendar: system-ui, -apple-system, sans-serif;

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Alpine Calendar — Alpine.js Calendar Component</title>
-  <meta name="description" content="A lightweight, feature-rich calendar component for Alpine.js with inline/popup display, range selection, date constraints, and TailwindCSS 4 theming.">
+  <meta name="description" content="A lightweight, feature-rich calendar component for Alpine.js with inline/popup display, range selection, date constraints, and CSS custom property theming.">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -287,6 +287,23 @@
     .card-body .rc-input {
       width: 100%;
       max-width: 260px;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.875rem;
+      font-family: inherit;
+      color: var(--demo-text);
+      background: var(--demo-surface);
+      border: 1px solid var(--demo-border);
+      border-radius: 8px;
+      box-shadow: var(--demo-shadow);
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .card-body .rc-input:focus {
+      border-color: var(--demo-accent);
+      box-shadow: 0 0 0 3px rgb(59 130 246 / 0.15);
+    }
+    .card-body .rc-input::placeholder {
+      color: var(--demo-text-muted);
     }
 
     /* Divider */
@@ -330,11 +347,11 @@
   <!-- ===== Hero ===== -->
   <div class="hero">
     <h1>Alpine Calendar</h1>
-    <p>A lightweight, feature-rich calendar component for Alpine.js. Inline &amp; popup display, range selection, date constraints, input masking, and TailwindCSS 4 theming.</p>
+    <p>A lightweight, feature-rich calendar component for Alpine.js. Inline &amp; popup display, range selection, date constraints, input masking, and CSS custom property theming.</p>
 
     <div class="hero-badges">
       <span class="badge">Alpine.js 3+</span>
-      <span class="badge">TailwindCSS 4</span>
+      <span class="badge">CSS Theming</span>
       <span class="badge">Zero Dependencies</span>
       <span class="badge">WCAG 2.1 AA</span>
       <span class="badge">Livewire Ready</span>
