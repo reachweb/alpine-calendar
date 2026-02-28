@@ -2,6 +2,8 @@
 
 A lightweight, AlpineJS-native calendar component with inline/popup display, input binding with masking, single/multiple/range selection, month/year pickers, birth-date wizard, TailwindCSS 4 theming, and timezone-safe date handling.
 
+**[Live Demo](https://reachweb.github.io/alpine-calendar/)**
+
 ## Installation
 
 ### npm / pnpm
