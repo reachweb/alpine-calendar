@@ -20,6 +20,13 @@ import type { DateMeta, DateMetaProvider } from '../core/metadata'
 import { generateCalendarTemplate } from './template'
 
 // ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+/** Mobile breakpoint media query. Must match the `@media (max-width: 639px)` rules in calendar.css. */
+const MOBILE_BREAKPOINT = '(max-width: 639px)'
+
+// ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
 
@@ -70,6 +77,8 @@ export interface CalendarConfig {
   format?: string
   /** Number of months to show. 1 = single, 2 = side-by-side dual, 3+ = scrollable. Default: 1. */
   months?: number
+  /** Number of months to show on mobile viewports (<640px). Only used when months === 2. Default: same as months. */
+  mobileMonths?: number
   /** Max height of the scrollable container in px (only used when months >= 3). Default: 400. */
   scrollHeight?: number
   /** First day of the week (0=Sun, 1=Mon, …, 6=Sat). Default: 1. */
@@ -273,6 +282,20 @@ function validateConfig(config: CalendarConfig): void {
     warn(`months must be a positive integer, got: ${config.months}`)
   }
 
+  // mobileMonths must be a positive integer
+  if (config.mobileMonths !== undefined) {
+    if (config.mobileMonths < 1 || !Number.isInteger(config.mobileMonths)) {
+      warn(`mobileMonths must be a positive integer, got: ${config.mobileMonths}`)
+    }
+    const months = config.months ?? 1
+    if (config.mobileMonths >= months) {
+      warn(`mobileMonths (${config.mobileMonths}) should be less than months (${months})`)
+    }
+    if (months !== 2) {
+      warn(`mobileMonths is only supported when months is 2; current months: ${months}`)
+    }
+  }
+
   // wizard + scrollable combo
   if (config.wizard && config.months && config.months >= 3) {
     warn('months >= 3 (scrollable) is not compatible with wizard mode; using months: 1')
@@ -452,8 +475,21 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
   const wizardConfig = config.wizard ?? false
   const rawMonthCount = config.months ?? 1
   // Force months: 1 when wizard + scrollable
-  const monthCount = (wizardConfig && rawMonthCount >= 3) ? 1 : rawMonthCount
-  const isScrollable = monthCount >= 3
+  const desktopMonthCount = (wizardConfig && rawMonthCount >= 3) ? 1 : rawMonthCount
+  const isScrollable = desktopMonthCount >= 3
+
+  // mobileMonths: only applies when months === 2
+  const hasMobileMonths = desktopMonthCount === 2 && config.mobileMonths !== undefined
+  const mobileMonthCount = hasMobileMonths
+    ? Math.max(1, Math.min(config.mobileMonths!, desktopMonthCount))
+    : desktopMonthCount
+
+  // Reuse a single MediaQueryList for both initial detection and listener setup
+  const mobileMql = (hasMobileMonths && mobileMonthCount !== desktopMonthCount
+    && typeof window !== 'undefined' && window.matchMedia)
+    ? window.matchMedia(MOBILE_BREAKPOINT)
+    : null
+  const monthCount = mobileMql?.matches ? mobileMonthCount : desktopMonthCount
   const scrollHeight = config.scrollHeight ?? 400
   const wizard = !!wizardConfig
   const wizardMode: 'none' | 'full' | 'year-month' | 'month-day' =
@@ -560,6 +596,9 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     showWeekNumbers,
     presets,
     inputName,
+
+    // --- Mobile months ---
+    _mediaQueryCleanup: null as (() => void) | null,
 
     // --- Reactive state ---
     month: viewDate.month,
@@ -725,7 +764,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         const fragment = document.createRange().createContextualFragment(
           generateCalendarTemplate({
             display: this.display,
-            isDualMonth: this.monthCount === 2,
+            isDualMonth: desktopMonthCount === 2,
             isWizard: this.wizardMode !== 'none',
             hasName: !!this.inputName,
             showWeekNumbers: this.showWeekNumbers,
@@ -796,9 +835,28 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
           this._initScrollListener()
         }
       })
+
+      // Set up responsive monthCount listener for dual-month with mobileMonths
+      if (mobileMql) {
+        const handler = (e: MediaQueryListEvent) => {
+          const newCount = e.matches ? mobileMonthCount : desktopMonthCount
+          if (newCount !== this.monthCount) {
+            this.monthCount = newCount
+            this._rebuildGrid()
+          }
+        }
+        mobileMql.addEventListener('change', handler)
+        this._mediaQueryCleanup = () => {
+          mobileMql.removeEventListener('change', handler)
+        }
+      }
     },
 
     destroy() {
+      if (this._mediaQueryCleanup) {
+        this._mediaQueryCleanup()
+        this._mediaQueryCleanup = null
+      }
       if (this._scrollObserver) {
         this._scrollObserver.disconnect()
         this._scrollObserver = null

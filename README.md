@@ -160,6 +160,7 @@ All options are passed via `x-data="calendar({ ... })"`.
 | `display` | `'inline' \| 'popup'` | `'inline'` | Inline calendar or popup with input |
 | `format` | `string` | `'DD/MM/YYYY'` | Date format (tokens: `DD`, `MM`, `YYYY`, `D`, `M`, `YY`) |
 | `months` | `number` | `1` | Months to display (1=single, 2=dual side-by-side, 3+=scrollable) |
+| `mobileMonths` | `number` | — | Months to show on mobile (<640px). Only used when `months` is `2`. |
 | `firstDay` | `0–6` | `1` | First day of week (0=Sun, 1=Mon, ...) |
 | `mask` | `boolean` | `true` | Enable input masking |
 | `value` | `string` | — | Initial value (ISO or formatted string) |
@@ -401,6 +402,9 @@ All classes use the `.rc-` prefix:
 | `.rc-month-grid` / `.rc-month` | Month picker |
 | `.rc-year-grid` / `.rc-year` | Year picker |
 | `.rc-months--dual` | Two-month side-by-side layout |
+| `.rc-nav--dual-hidden` | Hidden nav arrow in dual-month layout (prev on 2nd month) |
+| `.rc-nav--dual-next-first` | Next arrow on 1st month (hidden on desktop, visible on mobile) |
+| `.rc-nav--dual-next-last` | Next arrow on 2nd month (visible on desktop, hidden on mobile) |
 | `.rc-popup-overlay` | Popup backdrop |
 | `.rc-popup-header` / `.rc-popup-header__close` | Popup close header bar |
 | `.rc-calendar--wizard` | Wizard mode container |
@@ -559,9 +563,20 @@ A sticky header tracks the currently visible month as you scroll. Default scroll
 
 - **Mobile (<640px):** Popup renders as a centered fullscreen overlay. Touch-friendly targets (min 44px).
 - **Desktop (>=640px):** Popup renders as a centered modal with scale-in animation.
-- **Two months:** Side-by-side on desktop, stacked on mobile.
+- **Two months:** Side-by-side on desktop, stacked on mobile. Both nav arrows appear on the top month when stacked.
+- **`mobileMonths`:** Show fewer months on mobile (e.g., `mobileMonths: 1` with `months: 2` displays a single month on narrow viewports).
 - **Scrollable (3+ months):** Smooth scroll with `-webkit-overflow-scrolling: touch`.
 - **`prefers-reduced-motion`:** All animations are disabled.
+
+### Mobile Months
+
+When using `months: 2`, the calendar shows two months side-by-side on desktop and stacks them vertically on mobile. Set `mobileMonths: 1` to show only a single month on mobile instead:
+
+```html
+<div x-data="calendar({ mode: 'range', months: 2, mobileMonths: 1 })"></div>
+```
+
+The calendar listens for viewport changes at the 640px breakpoint and switches between the desktop and mobile month counts automatically. Selection is preserved across viewport changes.
 
 ## Accessibility
 

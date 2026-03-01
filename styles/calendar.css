@@ -164,6 +164,15 @@
   background-color: var(--color-calendar-hover);
 }
 
+/* Dual-month nav arrow responsive visibility */
+.rc-nav--dual-hidden { visibility: hidden; }
+.rc-nav--dual-next-first { visibility: hidden; } /* hidden on desktop: next arrow is on 2nd month */
+
+@media (max-width: 639px) {
+  .rc-nav--dual-next-first { visibility: visible; }  /* show on mobile: both arrows on top month */
+  .rc-nav--dual-next-last { visibility: hidden; }     /* hide on mobile: no arrows on bottom month */
+}
+
 /* ---------------------------------------------------------------------------
  * Weekday header row
  * ------------------------------------------------------------------------- */

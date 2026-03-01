@@ -89,9 +89,9 @@ function monthPickerView(): string {
 }
 
 function dayView(isDual: boolean, showWeekNumbers: boolean): string {
-  // For dual-month: hide prev on 2nd month, next on 1st
-  const prevStyle = isDual ? ' :style="gi > 0 ? \'visibility:hidden\' : \'\'"' : ''
-  const nextStyle = isDual ? ' :style="gi < grid.length - 1 ? \'visibility:hidden\' : \'\'"' : ''
+  // For dual-month: CSS classes control arrow visibility (responsive for mobile)
+  const prevClass = isDual ? ` :class="{ 'rc-nav--dual-hidden': gi > 0 }"` : ''
+  const nextClass = isDual ? ` :class="{ 'rc-nav--dual-next-first': gi === 0, 'rc-nav--dual-next-last': gi > 0 }"` : ''
   const monthsClass = isDual ? ' :class="{ \'rc-months--dual\': monthCount === 2 }"' : ''
 
   const gridClassBinding = `:class="{ 'rc-grid--slide-next': _navDirection === 'next', 'rc-grid--slide-prev': _navDirection === 'prev' }"`
@@ -120,9 +120,9 @@ function dayView(isDual: boolean, showWeekNumbers: boolean): string {
     <template x-for="(mg, gi) in grid" :key="mg.year + '-' + mg.month">
       <div${isDual ? '' : ''}>
         <div class="rc-header">
-          <button class="rc-header__nav" @click="prev()" :disabled="!canGoPrev" aria-label="Previous month"${prevStyle}>&#8249;</button>
+          <button class="rc-header__nav" @click="prev()" :disabled="!canGoPrev" aria-label="Previous month"${prevClass}>&#8249;</button>
           <button class="rc-header__label" @click="setView('months')" aria-label="Change view" x-text="monthYearLabel(gi)"></button>
-          <button class="rc-header__nav" @click="next()" :disabled="!canGoNext" aria-label="Next month"${nextStyle}>&#8250;</button>
+          <button class="rc-header__nav" @click="next()" :disabled="!canGoNext" aria-label="Next month"${nextClass}>&#8250;</button>
         </div>
         ${weekdayBlock}
         <div class="rc-grid-wrapper">
