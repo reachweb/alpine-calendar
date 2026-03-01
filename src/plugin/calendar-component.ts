@@ -481,7 +481,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
   // mobileMonths: only applies when months === 2
   const hasMobileMonths = desktopMonthCount === 2 && config.mobileMonths !== undefined
   const mobileMonthCount = hasMobileMonths
-    ? Math.max(1, Math.min(config.mobileMonths!, desktopMonthCount))
+    ? Math.max(1, Math.min(config.mobileMonths as number, desktopMonthCount))
     : desktopMonthCount
 
   // Reuse a single MediaQueryList for both initial detection and listener setup
