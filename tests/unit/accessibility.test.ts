@@ -4,45 +4,7 @@ import { CalendarDate } from '../../src/core/calendar-date'
 import { generateCalendarTemplate } from '../../src/plugin/template'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function withAlpineMocks(
-  component: ReturnType<typeof createCalendarData>,
-  options?: { refs?: Record<string, HTMLElement>; el?: HTMLElement },
-) {
-  const dispatchSpy = vi.fn()
-  const watchCallbacks = new Map<string, (() => void)[]>()
-  const watchSpy = vi.fn((prop: string, cb: () => void) => {
-    if (!watchCallbacks.has(prop)) watchCallbacks.set(prop, [])
-    watchCallbacks.get(prop)!.push(cb)
-  })
-  const nextTickCallbacks: (() => void)[] = []
-
-  Object.assign(component, {
-    $dispatch: dispatchSpy,
-    $watch: watchSpy,
-    $refs: options?.refs ?? {},
-    $nextTick: (cb: () => void) => nextTickCallbacks.push(cb),
-    $el: options?.el ?? document.createElement('div'),
-  })
-
-  const flushNextTick = () => {
-    while (nextTickCallbacks.length > 0) {
-      const cb = nextTickCallbacks.shift()
-      cb?.()
-    }
-  }
-
-  const triggerWatch = (prop: string) => {
-    const cbs = watchCallbacks.get(prop) ?? []
-    for (const cb of cbs) cb()
-  }
-
-  return { dispatchSpy, watchSpy, flushNextTick, triggerWatch }
-}
+import { withAlpineMocks } from '../helpers'
 
 // ===========================================================================
 // Aria-live announcements

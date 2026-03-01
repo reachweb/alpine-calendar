@@ -1,36 +1,7 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { createCalendarData } from '../../src/plugin/calendar-component'
 import { CalendarDate } from '../../src/core/calendar-date'
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function withAlpineMocks(
-  component: ReturnType<typeof createCalendarData>,
-  options?: { refs?: Record<string, HTMLElement>; el?: HTMLElement },
-) {
-  const dispatchSpy = vi.fn()
-  const watchSpy = vi.fn()
-  const nextTickCallbacks: (() => void)[] = []
-
-  Object.assign(component, {
-    $dispatch: dispatchSpy,
-    $watch: watchSpy,
-    $refs: options?.refs ?? {},
-    $nextTick: (cb: () => void) => nextTickCallbacks.push(cb),
-    $el: options?.el ?? document.createElement('div'),
-  })
-
-  const flushNextTick = () => {
-    while (nextTickCallbacks.length > 0) {
-      const cb = nextTickCallbacks.shift()
-      cb?.()
-    }
-  }
-
-  return { dispatchSpy, watchSpy, flushNextTick }
-}
+import { withAlpineMocks } from '../helpers'
 
 // ---------------------------------------------------------------------------
 // canGoPrev / canGoNext — Days view

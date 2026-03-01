@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createCalendarData } from '../../src/plugin/calendar-component'
+import { withAlpineMocks } from '../helpers'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -8,33 +9,6 @@ import { createCalendarData } from '../../src/plugin/calendar-component'
 function setViewport(width: number, height: number) {
   Object.defineProperty(window, 'innerWidth', { value: width, writable: true })
   Object.defineProperty(window, 'innerHeight', { value: height, writable: true })
-}
-
-function withAlpineMocks(
-  component: ReturnType<typeof createCalendarData>,
-  options?: { refs?: Record<string, HTMLElement>; el?: HTMLElement },
-) {
-  const dispatchSpy = vi.fn()
-  const watchSpy = vi.fn()
-  const refs = options?.refs ?? {}
-  const nextTickCallbacks: (() => void)[] = []
-
-  Object.assign(component, {
-    $dispatch: dispatchSpy,
-    $watch: watchSpy,
-    $refs: refs,
-    $nextTick: (cb: () => void) => nextTickCallbacks.push(cb),
-    $el: options?.el ?? document.createElement('div'),
-  })
-
-  const flushNextTick = () => {
-    while (nextTickCallbacks.length > 0) {
-      const cb = nextTickCallbacks.shift()
-      cb?.()
-    }
-  }
-
-  return { dispatchSpy, watchSpy, flushNextTick }
 }
 
 /**

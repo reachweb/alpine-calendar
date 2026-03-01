@@ -1,42 +1,12 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { CalendarDate, getISOWeekNumber } from '../../src/core/calendar-date'
 import { generateMonth, generateMonths } from '../../src/core/grid'
 import { createCalendarData } from '../../src/plugin/calendar-component'
 import type { CalendarConfig } from '../../src/plugin/calendar-component'
+import { withAlpineMocks } from '../helpers'
 
 // Fixed "today" to avoid flaky tests
 const TODAY = new CalendarDate(2025, 6, 15)
-
-// ---------------------------------------------------------------------------
-// Helper: mock Alpine magic properties
-// ---------------------------------------------------------------------------
-
-function withAlpineMocks(
-  component: ReturnType<typeof createCalendarData>,
-  options?: { refs?: Record<string, HTMLElement>; el?: HTMLElement },
-) {
-  const dispatchSpy = vi.fn()
-  const watchSpy = vi.fn()
-  const refs = options?.refs ?? {}
-  const nextTickCallbacks: (() => void)[] = []
-
-  Object.assign(component, {
-    $dispatch: dispatchSpy,
-    $watch: watchSpy,
-    $refs: refs,
-    $nextTick: (cb: () => void) => nextTickCallbacks.push(cb),
-    $el: options?.el ?? document.createElement('div'),
-  })
-
-  const flushNextTick = () => {
-    while (nextTickCallbacks.length > 0) {
-      const cb = nextTickCallbacks.shift()
-      cb?.()
-    }
-  }
-
-  return { dispatchSpy, watchSpy, flushNextTick }
-}
 
 function createComponent(config: CalendarConfig = {}) {
   const c = createCalendarData(config)

@@ -1,46 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { createCalendarData } from '../../src/plugin/calendar-component'
 import { CalendarDate } from '../../src/core/calendar-date'
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function withAlpineMocks(
-  component: ReturnType<typeof createCalendarData>,
-  options?: { refs?: Record<string, HTMLElement>; el?: HTMLElement },
-) {
-  const dispatchSpy = vi.fn()
-  const watchCallbacks = new Map<string, (() => void)[]>()
-  const watchSpy = vi.fn((prop: string, cb: () => void) => {
-    if (!watchCallbacks.has(prop)) watchCallbacks.set(prop, [])
-    watchCallbacks.get(prop)!.push(cb)
-  })
-  const nextTickCallbacks: (() => void)[] = []
-
-  Object.assign(component, {
-    $dispatch: dispatchSpy,
-    $watch: watchSpy,
-    $refs: options?.refs ?? {},
-    $nextTick: (cb: () => void) => nextTickCallbacks.push(cb),
-    $el: options?.el ?? document.createElement('div'),
-  })
-
-  const flushNextTick = () => {
-    while (nextTickCallbacks.length > 0) {
-      const cb = nextTickCallbacks.shift()
-      cb?.()
-    }
-  }
-
-  /** Trigger all watch callbacks for a property. */
-  const triggerWatch = (prop: string) => {
-    const cbs = watchCallbacks.get(prop) ?? []
-    for (const cb of cbs) cb()
-  }
-
-  return { dispatchSpy, watchSpy, flushNextTick, triggerWatch }
-}
+import { withAlpineMocks } from '../helpers'
 
 // ---------------------------------------------------------------------------
 // calendar:change (already implemented, verify it works)
@@ -278,7 +239,7 @@ describe('calendar:open / calendar:close events', () => {
     flushNextTick()
 
     c.open()
-    expect(dispatchSpy).toHaveBeenCalledWith('calendar:open')
+    expect(dispatchSpy).toHaveBeenCalledWith('calendar:open', null)
   })
 
   it('dispatches calendar:close on close()', () => {
@@ -290,7 +251,7 @@ describe('calendar:open / calendar:close events', () => {
     c.open()
     flushNextTick()
     c.close()
-    expect(dispatchSpy).toHaveBeenCalledWith('calendar:close')
+    expect(dispatchSpy).toHaveBeenCalledWith('calendar:close', null)
   })
 
   it('does not dispatch open in inline mode', () => {
@@ -301,6 +262,6 @@ describe('calendar:open / calendar:close events', () => {
     dispatchSpy.mockClear()
 
     c.open()
-    expect(dispatchSpy).not.toHaveBeenCalledWith('calendar:open')
+    expect(dispatchSpy).not.toHaveBeenCalledWith('calendar:open', null)
   })
 })

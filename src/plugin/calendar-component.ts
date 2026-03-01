@@ -636,6 +636,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     _Alpine: (Alpine ?? null) as { initTree: (el: HTMLElement) => void } | null,
     _autoRendered: false,
     _popupOverlayEl: null as HTMLElement | null,
+    _rootEl: null as HTMLElement | null,
 
     // Scrollable multi-month state
     isScrollable,
@@ -757,8 +758,11 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     // --- Lifecycle ---
 
     init() {
+      // Cache root element for dispatching events (avoids teleported popup context issues)
+      this._rootEl = alpine(this).$el
+
       // Auto-template injection: append calendar template if not already present
-      const el = alpine(this).$el
+      const el = this._rootEl
       const hasCalendar = el.querySelector('.rc-calendar') !== null
       if (!hasCalendar && config.template !== false && this._Alpine?.initTree) {
         const fragment = document.createRange().createContextualFragment(
@@ -878,6 +882,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         el.querySelector('.rc-calendar')?.remove()
         this._autoRendered = false
       }
+      this._rootEl = null
     },
 
     // --- Grid ---
@@ -1389,9 +1394,14 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       }
     },
 
+    /** Dispatch a CustomEvent on the component root element (not the evaluation context). */
+    _dispatchOnRoot(event: string, detail?: Record<string, unknown>) {
+      this._rootEl?.dispatchEvent(new CustomEvent(event, { detail: detail ?? null, bubbles: true }))
+    },
+
     /** Dispatch calendar:change event with current selection state. */
     _emitChange() {
-      alpine(this).$dispatch('calendar:change', {
+      this._dispatchOnRoot('calendar:change', {
         value: this._selection.toValue(),
         dates: this._selection.toArray().map((d: CalendarDate) => d.toISO()),
         formatted: this.formattedValue,
@@ -1400,7 +1410,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
 
     /** Dispatch calendar:navigate event on month/year change. */
     _emitNavigate() {
-      alpine(this).$dispatch('calendar:navigate', {
+      this._dispatchOnRoot('calendar:navigate', {
         year: this.year,
         month: this.month,
         view: this.view,
@@ -1409,7 +1419,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
 
     /** Dispatch calendar:view-change event on view switch. */
     _emitViewChange() {
-      alpine(this).$dispatch('calendar:view-change', {
+      this._dispatchOnRoot('calendar:view-change', {
         view: this.view,
         year: this.year,
         month: this.month,
@@ -1923,7 +1933,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
 
       this.isOpen = true
       this._inputEl?.setAttribute('aria-expanded', 'true')
-      alpine(this).$dispatch('calendar:open')
+      this._dispatchOnRoot('calendar:open')
 
       // CSS handles centered modal layout via `.rc-popup-overlay`
       alpine(this).$nextTick(() => {
@@ -1935,7 +1945,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       if (this.display !== 'popup') return
       this.isOpen = false
       this._inputEl?.setAttribute('aria-expanded', 'false')
-      alpine(this).$dispatch('calendar:close')
+      this._dispatchOnRoot('calendar:close')
     },
 
     toggle() {

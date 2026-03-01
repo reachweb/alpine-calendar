@@ -2,27 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { CalendarDate } from '../../src/core/calendar-date'
 import { createDateConstraint, createDisabledReasons } from '../../src/core/constraints'
 import { createCalendarData } from '../../src/plugin/calendar-component'
-
-// ---------------------------------------------------------------------------
-// Helper
-// ---------------------------------------------------------------------------
-
-function flushNextTick() {
-  // no-op in sync tests — $nextTick is mocked as sync
-}
-
-function withAlpineMocks(c: ReturnType<typeof createCalendarData>) {
-  const dispatched: Array<{ event: string; detail?: Record<string, unknown> }> = []
-  const obj = c as Record<string, unknown>
-  obj.$dispatch = (event: string, detail?: Record<string, unknown>) => {
-    dispatched.push({ event, detail })
-  }
-  obj.$watch = () => {}
-  obj.$refs = {}
-  obj.$nextTick = (cb: () => void) => cb()
-  obj.$el = document.createElement('div')
-  return { dispatched }
-}
+import { withAlpineMocks } from '../helpers'
 
 // ---------------------------------------------------------------------------
 // Core: createDisabledReasons
@@ -310,8 +290,9 @@ describe('component getDisabledReason', () => {
     const c = createCalendarData({
       disabledDaysOfWeek: [0, 6],
     })
-    withAlpineMocks(c)
+    const { flushNextTick } = withAlpineMocks(c)
     c.init()
+    flushNextTick()
     // Saturday
     const r = c.getDisabledReason('2025-06-07')
     expect(r).toEqual(['This day of the week is not available'])
@@ -321,8 +302,9 @@ describe('component getDisabledReason', () => {
     const c = createCalendarData({
       disabledDaysOfWeek: [0, 6],
     })
-    withAlpineMocks(c)
+    const { flushNextTick } = withAlpineMocks(c)
     c.init()
+    flushNextTick()
     // Monday
     expect(c.getDisabledReason('2025-06-09')).toEqual([])
   })
@@ -331,8 +313,9 @@ describe('component getDisabledReason', () => {
     const c = createCalendarData({
       minDate: '2025-03-01',
     })
-    withAlpineMocks(c)
+    const { flushNextTick } = withAlpineMocks(c)
     c.init()
+    flushNextTick()
     expect(c.getDisabledReason(new CalendarDate(2025, 2, 28))).toEqual([
       'Before the earliest available date',
     ])
@@ -340,8 +323,9 @@ describe('component getDisabledReason', () => {
 
   it('returns empty array for invalid ISO string', () => {
     const c = createCalendarData({})
-    withAlpineMocks(c)
+    const { flushNextTick } = withAlpineMocks(c)
     c.init()
+    flushNextTick()
     expect(c.getDisabledReason('invalid')).toEqual([])
   })
 
@@ -352,15 +336,17 @@ describe('component getDisabledReason', () => {
         disabledDayOfWeek: 'Weekends are closed',
       },
     })
-    withAlpineMocks(c)
+    const { flushNextTick } = withAlpineMocks(c)
     c.init()
+    flushNextTick()
     expect(c.getDisabledReason('2025-06-07')).toEqual(['Weekends are closed'])
   })
 
   it('reflects updateConstraints changes', () => {
     const c = createCalendarData({})
-    withAlpineMocks(c)
+    const { flushNextTick } = withAlpineMocks(c)
     c.init()
+    flushNextTick()
     expect(c.getDisabledReason('2025-06-07')).toEqual([])
 
     c.updateConstraints({ disabledDaysOfWeek: [0, 6] })
@@ -375,8 +361,9 @@ describe('component dayTitle', () => {
     const c = createCalendarData({
       disabledDaysOfWeek: [0, 6],
     })
-    withAlpineMocks(c)
+    const { flushNextTick } = withAlpineMocks(c)
     c.init()
+    flushNextTick()
     const cell = {
       date: new CalendarDate(2025, 6, 7), // Saturday
       isCurrentMonth: true,
@@ -390,8 +377,9 @@ describe('component dayTitle', () => {
     const c = createCalendarData({
       disabledDaysOfWeek: [0, 6],
     })
-    withAlpineMocks(c)
+    const { flushNextTick } = withAlpineMocks(c)
     c.init()
+    flushNextTick()
     const cell = {
       date: new CalendarDate(2025, 6, 9), // Monday
       isCurrentMonth: true,
@@ -407,8 +395,9 @@ describe('component dayTitle', () => {
       disabledDaysOfWeek: [6],
       disabledDates: ['2025-06-07'], // also Saturday
     })
-    withAlpineMocks(c)
+    const { flushNextTick } = withAlpineMocks(c)
     c.init()
+    flushNextTick()
     const cell = {
       date: new CalendarDate(2025, 6, 7),
       isCurrentMonth: true,

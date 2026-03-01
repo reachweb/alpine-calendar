@@ -13,37 +13,7 @@ import {
 } from '../../src/core/presets'
 import { createCalendarData } from '../../src/plugin/calendar-component'
 import type { CalendarConfig } from '../../src/plugin/calendar-component'
-
-// ---------------------------------------------------------------------------
-// Helper: mock Alpine magic properties
-// ---------------------------------------------------------------------------
-
-function withAlpineMocks(
-  component: ReturnType<typeof createCalendarData>,
-  options?: { refs?: Record<string, HTMLElement>; el?: HTMLElement },
-) {
-  const dispatchSpy = vi.fn()
-  const watchSpy = vi.fn()
-  const refs = options?.refs ?? {}
-  const nextTickCallbacks: (() => void)[] = []
-
-  Object.assign(component, {
-    $dispatch: dispatchSpy,
-    $watch: watchSpy,
-    $refs: refs,
-    $nextTick: (cb: () => void) => nextTickCallbacks.push(cb),
-    $el: options?.el ?? document.createElement('div'),
-  })
-
-  const flushNextTick = () => {
-    while (nextTickCallbacks.length > 0) {
-      const cb = nextTickCallbacks.shift()
-      cb?.()
-    }
-  }
-
-  return { dispatchSpy, watchSpy, flushNextTick }
-}
+import { withAlpineMocks } from '../helpers'
 
 function createComponent(config: CalendarConfig = {}) {
   const c = createCalendarData(config)

@@ -2,39 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createCalendarData } from '../../src/plugin/calendar-component'
 import type { CalendarConfig } from '../../src/plugin/calendar-component'
 import { CalendarDate } from '../../src/core/calendar-date'
-
-/**
- * Inject mock Alpine magic properties ($watch, $dispatch, $refs, $nextTick, $el) into a component.
- * Returns spies and helpers for assertions.
- */
-function withAlpineMocks(
-  component: ReturnType<typeof createCalendarData>,
-  options?: { refs?: Record<string, HTMLElement>; el?: HTMLElement },
-) {
-  const dispatchSpy = vi.fn()
-  const watchSpy = vi.fn()
-  const refs = options?.refs ?? {}
-  const nextTickCallbacks: (() => void)[] = []
-
-  // Inject Alpine magic properties onto the component object
-  Object.assign(component, {
-    $dispatch: dispatchSpy,
-    $watch: watchSpy,
-    $refs: refs,
-    $nextTick: (cb: () => void) => nextTickCallbacks.push(cb),
-    $el: options?.el ?? document.createElement('div'),
-  })
-
-  /** Flush all pending $nextTick callbacks */
-  const flushNextTick = () => {
-    while (nextTickCallbacks.length > 0) {
-      const cb = nextTickCallbacks.shift()
-      cb?.()
-    }
-  }
-
-  return { dispatchSpy, watchSpy, flushNextTick }
-}
+import { withAlpineMocks } from '../helpers'
 
 // ---------------------------------------------------------------------------
 // Default configuration
@@ -1209,7 +1177,7 @@ describe('popup', () => {
     c.init()
     c.open()
     expect(c.isOpen).toBe(true)
-    expect(dispatchSpy).toHaveBeenCalledWith('calendar:open')
+    expect(dispatchSpy).toHaveBeenCalledWith('calendar:open', null)
   })
 
   it('close() closes popup in popup mode', () => {
@@ -1219,7 +1187,7 @@ describe('popup', () => {
     c.open()
     c.close()
     expect(c.isOpen).toBe(false)
-    expect(dispatchSpy).toHaveBeenCalledWith('calendar:close')
+    expect(dispatchSpy).toHaveBeenCalledWith('calendar:close', null)
   })
 
   it('toggle() toggles popup state', () => {
@@ -1579,7 +1547,7 @@ describe('bindInput()', () => {
     expect(c.isOpen).toBe(false)
     input.dispatchEvent(new Event('focus'))
     expect(c.isOpen).toBe(true)
-    expect(dispatchSpy).toHaveBeenCalledWith('calendar:open')
+    expect(dispatchSpy).toHaveBeenCalledWith('calendar:open', null)
   })
 
   it('attaches blur handler that parses input', () => {
@@ -1710,7 +1678,7 @@ describe('handleFocus()', () => {
     expect(c.isOpen).toBe(false)
     c.handleFocus()
     expect(c.isOpen).toBe(true)
-    expect(dispatchSpy).toHaveBeenCalledWith('calendar:open')
+    expect(dispatchSpy).toHaveBeenCalledWith('calendar:open', null)
   })
 
   it('does nothing in inline mode', () => {
@@ -1737,7 +1705,7 @@ describe('handleFocus()', () => {
     // Flag is consumed — next focus opens normally
     c.handleFocus()
     expect(c.isOpen).toBe(true)
-    expect(dispatchSpy).toHaveBeenCalledWith('calendar:open')
+    expect(dispatchSpy).toHaveBeenCalledWith('calendar:open', null)
   })
 })
 
@@ -2271,7 +2239,7 @@ describe('popup positioning', () => {
 
     c.open()
     expect(c.isOpen).toBe(true)
-    expect(dispatchSpy).toHaveBeenCalledWith('calendar:open')
+    expect(dispatchSpy).toHaveBeenCalledWith('calendar:open', null)
   })
 
   it('close() resets popupStyle and stops positioning', () => {
@@ -2285,7 +2253,7 @@ describe('popup positioning', () => {
     c.close()
     expect(c.isOpen).toBe(false)
     expect(c.popupStyle).toContain('position:fixed')
-    expect(dispatchSpy).toHaveBeenCalledWith('calendar:close')
+    expect(dispatchSpy).toHaveBeenCalledWith('calendar:close', null)
   })
 
   it('destroy() cleans up state', () => {
@@ -2322,7 +2290,7 @@ describe('handleKeydown', () => {
     expect(c.isOpen).toBe(false)
     expect(preventSpy).toHaveBeenCalled()
     expect(stopSpy).toHaveBeenCalled()
-    expect(dispatchSpy).toHaveBeenCalledWith('calendar:close')
+    expect(dispatchSpy).toHaveBeenCalledWith('calendar:close', null)
   })
 
   it('returns focus to input on Escape', () => {
@@ -2715,7 +2683,7 @@ describe('keyboard navigation — Escape (enhanced)', () => {
 
     c.handleKeydown(new KeyboardEvent('keydown', { key: 'Escape' }))
     expect(c.isOpen).toBe(false)
-    expect(dispatchSpy).toHaveBeenCalledWith('calendar:close')
+    expect(dispatchSpy).toHaveBeenCalledWith('calendar:close', null)
   })
 
   it('in popup month view: returns to days view without closing', () => {
