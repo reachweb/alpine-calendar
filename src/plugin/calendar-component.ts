@@ -596,6 +596,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     _suppressFocusOpen: false,
     _Alpine: (Alpine ?? null) as { initTree: (el: HTMLElement) => void } | null,
     _autoRendered: false,
+    _popupOverlayEl: null as HTMLElement | null,
 
     // Scrollable multi-month state
     isScrollable,
@@ -741,6 +742,15 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
           this._Alpine.initTree(child)
         }
         this._autoRendered = true
+
+        // Teleport popup overlay to body to escape CSS containing block issues
+        if (display === 'popup') {
+          const overlay = el.querySelector('.rc-popup-overlay') as HTMLElement | null
+          if (overlay) {
+            document.body.appendChild(overlay)
+            this._popupOverlayEl = overlay
+          }
+        }
       }
 
       this._rebuildGrid()
@@ -799,9 +809,14 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         this._detachInput = null
       }
       this._inputEl = null
+      // Remove teleported popup from body
+      if (this._popupOverlayEl) {
+        this._popupOverlayEl.remove()
+        this._popupOverlayEl = null
+      }
       if (this._autoRendered) {
         const el = alpine(this).$el
-        el.querySelector('.rc-popup-overlay')?.remove()
+        el.querySelector('.rc-popup-overlay')?.remove()  // fallback for non-teleported
         el.querySelector('.rc-calendar')?.remove()
         this._autoRendered = false
       }
