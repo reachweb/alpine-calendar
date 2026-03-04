@@ -6,7 +6,11 @@ import {
   createRangeValidator,
   createDisabledReasons,
 } from '../core/constraints'
-import type { DateConstraintOptions, DateConstraintRule, ConstraintMessages } from '../core/constraints'
+import type {
+  DateConstraintOptions,
+  DateConstraintRule,
+  ConstraintMessages,
+} from '../core/constraints'
 import { generateMonths, generateMonthGrid, generateYearGrid } from '../core/grid'
 import type { DayCell, MonthGrid, MonthCell, YearCell } from '../core/grid'
 import { SingleSelection, MultipleSelection, RangeSelection } from '../core/selection'
@@ -334,7 +338,9 @@ function validateConfig(config: CalendarConfig): void {
 
   // wizard with non-single mode
   if (config.wizard && config.mode && config.mode !== 'single') {
-    warn(`wizard mode is designed for single selection; mode "${config.mode}" may not work as expected`)
+    warn(
+      `wizard mode is designed for single selection; mode "${config.mode}" may not work as expected`,
+    )
   }
 
   // timezone must be a valid IANA timezone string
@@ -427,9 +433,19 @@ function buildConstraints(
 
 /** Constraint-related keys from CalendarConfig. */
 const CONSTRAINT_KEYS = [
-  'minDate', 'maxDate', 'disabledDates', 'disabledDaysOfWeek',
-  'enabledDates', 'enabledDaysOfWeek', 'disabledMonths', 'enabledMonths',
-  'disabledYears', 'enabledYears', 'minRange', 'maxRange', 'rules',
+  'minDate',
+  'maxDate',
+  'disabledDates',
+  'disabledDaysOfWeek',
+  'enabledDates',
+  'enabledDaysOfWeek',
+  'disabledMonths',
+  'enabledMonths',
+  'disabledYears',
+  'enabledYears',
+  'minRange',
+  'maxRange',
+  'rules',
 ] as const
 
 type ConstraintConfig = Pick<CalendarConfig, (typeof CONSTRAINT_KEYS)[number]>
@@ -455,7 +471,10 @@ function extractConstraintConfig(cfg: Partial<CalendarConfig>): ConstraintConfig
  * This factory is called by `Alpine.data('calendar', createCalendarData)`.
  * The returned object becomes the reactive component state.
  */
-export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initTree: (el: HTMLElement) => void }) {
+export function createCalendarData(
+  config: CalendarConfig = {},
+  Alpine?: { initTree: (el: HTMLElement) => void },
+) {
   // --- Validate config ---
   validateConfig(config)
 
@@ -475,7 +494,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
   const wizardConfig = config.wizard ?? false
   const rawMonthCount = config.months ?? 1
   // Force months: 1 when wizard + scrollable
-  const desktopMonthCount = (wizardConfig && rawMonthCount >= 3) ? 1 : rawMonthCount
+  const desktopMonthCount = wizardConfig && rawMonthCount >= 3 ? 1 : rawMonthCount
   const isScrollable = desktopMonthCount >= 3
 
   // mobileMonths: only applies when months === 2
@@ -485,22 +504,25 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     : desktopMonthCount
 
   // Reuse a single MediaQueryList for both initial detection and listener setup
-  const mobileMql = (hasMobileMonths && mobileMonthCount !== desktopMonthCount
-    && typeof window !== 'undefined' && window.matchMedia)
-    ? window.matchMedia(MOBILE_BREAKPOINT)
-    : null
+  const mobileMql =
+    hasMobileMonths &&
+    mobileMonthCount !== desktopMonthCount &&
+    typeof window !== 'undefined' &&
+    window.matchMedia
+      ? window.matchMedia(MOBILE_BREAKPOINT)
+      : null
   const monthCount = mobileMql?.matches ? mobileMonthCount : desktopMonthCount
   const scrollHeight = config.scrollHeight ?? 400
   const wizard = !!wizardConfig
   const wizardMode: 'none' | 'full' | 'year-month' | 'month-day' =
-    wizardConfig === true ? 'full'
-    : wizardConfig === false ? 'none'
-    : wizardConfig
+    wizardConfig === true ? 'full' : wizardConfig === false ? 'none' : wizardConfig
   const wizardTotalSteps = wizardMode === 'none' ? 0 : wizardMode === 'full' ? 3 : 2
   const wizardStartView: 'days' | 'months' | 'years' =
-    wizardMode === 'full' || wizardMode === 'year-month' ? 'years'
-    : wizardMode === 'month-day' ? 'months'
-    : 'days'
+    wizardMode === 'full' || wizardMode === 'year-month'
+      ? 'years'
+      : wizardMode === 'month-day'
+        ? 'months'
+        : 'days'
   const useMask = config.mask ?? true
   const showWeekNumbers = config.showWeekNumbers ?? false
   const presets: RangePreset[] = config.presets ?? []
@@ -539,8 +561,16 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       const range = parseDateRange(config.value, format)
       if (range) {
         let [start, end] = range
-        if (end.isBefore(start)) { const tmp = start; start = end; end = tmp }
-        if (!isInitDisabled(start) && !isInitDisabled(end) && constraints.isRangeValid(start, end)) {
+        if (end.isBefore(start)) {
+          const tmp = start
+          start = end
+          end = tmp
+        }
+        if (
+          !isInitDisabled(start) &&
+          !isInitDisabled(end) &&
+          constraints.isRangeValid(start, end)
+        ) {
           selection.toggle(start)
           selection.toggle(end)
         }
@@ -561,9 +591,10 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
   const defaultViewDate = (initialDates.length > 0 ? initialDates[0] : today) as CalendarDate
 
   // Wizard: center year picker around ~30 years ago (full & year-month modes)
-  const viewDate = (wizardMode === 'full' || wizardMode === 'year-month')
-    ? new CalendarDate(today.year - 30, today.month, today.day)
-    : defaultViewDate
+  const viewDate =
+    wizardMode === 'full' || wizardMode === 'year-month'
+      ? new CalendarDate(today.year - 30, today.month, today.day)
+      : defaultViewDate
 
   // --- Compute initial inputValue ---
   function computeFormattedValue(sel: Selection): string {
@@ -609,9 +640,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
     monthGrid: [] as MonthCell[][],
     yearGrid: [] as YearCell[][],
     inputValue: computeFormattedValue(selection),
-    popupStyle: display === 'popup'
-      ? 'position:fixed;inset:0;z-index:50;'
-      : '',
+    popupStyle: display === 'popup' ? 'position:fixed;inset:0;z-index:50;' : '',
     focusedDate: null as CalendarDate | null,
     hoverDate: null as CalendarDate | null,
     wizardStep: (wizard ? 1 : 0) as number,
@@ -748,9 +777,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         const dayIndex = (this.firstDay + i) % 7
         const d = new Date(refSunday)
         d.setDate(refSunday.getDate() + dayIndex)
-        headers.push(
-          new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(d),
-        )
+        headers.push(new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(d))
       }
       return headers
     },
@@ -786,10 +813,15 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         }
         this._autoRendered = true
 
-        // Teleport popup overlay to body to escape CSS containing block issues
+        // Teleport popup overlay to body to escape CSS containing block issues.
+        // Preserve the Alpine scope chain so that x-if / x-for directives
+        // evaluated after teleportation can still resolve component data.
         if (display === 'popup') {
           const overlay = el.querySelector('.rc-popup-overlay') as HTMLElement | null
           if (overlay) {
+            const xEl = el as HTMLElement & { _x_dataStack?: unknown[] }
+            const xOverlay = overlay as HTMLElement & { _x_dataStack?: unknown[] }
+            if (xEl._x_dataStack) xOverlay._x_dataStack = xEl._x_dataStack
             document.body.appendChild(overlay)
             this._popupOverlayEl = overlay
           }
@@ -806,7 +838,9 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         this._emitNavigate()
         this._announceNavigation()
         if (this.isScrollable) {
-          alpine(this).$nextTick(() => { this._rebindScrollObserver() })
+          alpine(this).$nextTick(() => {
+            this._rebindScrollObserver()
+          })
         }
       })
       alpine(this).$watch('year', () => {
@@ -816,7 +850,9 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         this._emitNavigate()
         this._announceNavigation()
         if (this.isScrollable) {
-          alpine(this).$nextTick(() => { this._rebindScrollObserver() })
+          alpine(this).$nextTick(() => {
+            this._rebindScrollObserver()
+          })
         }
       })
       alpine(this).$watch('view', () => {
@@ -878,7 +914,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       }
       if (this._autoRendered) {
         const el = alpine(this).$el
-        el.querySelector('.rc-popup-overlay')?.remove()  // fallback for non-teleported
+        el.querySelector('.rc-popup-overlay')?.remove() // fallback for non-teleported
         el.querySelector('.rc-calendar')?.remove()
         this._autoRendered = false
       }
@@ -912,7 +948,9 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
      * Build a flat array of grid items for template rendering, interleaving week number
      * markers with day cells. Used by the auto-rendered template when `showWeekNumbers` is true.
      */
-    dayGridItems(mg: MonthGrid): { isWeekNumber: boolean; weekNumber: number; cell: DayCell; key: string }[] {
+    dayGridItems(
+      mg: MonthGrid,
+    ): { isWeekNumber: boolean; weekNumber: number; cell: DayCell; key: string }[] {
       const items: { isWeekNumber: boolean; weekNumber: number; cell: DayCell; key: string }[] = []
       for (let ri = 0; ri < mg.rows.length; ri++) {
         const row = mg.rows[ri]
@@ -1053,9 +1091,12 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
      * Compute CSS class object for a day cell.
      * Returns an object keyed by class name with boolean values, suitable for Alpine `:class`.
      */
-    dayClasses(
-      cell: { date: CalendarDate; isCurrentMonth: boolean; isToday: boolean; isDisabled: boolean },
-    ): Record<string, boolean> {
+    dayClasses(cell: {
+      date: CalendarDate
+      isCurrentMonth: boolean
+      isToday: boolean
+      isDisabled: boolean
+    }): Record<string, boolean> {
       // Read _selectionRev and _metadataRev to register them as Alpine dependencies.
       void this._selectionRev
       void this._metadataRev
@@ -1080,7 +1121,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
 
       // Metadata-driven classes
       const meta = this._getDateMeta(d)
-      const hasLabel = !!(meta?.label)
+      const hasLabel = !!meta?.label
       const isAvailable = meta?.availability === 'available'
       const isUnavailable = meta?.availability === 'unavailable'
 
@@ -1115,9 +1156,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
      * Get tooltip text for a day cell explaining why it is disabled.
      * Returns an empty string for enabled dates.
      */
-    dayTitle(
-      cell: { date: CalendarDate; isDisabled: boolean },
-    ): string {
+    dayTitle(cell: { date: CalendarDate; isDisabled: boolean }): string {
       void this._metadataRev
       const meta = this._getDateMeta(cell.date)
       const parts: string[] = []
@@ -1142,9 +1181,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
      * Get metadata for a day cell. Returns `DateMeta | undefined`.
      * Reads `_metadataRev` for Alpine reactivity.
      */
-    dayMeta(
-      cell: { date: CalendarDate },
-    ): DateMeta | undefined {
+    dayMeta(cell: { date: CalendarDate }): DateMeta | undefined {
       void this._metadataRev
       return this._getDateMeta(cell.date)
     },
@@ -1153,9 +1190,7 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
      * Get inline style string for a day cell.
      * Sets `--color-calendar-day-meta` when the metadata has a custom color.
      */
-    dayStyle(
-      cell: { date: CalendarDate },
-    ): string {
+    dayStyle(cell: { date: CalendarDate }): string {
       void this._metadataRev
       const meta = this._getDateMeta(cell.date)
       if (meta?.color) {
@@ -1303,7 +1338,11 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         const range = parseDateRange(value, format)
         if (range) {
           let [start, end] = range
-          if (end.isBefore(start)) { const tmp = start; start = end; end = tmp }
+          if (end.isBefore(start)) {
+            const tmp = start
+            start = end
+            end = tmp
+          }
           if (
             !this._isEffectivelyDisabled(start) &&
             !this._isEffectivelyDisabled(end) &&
@@ -1510,7 +1549,10 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       this._syncInputFromSelection()
 
       // Announce selection to screen readers
-      const dateLabel = date.format({ weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }, locale)
+      const dateLabel = date.format(
+        { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' },
+        locale,
+      )
       if (mode === 'single') {
         this._announce(dateLabel + ' selected')
       } else if (mode === 'multiple') {
@@ -1527,8 +1569,14 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
         } else if (wasPartialRange) {
           const dates = range.toArray()
           if (dates.length === 2) {
-            const startLabel = (dates[0] as CalendarDate).format({ weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }, locale)
-            const endLabel = (dates[1] as CalendarDate).format({ weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }, locale)
+            const startLabel = (dates[0] as CalendarDate).format(
+              { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' },
+              locale,
+            )
+            const endLabel = (dates[1] as CalendarDate).format(
+              { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' },
+              locale,
+            )
             this._announce('Range: ' + startLabel + ' to ' + endLabel)
           }
         }
@@ -1824,7 +1872,9 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       this._rebuildMonthGrid()
       this._rebuildYearGrid()
       if (this.isScrollable) {
-        alpine(this).$nextTick(() => { this._rebindScrollObserver() })
+        alpine(this).$nextTick(() => {
+          this._rebindScrollObserver()
+        })
       }
     },
 
@@ -1846,7 +1896,9 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       this._metadataRev++
       this._rebuildGrid()
       if (this.isScrollable) {
-        alpine(this).$nextTick(() => { this._rebindScrollObserver() })
+        alpine(this).$nextTick(() => {
+          this._rebindScrollObserver()
+        })
       }
     },
 
@@ -2170,6 +2222,5 @@ export function createCalendarData(config: CalendarConfig = {}, Alpine?: { initT
       ) as HTMLElement | null
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
     },
-
   }
 }
