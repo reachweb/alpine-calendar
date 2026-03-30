@@ -1,4 +1,4 @@
-import { CalendarDate } from '../core/calendar-date'
+import { CalendarDate, daysInMonth } from '../core/calendar-date'
 import {
   createDateConstraint,
   createMonthConstraint,
@@ -571,14 +571,13 @@ export function createCalendarData(
           !isInitDisabled(end) &&
           constraints.isRangeValid(start, end)
         ) {
-          selection.toggle(start)
-          selection.toggle(end)
+          ;(selection as RangeSelection).setRange(start, end)
         }
       }
     } else if (mode === 'multiple') {
       const dates = parseDateMultiple(config.value, format)
       for (const d of dates) {
-        if (!isInitDisabled(d)) selection.toggle(d)
+        if (!isInitDisabled(d)) (selection as MultipleSelection).add(d)
       }
     }
   }
@@ -655,8 +654,8 @@ export function createCalendarData(
     _constraintConfig: extractConstraintConfig(config),
     _isDisabledDate: constraints.isDisabledDate,
     _isRangeValid: constraints.isRangeValid,
-    _isMonthDisabled: constraints.isMonthDisabled,
-    _isYearDisabled: constraints.isYearDisabled,
+    _isMonthDisabled: constraints.isMonthDisabled as (year: number, month: number) => boolean,
+    _isYearDisabled: constraints.isYearDisabled as (year: number) => boolean,
     _getDisabledReasons: constraints.getDisabledReasons,
     _inputEl: null as HTMLInputElement | null,
     _detachInput: null as (() => void) | null,
@@ -688,6 +687,38 @@ export function createCalendarData(
     _isEffectivelyDisabled(d: CalendarDate): boolean {
       if (this._isDisabledDate(d)) return true
       return this._getDateMeta(d)?.availability === 'unavailable'
+    },
+
+    /** Return the first non-disabled day in a month, or null if all days are disabled. */
+    _firstSelectableDay(year: number, month: number): CalendarDate | null {
+      const count = daysInMonth(year, month)
+      for (let d = 1; d <= count; d++) {
+        const candidate = new CalendarDate(year, month, d)
+        if (!this._isEffectivelyDisabled(candidate)) return candidate
+      }
+      return null
+    },
+
+    /**
+     * Wrap shallow month/year constraint checks with deep day-level checks.
+     * A month is disabled if the shallow check says so OR every day in it is effectively disabled.
+     * A year is disabled if every month in it is disabled.
+     */
+    _wrapWithDeepChecks(c: ConstraintFunctions): void {
+      const shallowMonth = c.isMonthDisabled
+      this._isMonthDisabled = (year: number, month: number) => {
+        if (shallowMonth(year, month)) return true
+        return this._firstSelectableDay(year, month) === null
+      }
+
+      const shallowYear = c.isYearDisabled
+      this._isYearDisabled = (year: number) => {
+        if (shallowYear(year)) return true
+        for (let m = 1; m <= 12; m++) {
+          if (!this._isMonthDisabled(year, m)) return false
+        }
+        return true
+      }
     },
 
     // --- Accessibility: live region ---
@@ -787,6 +818,9 @@ export function createCalendarData(
     init() {
       // Cache root element for dispatching events (avoids teleported popup context issues)
       this._rootEl = alpine(this).$el
+
+      // Wrap shallow month/year checks with deep day-level constraint checks
+      this._wrapWithDeepChecks(constraints)
 
       // Auto-template injection: append calendar template if not already present
       const el = this._rootEl
@@ -1349,8 +1383,7 @@ export function createCalendarData(
             this._isRangeValid(start, end)
           ) {
             this._selection.clear()
-            this._selection.toggle(start)
-            this._selection.toggle(end)
+            ;(this._selection as RangeSelection).setRange(start, end)
             this.month = start.month
             this.year = start.year
             changed = true
@@ -1362,7 +1395,7 @@ export function createCalendarData(
         if (valid.length > 0) {
           this._selection.clear()
           for (const d of valid) {
-            this._selection.toggle(d)
+            ;(this._selection as MultipleSelection).add(d)
           }
           const first = valid[0] as CalendarDate
           this.month = first.month
@@ -1735,6 +1768,10 @@ export function createCalendarData(
         }
         // Use setRange() for direct assignment — avoids toggle() deselecting same-day ranges
         ;(this._selection as RangeSelection).setRange(start, end)
+      } else if (mode === 'multiple') {
+        for (const d of dates) {
+          ;(this._selection as MultipleSelection).add(d)
+        }
       } else {
         for (const d of dates) {
           this._selection.toggle(d)
@@ -1865,9 +1902,8 @@ export function createCalendarData(
       const c = buildConstraints(merged, constraintMessages)
       this._isDisabledDate = c.isDisabledDate
       this._isRangeValid = c.isRangeValid
-      this._isMonthDisabled = c.isMonthDisabled
-      this._isYearDisabled = c.isYearDisabled
       this._getDisabledReasons = c.getDisabledReasons
+      this._wrapWithDeepChecks(c)
       this._rebuildGrid()
       this._rebuildMonthGrid()
       this._rebuildYearGrid()
@@ -1895,6 +1931,8 @@ export function createCalendarData(
       this._getDateMeta = normalizeDateMeta(provider)
       this._metadataRev++
       this._rebuildGrid()
+      this._rebuildMonthGrid()
+      this._rebuildYearGrid()
       if (this.isScrollable) {
         alpine(this).$nextTick(() => {
           this._rebindScrollObserver()
@@ -1914,9 +1952,11 @@ export function createCalendarData(
       this._wizardMonth = targetMonth
 
       if (wizardMode === 'year-month') {
-        // Auto-select 1st of month → emit → close
+        // Find first selectable day in month (day 1 may be disabled)
+        const selectableDay = this._firstSelectableDay(this.year, targetMonth)
+        if (!selectableDay) return
         this.wizardStep = wizardTotalSteps
-        this.selectDate(new CalendarDate(this.year, targetMonth, 1))
+        this.selectDate(selectableDay)
         return
       }
 
@@ -2167,8 +2207,8 @@ export function createCalendarData(
     /** Attach an IntersectionObserver that updates the sticky header as the user scrolls. */
     _initScrollListener() {
       if (typeof IntersectionObserver === 'undefined') return
-      const el = alpine(this).$el
-      const container = el.querySelector('.rc-months--scroll') as HTMLElement | null
+      const searchRoot = this._popupOverlayEl ?? alpine(this).$el
+      const container = searchRoot.querySelector('.rc-months--scroll') as HTMLElement | null
       if (!container) return
       this._scrollContainerEl = container
 

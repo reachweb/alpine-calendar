@@ -111,6 +111,11 @@ export class MultipleSelection implements Selection {
     return [...this.keys].sort().join(', ')
   }
 
+  /** Add a date (no-op if already selected). */
+  add(date: CalendarDate): void {
+    this.keys.add(date.toKey())
+  }
+
   /** Number of currently selected dates. */
   get count(): number {
     return this.keys.size
