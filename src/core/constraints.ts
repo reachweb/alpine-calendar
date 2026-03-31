@@ -103,14 +103,20 @@ interface PrecomputedRule {
 /** Pre-compute merged sets for a rule against global sets (avoids per-call allocation). */
 function mergeSetsForRule(ruleSets: PrecomputedSets, globalSets: PrecomputedSets): PrecomputedSets {
   return {
-    disabledKeys: ruleSets.disabledKeys !== undefined ? ruleSets.disabledKeys : globalSets.disabledKeys,
-    disabledDays: ruleSets.disabledDays !== undefined ? ruleSets.disabledDays : globalSets.disabledDays,
+    disabledKeys:
+      ruleSets.disabledKeys !== undefined ? ruleSets.disabledKeys : globalSets.disabledKeys,
+    disabledDays:
+      ruleSets.disabledDays !== undefined ? ruleSets.disabledDays : globalSets.disabledDays,
     enabledKeys: ruleSets.enabledKeys !== undefined ? ruleSets.enabledKeys : globalSets.enabledKeys,
     enabledDays: ruleSets.enabledDays !== undefined ? ruleSets.enabledDays : globalSets.enabledDays,
-    disabledMonths: ruleSets.disabledMonths !== undefined ? ruleSets.disabledMonths : globalSets.disabledMonths,
-    enabledMonths: ruleSets.enabledMonths !== undefined ? ruleSets.enabledMonths : globalSets.enabledMonths,
-    disabledYears: ruleSets.disabledYears !== undefined ? ruleSets.disabledYears : globalSets.disabledYears,
-    enabledYears: ruleSets.enabledYears !== undefined ? ruleSets.enabledYears : globalSets.enabledYears,
+    disabledMonths:
+      ruleSets.disabledMonths !== undefined ? ruleSets.disabledMonths : globalSets.disabledMonths,
+    enabledMonths:
+      ruleSets.enabledMonths !== undefined ? ruleSets.enabledMonths : globalSets.enabledMonths,
+    disabledYears:
+      ruleSets.disabledYears !== undefined ? ruleSets.disabledYears : globalSets.disabledYears,
+    enabledYears:
+      ruleSets.enabledYears !== undefined ? ruleSets.enabledYears : globalSets.enabledYears,
   }
 }
 
@@ -280,7 +286,12 @@ export function createDateConstraint(
     const effectiveMinDate = rule.hasMinDate ? rule.minDate : minDate
     const effectiveMaxDate = rule.hasMaxDate ? rule.maxDate : maxDate
 
-    return checkDisabled(date, effectiveMinDate, effectiveMaxDate, rule.mergedSets!)
+    return checkDisabled(
+      date,
+      effectiveMinDate,
+      effectiveMaxDate,
+      rule.mergedSets as PrecomputedSets,
+    )
   }
 }
 
@@ -443,9 +454,7 @@ export function createMonthConstraint(
  * isDisabled(2025)  // false
  * ```
  */
-export function createYearConstraint(
-  options: DateConstraintOptions,
-): (year: number) => boolean {
+export function createYearConstraint(options: DateConstraintOptions): (year: number) => boolean {
   const { minDate, maxDate } = options
 
   const disabledYearSet = options.disabledYears ? new Set(options.disabledYears) : undefined
@@ -653,6 +662,12 @@ export function createDisabledReasons(
     const effectiveMinDate = rule.hasMinDate ? rule.minDate : minDate
     const effectiveMaxDate = rule.hasMaxDate ? rule.maxDate : maxDate
 
-    return collectReasons(date, effectiveMinDate, effectiveMaxDate, rule.mergedSets!, msgs)
+    return collectReasons(
+      date,
+      effectiveMinDate,
+      effectiveMaxDate,
+      rule.mergedSets as PrecomputedSets,
+      msgs,
+    )
   }
 }

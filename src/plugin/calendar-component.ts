@@ -528,7 +528,7 @@ export function createCalendarData(
   const inputId = config.inputId ?? null
   const inputRef = config.inputRef ?? 'rc-input'
   const locale = config.locale
-  const closeOnSelect = config.closeOnSelect ?? (mode !== 'multiple')
+  const closeOnSelect = config.closeOnSelect ?? mode !== 'multiple'
   const beforeSelectCb = config.beforeSelect ?? null
 
   // --- Build constraint functions ---
@@ -720,7 +720,7 @@ export function createCalendarData(
       this._isMonthDisabled = (year: number, month: number) => {
         if (!this._monthDisabledCache) this._monthDisabledCache = new Map()
         const key = `${year}-${month}`
-        if (this._monthDisabledCache.has(key)) return this._monthDisabledCache.get(key)!
+        if (this._monthDisabledCache.has(key)) return this._monthDisabledCache.get(key) as boolean
         const result = shallowMonth(year, month) || this._firstSelectableDay(year, month) === null
         this._monthDisabledCache.set(key, result)
         return result
@@ -729,14 +729,17 @@ export function createCalendarData(
       const shallowYear = c.isYearDisabled
       this._isYearDisabled = (year: number) => {
         if (!this._yearDisabledCache) this._yearDisabledCache = new Map()
-        if (this._yearDisabledCache.has(year)) return this._yearDisabledCache.get(year)!
+        if (this._yearDisabledCache.has(year)) return this._yearDisabledCache.get(year) as boolean
         let result = false
         if (shallowYear(year)) {
           result = true
         } else {
           result = true
           for (let m = 1; m <= 12; m++) {
-            if (!this._isMonthDisabled(year, m)) { result = false; break }
+            if (!this._isMonthDisabled(year, m)) {
+              result = false
+              break
+            }
           }
         }
         this._yearDisabledCache.set(year, result)
