@@ -765,9 +765,16 @@ describe('constraints — rules', () => {
     })
     withAlpineMocks(c)
     c.init()
-    // Invalid rule is skipped — no constraints applied
-    c.selectDate('2025-06-14') // Saturday → no rule active → allowed
+    // Half-open range: invalid `from` is ignored, `to` is valid → rule applies up to June 30
+    c.selectDate('2025-06-14') // Saturday → rule active → disabled
+    expect(c.selectedDates).toHaveLength(0)
+    // Weekday within range is allowed
+    c.selectDate('2025-06-13') // Friday → allowed
     expect(c.selectedDates).toHaveLength(1)
+    // Date after rule range is unrestricted (single mode replaces)
+    c.selectDate('2025-07-05') // Saturday after June 30 → no rule → allowed
+    expect(c.selectedDates).toHaveLength(1)
+    expect(c.selectedDates[0].toISO()).toBe('2025-07-05')
   })
 })
 

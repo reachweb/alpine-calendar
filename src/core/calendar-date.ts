@@ -166,9 +166,17 @@ export class CalendarDate {
    * @param options - Intl.DateTimeFormat options (e.g. { month: 'long', year: 'numeric' })
    * @param locale  - BCP 47 locale string (default: browser locale)
    */
+  private static _fmtCache = new Map<string, Intl.DateTimeFormat>()
+
   format(options: Intl.DateTimeFormatOptions, locale?: string): string {
+    const key = (locale ?? '') + '|' + JSON.stringify(options)
+    let fmt = CalendarDate._fmtCache.get(key)
+    if (!fmt) {
+      fmt = new Intl.DateTimeFormat(locale, options)
+      CalendarDate._fmtCache.set(key, fmt)
+    }
     const d = this.toNativeDate()
-    return new Intl.DateTimeFormat(locale, options).format(d)
+    return fmt.format(d)
   }
 }
 

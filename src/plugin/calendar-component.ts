@@ -211,16 +211,14 @@ function parseConfigRule(rule: CalendarConfigRule): DateConstraintRule | null {
   const from = rule.from ? parseISODate(rule.from) : null
   const to = rule.to ? parseISODate(rule.to) : null
 
-  // A rule must have either a date range (from+to) or recurring months
-  const hasDateRange = from !== null && to !== null
+  // A rule must have a date range (full or half-open) or recurring months
+  const hasDateRange = from !== null || to !== null
   const hasMonths = Array.isArray(rule.months) && rule.months.length > 0
   if (!hasDateRange && !hasMonths) return null
 
   const result: DateConstraintRule = {}
-  if (hasDateRange) {
-    result.from = from
-    result.to = to
-  }
+  if (from !== null) result.from = from
+  if (to !== null) result.to = to
   if (hasMonths) {
     result.months = rule.months
   }
@@ -530,7 +528,7 @@ export function createCalendarData(
   const inputId = config.inputId ?? null
   const inputRef = config.inputRef ?? 'rc-input'
   const locale = config.locale
-  const closeOnSelect = config.closeOnSelect ?? true
+  const closeOnSelect = config.closeOnSelect ?? (mode !== 'multiple')
   const beforeSelectCb = config.beforeSelect ?? null
 
   // --- Build constraint functions ---
@@ -682,6 +680,16 @@ export function createCalendarData(
     // --- Date metadata ---
     _getDateMeta: initialGetDateMeta,
     _metadataRev: 0,
+    _dateMetaCache: null as Map<string, DateMeta | undefined> | null,
+
+    _getCachedDateMeta(d: CalendarDate): DateMeta | undefined {
+      if (!this._dateMetaCache) this._dateMetaCache = new Map()
+      const key = d.toKey()
+      if (this._dateMetaCache.has(key)) return this._dateMetaCache.get(key)
+      const meta = this._getDateMeta(d)
+      this._dateMetaCache.set(key, meta)
+      return meta
+    },
 
     /** Check if a date is effectively disabled (constraint OR metadata unavailability). */
     _isEffectivelyDisabled(d: CalendarDate): boolean {
@@ -704,20 +712,35 @@ export function createCalendarData(
      * A month is disabled if the shallow check says so OR every day in it is effectively disabled.
      * A year is disabled if every month in it is disabled.
      */
+    _monthDisabledCache: null as Map<string, boolean> | null,
+    _yearDisabledCache: null as Map<number, boolean> | null,
+
     _wrapWithDeepChecks(c: ConstraintFunctions): void {
       const shallowMonth = c.isMonthDisabled
       this._isMonthDisabled = (year: number, month: number) => {
-        if (shallowMonth(year, month)) return true
-        return this._firstSelectableDay(year, month) === null
+        if (!this._monthDisabledCache) this._monthDisabledCache = new Map()
+        const key = `${year}-${month}`
+        if (this._monthDisabledCache.has(key)) return this._monthDisabledCache.get(key)!
+        const result = shallowMonth(year, month) || this._firstSelectableDay(year, month) === null
+        this._monthDisabledCache.set(key, result)
+        return result
       }
 
       const shallowYear = c.isYearDisabled
       this._isYearDisabled = (year: number) => {
-        if (shallowYear(year)) return true
-        for (let m = 1; m <= 12; m++) {
-          if (!this._isMonthDisabled(year, m)) return false
+        if (!this._yearDisabledCache) this._yearDisabledCache = new Map()
+        if (this._yearDisabledCache.has(year)) return this._yearDisabledCache.get(year)!
+        let result = false
+        if (shallowYear(year)) {
+          result = true
+        } else {
+          result = true
+          for (let m = 1; m <= 12; m++) {
+            if (!this._isMonthDisabled(year, m)) { result = false; break }
+          }
         }
-        return true
+        this._yearDisabledCache.set(year, result)
+        return result
       }
     },
 
@@ -800,16 +823,21 @@ export function createCalendarData(
      * Localized short weekday headers in the correct order for the current `firstDay`.
      * Returns an array of 7 short names (e.g., ["Mo", "Tu", "We", ...]).
      */
+    _weekdayHeaders: null as string[] | null,
+
     get weekdayHeaders(): string[] {
+      if (this._weekdayHeaders) return this._weekdayHeaders
       const headers: string[] = []
       // Use a reference Sunday (Jan 4 2026 is a Sunday)
       const refSunday = new Date(2026, 0, 4)
+      const fmt = new Intl.DateTimeFormat(locale, { weekday: 'short' })
       for (let i = 0; i < 7; i++) {
         const dayIndex = (this.firstDay + i) % 7
         const d = new Date(refSunday)
         d.setDate(refSunday.getDate() + dayIndex)
-        headers.push(new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(d))
+        headers.push(fmt.format(d))
       }
+      this._weekdayHeaders = headers
       return headers
     },
 
@@ -904,9 +932,12 @@ export function createCalendarData(
             `[reach-calendar] Popup mode requires an <input x-ref="${inputRef}"> inside the component container.`,
           )
         }
-        // Init scroll listener for scrollable multi-month
+        // Init scroll listener for scrollable multi-month (double $nextTick
+        // to ensure x-for elements are rendered after Alpine.initTree)
         if (this.isScrollable) {
-          this._initScrollListener()
+          alpine(this).$nextTick(() => {
+            this._initScrollListener()
+          })
         }
       })
 
@@ -958,6 +989,9 @@ export function createCalendarData(
     // --- Grid ---
 
     _rebuildGrid() {
+      this._dateMetaCache = null
+      this._monthDisabledCache = null
+      this._yearDisabledCache = null
       this.grid = generateMonths(
         this.year,
         this.month,
@@ -1154,7 +1188,7 @@ export function createCalendarData(
       }
 
       // Metadata-driven classes
-      const meta = this._getDateMeta(d)
+      const meta = this._getCachedDateMeta(d)
       const hasLabel = !!meta?.label
       const isAvailable = meta?.availability === 'available'
       const isUnavailable = meta?.availability === 'unavailable'
@@ -1192,7 +1226,7 @@ export function createCalendarData(
      */
     dayTitle(cell: { date: CalendarDate; isDisabled: boolean }): string {
       void this._metadataRev
-      const meta = this._getDateMeta(cell.date)
+      const meta = this._getCachedDateMeta(cell.date)
       const parts: string[] = []
 
       if (cell.isDisabled) {
@@ -1217,7 +1251,7 @@ export function createCalendarData(
      */
     dayMeta(cell: { date: CalendarDate }): DateMeta | undefined {
       void this._metadataRev
-      return this._getDateMeta(cell.date)
+      return this._getCachedDateMeta(cell.date)
     },
 
     /**
@@ -1226,7 +1260,7 @@ export function createCalendarData(
      */
     dayStyle(cell: { date: CalendarDate }): string {
       void this._metadataRev
-      const meta = this._getDateMeta(cell.date)
+      const meta = this._getCachedDateMeta(cell.date)
       if (meta?.color) {
         return `--color-calendar-day-meta: ${meta.color};`
       }
@@ -1393,14 +1427,21 @@ export function createCalendarData(
         const dates = parseDateMultiple(value, format)
         const valid = dates.filter((d) => !this._isEffectivelyDisabled(d))
         if (valid.length > 0) {
-          this._selection.clear()
-          for (const d of valid) {
-            ;(this._selection as MultipleSelection).add(d)
+          // Compare parsed dates with current selection to avoid silent data loss
+          const newKeys = new Set(valid.map((d) => d.toKey()))
+          const currentKeys = new Set(this._selection.toArray().map((d) => d.toKey()))
+          const setsEqual =
+            newKeys.size === currentKeys.size && [...newKeys].every((k) => currentKeys.has(k))
+          if (!setsEqual) {
+            this._selection.clear()
+            for (const d of valid) {
+              ;(this._selection as MultipleSelection).add(d)
+            }
+            const first = valid[0] as CalendarDate
+            this.month = first.month
+            this.year = first.year
+            changed = true
           }
-          const first = valid[0] as CalendarDate
-          this.month = first.month
-          this.year = first.year
-          changed = true
         }
       }
 
@@ -2170,7 +2211,17 @@ export function createCalendarData(
      */
     _moveFocusByMonths(deltaMonths: number) {
       if (!this.focusedDate) return
-      const candidate = this.focusedDate.addMonths(deltaMonths)
+      let candidate = this.focusedDate.addMonths(deltaMonths)
+
+      // Skip disabled dates (up to 31 attempts), matching _moveFocus() behavior
+      let attempts = 0
+      while (this._isEffectivelyDisabled(candidate) && attempts < 31) {
+        candidate = candidate.addDays(deltaMonths > 0 ? 1 : -1)
+        attempts++
+      }
+
+      if (this._isEffectivelyDisabled(candidate)) return
+
       this._setFocusedDate(candidate)
     },
 

@@ -93,10 +93,25 @@ interface PrecomputedRule {
   minRange: number | undefined
   maxRange: number | undefined
   sets: PrecomputedSets
+  mergedSets?: PrecomputedSets
   hasMinDate: boolean
   hasMaxDate: boolean
   priority: number
   originalIndex: number
+}
+
+/** Pre-compute merged sets for a rule against global sets (avoids per-call allocation). */
+function mergeSetsForRule(ruleSets: PrecomputedSets, globalSets: PrecomputedSets): PrecomputedSets {
+  return {
+    disabledKeys: ruleSets.disabledKeys !== undefined ? ruleSets.disabledKeys : globalSets.disabledKeys,
+    disabledDays: ruleSets.disabledDays !== undefined ? ruleSets.disabledDays : globalSets.disabledDays,
+    enabledKeys: ruleSets.enabledKeys !== undefined ? ruleSets.enabledKeys : globalSets.enabledKeys,
+    enabledDays: ruleSets.enabledDays !== undefined ? ruleSets.enabledDays : globalSets.enabledDays,
+    disabledMonths: ruleSets.disabledMonths !== undefined ? ruleSets.disabledMonths : globalSets.disabledMonths,
+    enabledMonths: ruleSets.enabledMonths !== undefined ? ruleSets.enabledMonths : globalSets.enabledMonths,
+    disabledYears: ruleSets.disabledYears !== undefined ? ruleSets.disabledYears : globalSets.disabledYears,
+    enabledYears: ruleSets.enabledYears !== undefined ? ruleSets.enabledYears : globalSets.enabledYears,
+  }
 }
 
 function precomputeSets(opts: DateConstraintProperties): PrecomputedSets {
@@ -161,9 +176,16 @@ function checkDisabled(
 
 /** Check if a date matches a precomputed rule (date-range or recurring months). */
 function matchesRule(rule: PrecomputedRule, date: CalendarDate): boolean {
-  // Date-range rule: from/to both set
+  // Date-range rule: both endpoints
   if (rule.from && rule.to) {
     return date.isBetween(rule.from, rule.to)
+  }
+  // Half-open ranges
+  if (rule.from && !rule.to) {
+    return !date.isBefore(rule.from)
+  }
+  if (!rule.from && rule.to) {
+    return !date.isAfter(rule.to)
   }
   // Recurring months rule
   if (rule.recurringMonths) {
@@ -222,28 +244,32 @@ export function createDateConstraint(
   // Precompute global sets
   const globalSets = precomputeSets(options)
 
-  // Precompute rule sets
-  const precomputedRules: PrecomputedRule[] | undefined = rules?.map((rule, index) => ({
-    from: rule.from,
-    to: rule.to,
-    recurringMonths: rule.months ? new Set(rule.months) : undefined,
-    minDate: rule.minDate,
-    maxDate: rule.maxDate,
-    minRange: rule.minRange,
-    maxRange: rule.maxRange,
-    sets: precomputeSets(rule),
-    hasMinDate: rule.minDate !== undefined,
-    hasMaxDate: rule.maxDate !== undefined,
-    priority: rule.priority ?? 0,
-    originalIndex: index,
-  }))
+  // Precompute rule sets with pre-merged global fallbacks
+  const precomputedRules: PrecomputedRule[] | undefined = rules?.map((rule, index) => {
+    const sets = precomputeSets(rule)
+    return {
+      from: rule.from,
+      to: rule.to,
+      recurringMonths: rule.months ? new Set(rule.months) : undefined,
+      minDate: rule.minDate,
+      maxDate: rule.maxDate,
+      minRange: rule.minRange,
+      maxRange: rule.maxRange,
+      sets,
+      mergedSets: mergeSetsForRule(sets, globalSets),
+      hasMinDate: rule.minDate !== undefined,
+      hasMaxDate: rule.maxDate !== undefined,
+      priority: rule.priority ?? 0,
+      originalIndex: index,
+    }
+  })
 
   // Fast path: no rules
   if (!precomputedRules || precomputedRules.length === 0) {
     return (date: CalendarDate): boolean => checkDisabled(date, minDate, maxDate, globalSets)
   }
 
-  // With rules: find the best matching rule (highest priority), merge, and check
+  // With rules: find the best matching rule (highest priority), use pre-merged sets
   return (date: CalendarDate): boolean => {
     const rule = findBestRule(precomputedRules, date)
 
@@ -251,32 +277,10 @@ export function createDateConstraint(
       return checkDisabled(date, minDate, maxDate, globalSets)
     }
 
-    // Rule overrides global where explicitly set
     const effectiveMinDate = rule.hasMinDate ? rule.minDate : minDate
     const effectiveMaxDate = rule.hasMaxDate ? rule.maxDate : maxDate
 
-    const mergedSets: PrecomputedSets = {
-      disabledKeys:
-        rule.sets.disabledKeys !== undefined ? rule.sets.disabledKeys : globalSets.disabledKeys,
-      disabledDays:
-        rule.sets.disabledDays !== undefined ? rule.sets.disabledDays : globalSets.disabledDays,
-      enabledKeys:
-        rule.sets.enabledKeys !== undefined ? rule.sets.enabledKeys : globalSets.enabledKeys,
-      enabledDays:
-        rule.sets.enabledDays !== undefined ? rule.sets.enabledDays : globalSets.enabledDays,
-      disabledMonths:
-        rule.sets.disabledMonths !== undefined
-          ? rule.sets.disabledMonths
-          : globalSets.disabledMonths,
-      enabledMonths:
-        rule.sets.enabledMonths !== undefined ? rule.sets.enabledMonths : globalSets.enabledMonths,
-      disabledYears:
-        rule.sets.disabledYears !== undefined ? rule.sets.disabledYears : globalSets.disabledYears,
-      enabledYears:
-        rule.sets.enabledYears !== undefined ? rule.sets.enabledYears : globalSets.enabledYears,
-    }
-
-    return checkDisabled(date, effectiveMinDate, effectiveMaxDate, mergedSets)
+    return checkDisabled(date, effectiveMinDate, effectiveMaxDate, rule.mergedSets!)
   }
 }
 
@@ -565,6 +569,7 @@ function collectReasons(
 
   if (sets.enabledDays && !sets.enabledDays.has(dow)) {
     reasons.push(msgs.notEnabledDayOfWeek)
+    return reasons
   }
 
   // 6. Specific dates
@@ -612,20 +617,25 @@ export function createDisabledReasons(
   const globalSets = precomputeSets(options)
 
   // Precompute rule sets
-  const precomputedRules: PrecomputedRule[] | undefined = rules?.map((rule, index) => ({
-    from: rule.from,
-    to: rule.to,
-    recurringMonths: rule.months ? new Set(rule.months) : undefined,
-    minDate: rule.minDate,
-    maxDate: rule.maxDate,
-    minRange: rule.minRange,
-    maxRange: rule.maxRange,
-    sets: precomputeSets(rule),
-    hasMinDate: rule.minDate !== undefined,
-    hasMaxDate: rule.maxDate !== undefined,
-    priority: rule.priority ?? 0,
-    originalIndex: index,
-  }))
+  // Precompute rule sets with pre-merged global fallbacks
+  const precomputedRules: PrecomputedRule[] | undefined = rules?.map((rule, index) => {
+    const sets = precomputeSets(rule)
+    return {
+      from: rule.from,
+      to: rule.to,
+      recurringMonths: rule.months ? new Set(rule.months) : undefined,
+      minDate: rule.minDate,
+      maxDate: rule.maxDate,
+      minRange: rule.minRange,
+      maxRange: rule.maxRange,
+      sets,
+      mergedSets: mergeSetsForRule(sets, globalSets),
+      hasMinDate: rule.minDate !== undefined,
+      hasMaxDate: rule.maxDate !== undefined,
+      priority: rule.priority ?? 0,
+      originalIndex: index,
+    }
+  })
 
   // Fast path: no rules
   if (!precomputedRules || precomputedRules.length === 0) {
@@ -643,27 +653,6 @@ export function createDisabledReasons(
     const effectiveMinDate = rule.hasMinDate ? rule.minDate : minDate
     const effectiveMaxDate = rule.hasMaxDate ? rule.maxDate : maxDate
 
-    const mergedSets: PrecomputedSets = {
-      disabledKeys:
-        rule.sets.disabledKeys !== undefined ? rule.sets.disabledKeys : globalSets.disabledKeys,
-      disabledDays:
-        rule.sets.disabledDays !== undefined ? rule.sets.disabledDays : globalSets.disabledDays,
-      enabledKeys:
-        rule.sets.enabledKeys !== undefined ? rule.sets.enabledKeys : globalSets.enabledKeys,
-      enabledDays:
-        rule.sets.enabledDays !== undefined ? rule.sets.enabledDays : globalSets.enabledDays,
-      disabledMonths:
-        rule.sets.disabledMonths !== undefined
-          ? rule.sets.disabledMonths
-          : globalSets.disabledMonths,
-      enabledMonths:
-        rule.sets.enabledMonths !== undefined ? rule.sets.enabledMonths : globalSets.enabledMonths,
-      disabledYears:
-        rule.sets.disabledYears !== undefined ? rule.sets.disabledYears : globalSets.disabledYears,
-      enabledYears:
-        rule.sets.enabledYears !== undefined ? rule.sets.enabledYears : globalSets.enabledYears,
-    }
-
-    return collectReasons(date, effectiveMinDate, effectiveMaxDate, mergedSets, msgs)
+    return collectReasons(date, effectiveMinDate, effectiveMaxDate, rule.mergedSets!, msgs)
   }
 }
