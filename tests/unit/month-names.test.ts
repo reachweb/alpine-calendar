@@ -570,3 +570,57 @@ describe('locale-aware case folding', () => {
     }
   })
 })
+
+// ---------------------------------------------------------------------------
+// Locales with digits/spaces in month names (Vietnamese, Chinese, etc.)
+// ---------------------------------------------------------------------------
+
+describe('month names with digits and spaces', () => {
+  it('round-trips all 12 months (MMMM) in Vietnamese (vi)', () => {
+    const fmt = 'DD MMMM YYYY'
+    const locale = 'vi'
+    for (let m = 1; m <= 12; m++) {
+      const original = new CalendarDate(2026, m, 15)
+      const formatted = formatDate(original, fmt, locale)
+      const parsed = parseDate(formatted, fmt, locale)
+      expect(parsed).not.toBeNull()
+      expect(parsed?.toISO()).toBe(original.toISO())
+    }
+  })
+
+  it('round-trips all 12 months (MMM) in Vietnamese (vi)', () => {
+    const fmt = 'DD MMM YYYY'
+    const locale = 'vi'
+    for (let m = 1; m <= 12; m++) {
+      const original = new CalendarDate(2026, m, 15)
+      const formatted = formatDate(original, fmt, locale)
+      const parsed = parseDate(formatted, fmt, locale)
+      expect(parsed).not.toBeNull()
+      expect(parsed?.toISO()).toBe(original.toISO())
+    }
+  })
+
+  it('round-trips all 12 months (MMMM) in Chinese (zh-CN)', () => {
+    const fmt = 'YYYY MMMM DD'
+    const locale = 'zh-CN'
+    for (let m = 1; m <= 12; m++) {
+      const original = new CalendarDate(2026, m, 15)
+      const formatted = formatDate(original, fmt, locale)
+      const parsed = parseDate(formatted, fmt, locale)
+      expect(parsed).not.toBeNull()
+      expect(parsed?.toISO()).toBe(original.toISO())
+    }
+  })
+
+  it('round-trips all 12 months (MMM) in Chinese (zh-CN)', () => {
+    const fmt = 'YYYY MMM DD'
+    const locale = 'zh-CN'
+    for (let m = 1; m <= 12; m++) {
+      const original = new CalendarDate(2026, m, 15)
+      const formatted = formatDate(original, fmt, locale)
+      const parsed = parseDate(formatted, fmt, locale)
+      expect(parsed).not.toBeNull()
+      expect(parsed?.toISO()).toBe(original.toISO())
+    }
+  })
+})

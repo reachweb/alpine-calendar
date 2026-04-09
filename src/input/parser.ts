@@ -21,20 +21,21 @@ interface TokenDef {
   extract: (match: string, locale?: string) => number
 }
 
-// Permissive pattern for month names: Unicode letters and dots (for
-// abbreviated forms like Russian "янв." or French "févr.").
-const MONTH_NAME_PATTERN = '([\\p{L}.]+)'
+// Permissive pattern for month names: Unicode letters, numbers,
+// whitespace, and dots (for abbreviated forms like Russian "янв.",
+// French "févr.", Vietnamese "tháng 1", or Chinese "1月").
+const MONTH_NAME_PATTERN = '([\\p{L}\\p{N}.\\s]+)'
 
 const TOKENS: Record<string, TokenDef> = {
   YYYY: { pattern: '(\\d{4})', extract: (m) => Number(m) },
   YY: { pattern: '(\\d{2})', extract: (m) => 2000 + Number(m) },
   MMMM: {
     pattern: MONTH_NAME_PATTERN,
-    extract: (m, locale) => parseMonthName(m, locale) ?? 0,
+    extract: (m, locale) => parseMonthName(m.trim(), locale) ?? 0,
   },
   MMM: {
     pattern: MONTH_NAME_PATTERN,
-    extract: (m, locale) => parseMonthName(m, locale) ?? 0,
+    extract: (m, locale) => parseMonthName(m.trim(), locale) ?? 0,
   },
   MM: { pattern: '(\\d{1,2})', extract: (m) => Number(m) },
   M: { pattern: '(\\d{1,2})', extract: (m) => Number(m) },
@@ -51,8 +52,8 @@ const TOKEN_NAMES = Object.keys(TOKENS).sort((a, b) => b.length - a.length)
  * Separators (/, -, .) in the format are matched literally.
  * Tokens (DD, MM, YYYY, etc.) become capturing groups.
  *
- * Results are cached per format+locale since a calendar typically uses
- * one format for its entire lifetime.
+ * Results are cached per format since the compiled regex and extraction
+ * plan depend only on the format string.
  */
 const compiledFormatCache = new Map<
   string,
