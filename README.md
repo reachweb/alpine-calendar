@@ -158,7 +158,7 @@ All options are passed via `x-data="calendar({ ... })"`.
 |--------|------|---------|-------------|
 | `mode` | `'single' \| 'multiple' \| 'range'` | `'single'` | Selection mode |
 | `display` | `'inline' \| 'popup'` | `'inline'` | Inline calendar or popup with input |
-| `format` | `string` | `'DD/MM/YYYY'` | Date format (tokens: `DD`, `MM`, `YYYY`, `D`, `M`, `YY`) |
+| `format` | `string` | `'DD/MM/YYYY'` | Date format (tokens: `DD`, `MM`, `YYYY`, `D`, `M`, `YY`, `MMM`, `MMMM`) |
 | `months` | `number` | `1` | Months to display (1=single, 2=dual side-by-side, 3+=scrollable) |
 | `mobileMonths` | `number` | — | Months to show on mobile (<640px). Only used when `months` is `2`. |
 | `firstDay` | `0–6` | `1` | First day of week (0=Sun, 1=Mon, ...) |
@@ -178,6 +178,28 @@ All options are passed via `x-data="calendar({ ... })"`.
 | `constraintMessages` | `ConstraintMessages` | — | Custom tooltip strings for disabled dates |
 | `dateMetadata` | `DateMetaProvider` | — | Per-date metadata: labels, availability, colors (see [Date Metadata](#date-metadata)) |
 | `template` | `boolean` | `true` | Auto-render template when no `.rc-calendar` exists |
+
+### Format Tokens
+
+| Token | Output | Example |
+|-------|--------|---------|
+| `YYYY` | 4-digit year | `2026` |
+| `YY` | 2-digit year | `26` |
+| `MMMM` | Full month name (locale-aware) | `March` |
+| `MMM` | Short month name (locale-aware) | `Mar` |
+| `MM` | Month, zero-padded | `03` |
+| `M` | Month | `3` |
+| `DD` | Day, zero-padded | `05` |
+| `D` | Day | `5` |
+
+Month-name tokens (`MMM`, `MMMM`) use the `locale` config option for localization. Input masking is automatically disabled when the format contains month-name tokens since they produce variable-length strings.
+
+```html
+<!-- Human-readable date input -->
+<div x-data="calendar({ format: 'DD MMM YYYY', locale: 'en-US', display: 'popup' })">
+  <input x-ref="rc-input" type="text" placeholder="15 Mar 2026" />
+</div>
+```
 
 ### Date Constraints
 

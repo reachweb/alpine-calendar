@@ -1,4 +1,5 @@
 import type { CalendarDate } from '../core/calendar-date'
+import { getMonthNames } from './month-names'
 
 /**
  * Date formatting utilities using format token strings.
@@ -6,6 +7,8 @@ import type { CalendarDate } from '../core/calendar-date'
  * Supported tokens (same as parser):
  *   DD   - Day of month, zero-padded (01–31)
  *   D    - Day of month (1–31)
+ *   MMMM - Full month name (e.g. "March"), locale-aware
+ *   MMM  - Short month name (e.g. "Mar"), locale-aware
  *   MM   - Month, zero-padded (01–12)
  *   M    - Month (1–12)
  *   YYYY - Full year (e.g. 2025)
@@ -19,16 +22,18 @@ import type { CalendarDate } from '../core/calendar-date'
 // ---------------------------------------------------------------------------
 
 /** Map of token names to their formatting functions. */
-const TOKEN_FORMATTERS: Record<string, (date: CalendarDate) => string> = {
+const TOKEN_FORMATTERS: Record<string, (date: CalendarDate, locale?: string) => string> = {
   YYYY: (d) => String(d.year).padStart(4, '0'),
   YY: (d) => String(d.year % 100).padStart(2, '0'),
+  MMMM: (d, locale) => getMonthNames('long', locale)[d.month - 1] as string,
+  MMM: (d, locale) => getMonthNames('short', locale)[d.month - 1] as string,
   MM: (d) => String(d.month).padStart(2, '0'),
   M: (d) => String(d.month),
   DD: (d) => String(d.day).padStart(2, '0'),
   D: (d) => String(d.day),
 }
 
-// Sorted longest-first so YYYY matches before YY, DD before D, MM before M
+// Sorted longest-first so MMMM matches before MMM before MM before M, etc.
 const TOKEN_NAMES = Object.keys(TOKEN_FORMATTERS).sort((a, b) => b.length - a.length)
 
 // ---------------------------------------------------------------------------
@@ -42,10 +47,11 @@ const TOKEN_NAMES = Object.keys(TOKEN_FORMATTERS).sort((a, b) => b.length - a.le
  * All non-token characters are passed through as literals.
  *
  * @param date   - The CalendarDate to format
- * @param format - The format string (e.g., "DD/MM/YYYY")
- * @returns Formatted date string (e.g., "15/06/2025")
+ * @param format - The format string (e.g., "DD/MM/YYYY" or "DD MMM YYYY")
+ * @param locale - BCP 47 locale for month-name tokens; omit for browser default
+ * @returns Formatted date string (e.g., "15/06/2025" or "15 Mar 2025")
  */
-export function formatDate(date: CalendarDate, format: string): string {
+export function formatDate(date: CalendarDate, format: string, locale?: string): string {
   let remaining = format
   let result = ''
 
@@ -55,7 +61,7 @@ export function formatDate(date: CalendarDate, format: string): string {
       if (remaining.startsWith(token)) {
         const formatter = TOKEN_FORMATTERS[token]
         if (formatter) {
-          result += formatter(date)
+          result += formatter(date, locale)
           remaining = remaining.slice(token.length)
           matched = true
           break
@@ -79,10 +85,16 @@ export function formatDate(date: CalendarDate, format: string): string {
  * @param start  - The range start date
  * @param end    - The range end date
  * @param format - The format string for each date
+ * @param locale - BCP 47 locale for month-name tokens; omit for browser default
  * @returns Formatted range string (e.g., "01/06/2025 – 30/06/2025")
  */
-export function formatRange(start: CalendarDate, end: CalendarDate, format: string): string {
-  return `${formatDate(start, format)} – ${formatDate(end, format)}`
+export function formatRange(
+  start: CalendarDate,
+  end: CalendarDate,
+  format: string,
+  locale?: string,
+): string {
+  return `${formatDate(start, format, locale)} – ${formatDate(end, format, locale)}`
 }
 
 /**
@@ -95,12 +107,14 @@ export function formatRange(start: CalendarDate, end: CalendarDate, format: stri
  * @param format     - The format string for each date
  * @param maxDisplay - Maximum number of dates to show before switching to count
  *                     (default: no limit — always shows all dates)
+ * @param locale     - BCP 47 locale for month-name tokens; omit for browser default
  * @returns Formatted string: comma-separated dates or count string
  */
 export function formatMultiple(
   dates: readonly CalendarDate[],
   format: string,
   maxDisplay?: number,
+  locale?: string,
 ): string {
   if (dates.length === 0) return ''
 
@@ -108,5 +122,5 @@ export function formatMultiple(
     return `${dates.length} dates selected`
   }
 
-  return dates.map((d) => formatDate(d, format)).join(', ')
+  return dates.map((d) => formatDate(d, format, locale)).join(', ')
 }

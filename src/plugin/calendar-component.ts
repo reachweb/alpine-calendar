@@ -18,6 +18,7 @@ import type { Selection } from '../core/selection'
 import { formatDate, formatRange, formatMultiple } from '../input/formatter'
 import { parseDate, parseDateRange, parseDateMultiple } from '../input/parser'
 import { attachMask } from '../input/mask'
+import { formatHasMonthName } from '../input/month-names'
 import type { RangePreset } from '../core/presets'
 import { normalizeDateMeta } from '../core/metadata'
 import type { DateMeta, DateMetaProvider } from '../core/metadata'
@@ -553,10 +554,10 @@ export function createCalendarData(
 
   if (config.value) {
     if (mode === 'single') {
-      const d = parseDate(config.value, format) ?? CalendarDate.fromISO(config.value)
+      const d = parseDate(config.value, format, locale) ?? CalendarDate.fromISO(config.value)
       if (d && !isInitDisabled(d)) selection.toggle(d)
     } else if (mode === 'range') {
-      const range = parseDateRange(config.value, format)
+      const range = parseDateRange(config.value, format, locale)
       if (range) {
         let [start, end] = range
         if (end.isBefore(start)) {
@@ -573,7 +574,7 @@ export function createCalendarData(
         }
       }
     } else if (mode === 'multiple') {
-      const dates = parseDateMultiple(config.value, format)
+      const dates = parseDateMultiple(config.value, format, locale)
       for (const d of dates) {
         if (!isInitDisabled(d)) (selection as MultipleSelection).add(d)
       }
@@ -599,12 +600,12 @@ export function createCalendarData(
     if (dates.length === 0) return ''
     const first = dates[0] as CalendarDate
     if (mode === 'range' && dates.length === 2) {
-      return formatRange(first, dates[1] as CalendarDate, format)
+      return formatRange(first, dates[1] as CalendarDate, format, locale)
     }
     if (mode === 'multiple') {
-      return formatMultiple(dates, format)
+      return formatMultiple(dates, format, undefined, locale)
     }
-    return formatDate(first, format)
+    return formatDate(first, format, locale)
   }
 
   // ---------------------------------------------------------------------------
@@ -1298,8 +1299,8 @@ export function createCalendarData(
       // Set initial value
       el.value = this.inputValue
 
-      // Attach mask if enabled
-      if (useMask) {
+      // Attach mask if enabled (auto-disabled for month-name formats)
+      if (useMask && !formatHasMonthName(format)) {
         this._detachInput = attachMask(el, format)
         // attachMask reformats the existing value through the mask
         this.inputValue = el.value
@@ -1397,7 +1398,7 @@ export function createCalendarData(
       let changed = false
 
       if (mode === 'single') {
-        const parsed = parseDate(value, format) ?? CalendarDate.fromISO(value)
+        const parsed = parseDate(value, format, locale) ?? CalendarDate.fromISO(value)
         if (parsed && !this._isEffectivelyDisabled(parsed)) {
           this._selection.clear()
           this._selection.toggle(parsed)
@@ -1406,7 +1407,7 @@ export function createCalendarData(
           changed = true
         }
       } else if (mode === 'range') {
-        const range = parseDateRange(value, format)
+        const range = parseDateRange(value, format, locale)
         if (range) {
           let [start, end] = range
           if (end.isBefore(start)) {
@@ -1427,7 +1428,7 @@ export function createCalendarData(
           }
         }
       } else if (mode === 'multiple') {
-        const dates = parseDateMultiple(value, format)
+        const dates = parseDateMultiple(value, format, locale)
         const valid = dates.filter((d) => !this._isEffectivelyDisabled(d))
         if (valid.length > 0) {
           // Compare parsed dates with current selection to avoid silent data loss
@@ -1778,13 +1779,14 @@ export function createCalendarData(
 
       if (typeof value === 'string') {
         // Single ISO string
-        const d = CalendarDate.fromISO(value) ?? parseDate(value, format)
+        const d = CalendarDate.fromISO(value) ?? parseDate(value, format, locale)
         if (d && !this._isEffectivelyDisabled(d)) {
           dates.push(d)
         }
       } else if (Array.isArray(value)) {
         for (const v of value) {
-          const d = typeof v === 'string' ? (CalendarDate.fromISO(v) ?? parseDate(v, format)) : v
+          const d =
+            typeof v === 'string' ? (CalendarDate.fromISO(v) ?? parseDate(v, format, locale)) : v
           if (d && !this._isEffectivelyDisabled(d)) {
             dates.push(d)
           }
