@@ -1,5 +1,5 @@
 import type { CalendarDate } from '../core/calendar-date'
-import { getMonthNames } from './month-names'
+import { getMonthNamesInContext } from './month-names'
 
 /**
  * Date formatting utilities using format token strings.
@@ -25,8 +25,8 @@ import { getMonthNames } from './month-names'
 const TOKEN_FORMATTERS: Record<string, (date: CalendarDate, locale?: string) => string> = {
   YYYY: (d) => String(d.year).padStart(4, '0'),
   YY: (d) => String(d.year % 100).padStart(2, '0'),
-  MMMM: (d, locale) => getMonthNames('long', locale)[d.month - 1] as string,
-  MMM: (d, locale) => getMonthNames('short', locale)[d.month - 1] as string,
+  MMMM: (d, locale) => getMonthNamesInContext('long', locale)[d.month - 1] as string,
+  MMM: (d, locale) => getMonthNamesInContext('short', locale)[d.month - 1] as string,
   MM: (d) => String(d.month).padStart(2, '0'),
   M: (d) => String(d.month),
   DD: (d) => String(d.day).padStart(2, '0'),

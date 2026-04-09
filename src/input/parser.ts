@@ -1,5 +1,5 @@
 import { CalendarDate, daysInMonth } from '../core/calendar-date'
-import { getMonthNames, parseMonthName } from './month-names'
+import { parseMonthName } from './month-names'
 
 /**
  * Supported format tokens:
@@ -17,25 +17,23 @@ import { getMonthNames, parseMonthName } from './month-names'
 
 /** Map of format tokens to their regex patterns and extraction logic. */
 interface TokenDef {
-  pattern: string | ((locale?: string) => string)
+  pattern: string
   extract: (match: string, locale?: string) => number
 }
+
+// Permissive pattern for month names: Unicode letters and dots (for
+// abbreviated forms like Russian "янв." or French "févr.").
+const MONTH_NAME_PATTERN = '([\\p{L}.]+)'
 
 const TOKENS: Record<string, TokenDef> = {
   YYYY: { pattern: '(\\d{4})', extract: (m) => Number(m) },
   YY: { pattern: '(\\d{2})', extract: (m) => 2000 + Number(m) },
   MMMM: {
-    pattern: (locale) => {
-      const names = getMonthNames('long', locale)
-      return '(' + names.map(escapeRegex).join('|') + ')'
-    },
+    pattern: MONTH_NAME_PATTERN,
     extract: (m, locale) => parseMonthName(m, locale) ?? 0,
   },
   MMM: {
-    pattern: (locale) => {
-      const names = getMonthNames('short', locale)
-      return '(' + names.map(escapeRegex).join('|') + ')'
-    },
+    pattern: MONTH_NAME_PATTERN,
     extract: (m, locale) => parseMonthName(m, locale) ?? 0,
   },
   MM: { pattern: '(\\d{1,2})', extract: (m) => Number(m) },
@@ -61,22 +59,17 @@ const compiledFormatCache = new Map<
   { regex: RegExp; extractors: { token: string; index: number }[] }
 >()
 
-function compileFormat(
-  format: string,
-  locale?: string,
-): {
+function compileFormat(format: string): {
   regex: RegExp
   extractors: { token: string; index: number }[]
 } {
-  const cacheKey = (locale ?? '') + '|' + format
-  const cached = compiledFormatCache.get(cacheKey)
+  const cached = compiledFormatCache.get(format)
   if (cached) return cached
 
   let remaining = format
   let regexStr = '^'
   const extractors: { token: string; index: number }[] = []
   let groupIndex = 1
-  let hasMonthName = false
 
   while (remaining.length > 0) {
     let matched = false
@@ -85,12 +78,10 @@ function compileFormat(
       if (remaining.startsWith(name)) {
         const def = TOKENS[name]
         if (def) {
-          const pat = typeof def.pattern === 'function' ? def.pattern(locale) : def.pattern
-          regexStr += pat
+          regexStr += def.pattern
           extractors.push({ token: name, index: groupIndex })
           groupIndex++
           remaining = remaining.slice(name.length)
-          if (name === 'MMM' || name === 'MMMM') hasMonthName = true
           matched = true
           break
         }
@@ -106,8 +97,8 @@ function compileFormat(
   }
 
   regexStr += '$'
-  const result = { regex: new RegExp(regexStr, hasMonthName ? 'i' : ''), extractors }
-  compiledFormatCache.set(cacheKey, result)
+  const result = { regex: new RegExp(regexStr, 'u'), extractors }
+  compiledFormatCache.set(format, result)
   return result
 }
 
@@ -141,7 +132,7 @@ export function parseDate(input: string, format: string, locale?: string): Calen
   const trimmed = input.trim()
   if (trimmed === '') return null
 
-  const { regex, extractors } = compileFormat(format, locale)
+  const { regex, extractors } = compileFormat(format)
   const match = regex.exec(trimmed)
   if (!match) return null
 
@@ -218,12 +209,52 @@ export function parseDateMultiple(input: string, format: string, locale?: string
   const trimmed = input.trim()
   if (trimmed === '') return []
 
+  // When the format itself contains a comma (e.g. "MMMM D, YYYY"),
+  // naive comma-splitting breaks. Use greedy left-to-right parsing instead.
+  if (format.includes(',')) {
+    return parseMultipleGreedy(trimmed, format, locale)
+  }
+
   const parts = trimmed.split(',')
   const dates: CalendarDate[] = []
 
   for (const part of parts) {
     const date = parseDate(part, format, locale) ?? CalendarDate.fromISO(part.trim())
     if (date) dates.push(date)
+  }
+
+  return dates
+}
+
+/**
+ * Greedy left-to-right parser for formats that contain commas.
+ * Builds a prefix-anchored (no trailing $) regex, matches each date,
+ * consumes the separator, and repeats.
+ */
+function parseMultipleGreedy(input: string, format: string, locale?: string): CalendarDate[] {
+  // Build a prefix-only regex (^pattern without $) for prefix matching
+  const { regex: fullRegex } = compileFormat(format)
+  const prefixSource = fullRegex.source.replace(/\$$/, '')
+  const prefixRegex = new RegExp(prefixSource, fullRegex.flags)
+
+  const dates: CalendarDate[] = []
+  let remaining = input
+
+  while (remaining.length > 0) {
+    const match = prefixRegex.exec(remaining)
+    if (!match || match.index !== 0) break
+
+    const date = parseDate(match[0], format, locale)
+    if (date) dates.push(date)
+
+    remaining = remaining.slice(match[0].length)
+    // Consume separator: comma + optional whitespace
+    const sepMatch = /^,\s*/.exec(remaining)
+    if (sepMatch) {
+      remaining = remaining.slice(sepMatch[0].length)
+    } else if (remaining.length > 0) {
+      break
+    }
   }
 
   return dates

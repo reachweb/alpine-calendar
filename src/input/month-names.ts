@@ -11,8 +11,12 @@
 
 const cache = new Map<string, string[]>()
 
-function cacheKey(style: 'short' | 'long', locale?: string): string {
-  return (locale ?? '') + '|' + style
+function cacheKey(
+  style: 'short' | 'long',
+  locale?: string,
+  context?: 'standalone' | 'format',
+): string {
+  return (locale ?? '') + '|' + style + '|' + (context ?? 'standalone')
 }
 
 // ---------------------------------------------------------------------------
@@ -27,7 +31,7 @@ function cacheKey(style: 'short' | 'long', locale?: string): string {
  * @param locale - BCP 47 locale string; omit for browser default
  */
 export function getMonthNames(style: 'short' | 'long', locale?: string): string[] {
-  const key = cacheKey(style, locale)
+  const key = cacheKey(style, locale, 'standalone')
   const cached = cache.get(key)
   if (cached) return cached
 
@@ -36,6 +40,30 @@ export function getMonthNames(style: 'short' | 'long', locale?: string): string[
   for (let m = 0; m < 12; m++) {
     // Use a fixed day (15th) to avoid any timezone-related month rollover
     names.push(fmt.format(new Date(2000, m, 15)))
+  }
+
+  cache.set(key, names)
+  return names
+}
+
+/**
+ * Return an array of 12 month names in "format" context (i.e. as they appear
+ * inside a full date string). In inflected locales like Polish and Russian
+ * this produces the genitive form ("marca" instead of "marzec").
+ *
+ * For non-inflected locales the result is identical to getMonthNames().
+ */
+export function getMonthNamesInContext(style: 'short' | 'long', locale?: string): string[] {
+  const key = cacheKey(style, locale, 'format')
+  const cached = cache.get(key)
+  if (cached) return cached
+
+  const fmt = new Intl.DateTimeFormat(locale, { month: style, day: 'numeric' })
+  const names: string[] = []
+  for (let m = 0; m < 12; m++) {
+    const parts = fmt.formatToParts(new Date(2000, m, 15))
+    const monthPart = parts.find((p) => p.type === 'month')
+    names.push(monthPart?.value ?? (getMonthNames(style, locale)[m] as string))
   }
 
   cache.set(key, names)
@@ -52,14 +80,14 @@ export function getMonthNames(style: 'short' | 'long', locale?: string): string[
  * @param locale - BCP 47 locale string; omit for browser default
  */
 export function parseMonthName(name: string, locale?: string): number | null {
-  const lower = name.toLowerCase()
+  const opts: Intl.CollatorOptions = { sensitivity: 'base' }
 
   for (const style of ['short', 'long'] as const) {
-    const names = getMonthNames(style, locale)
-    for (let i = 0; i < names.length; i++) {
-      if ((names[i] as string).toLowerCase() === lower) {
-        return i + 1
-      }
+    const standAlone = getMonthNames(style, locale)
+    const inContext = getMonthNamesInContext(style, locale)
+    for (let i = 0; i < standAlone.length; i++) {
+      if (name.localeCompare(standAlone[i] as string, locale, opts) === 0) return i + 1
+      if (name.localeCompare(inContext[i] as string, locale, opts) === 0) return i + 1
     }
   }
 

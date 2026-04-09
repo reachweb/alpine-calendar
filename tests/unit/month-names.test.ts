@@ -2,7 +2,12 @@ import { describe, it, expect } from 'vitest'
 import { CalendarDate } from '../../src/core/calendar-date'
 import { formatDate, formatRange, formatMultiple } from '../../src/input/formatter'
 import { parseDate, parseDateRange, parseDateMultiple } from '../../src/input/parser'
-import { getMonthNames, parseMonthName, formatHasMonthName } from '../../src/input/month-names'
+import {
+  getMonthNames,
+  getMonthNamesInContext,
+  parseMonthName,
+  formatHasMonthName,
+} from '../../src/input/month-names'
 
 // ---------------------------------------------------------------------------
 // getMonthNames
@@ -411,5 +416,157 @@ describe('parseDateMultiple with month-name tokens', () => {
     expect(result[0]?.toISO()).toBe('2026-01-05')
     expect(result[1]?.toISO()).toBe('2026-06-15')
     expect(result[2]?.toISO()).toBe('2026-12-25')
+  })
+
+  it('parses MMMM D, YYYY format with commas inside dates', () => {
+    const result = parseDateMultiple('July 4, 2026, August 5, 2026', 'MMMM D, YYYY', 'en-US')
+    expect(result).toHaveLength(2)
+    expect(result[0]?.toISO()).toBe('2026-07-04')
+    expect(result[1]?.toISO()).toBe('2026-08-05')
+  })
+
+  it('parses single date in MMMM D, YYYY format', () => {
+    const result = parseDateMultiple('December 25, 2026', 'MMMM D, YYYY', 'en-US')
+    expect(result).toHaveLength(1)
+    expect(result[0]?.toISO()).toBe('2026-12-25')
+  })
+
+  it('parses three dates in MMMM D, YYYY format', () => {
+    const result = parseDateMultiple(
+      'January 1, 2026, March 15, 2026, December 31, 2026',
+      'MMMM D, YYYY',
+      'en-US',
+    )
+    expect(result).toHaveLength(3)
+    expect(result[0]?.toISO()).toBe('2026-01-01')
+    expect(result[1]?.toISO()).toBe('2026-03-15')
+    expect(result[2]?.toISO()).toBe('2026-12-31')
+  })
+
+  it('round-trips formatMultiple → parseDateMultiple with MMMM D, YYYY', () => {
+    const dates = [new CalendarDate(2026, 7, 4), new CalendarDate(2026, 8, 5)]
+    const fmt = 'MMMM D, YYYY'
+    const formatted = formatMultiple(dates, fmt, undefined, 'en-US')
+    const parsed = parseDateMultiple(formatted, fmt, 'en-US')
+    expect(parsed).toHaveLength(2)
+    expect(parsed[0]?.toISO()).toBe('2026-07-04')
+    expect(parsed[1]?.toISO()).toBe('2026-08-05')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Inflected locales (genitive month names) — Issue #1
+// ---------------------------------------------------------------------------
+
+describe('inflected locale month names', () => {
+  describe('getMonthNamesInContext', () => {
+    it('returns different forms than stand-alone for inflected locales', () => {
+      // In inflected locales, at least some months should differ
+      // between stand-alone and format-context forms
+      for (const locale of ['pl', 'ru']) {
+        const sa = getMonthNames('long', locale)
+        const ctx = getMonthNamesInContext('long', locale)
+        const hasDifference = sa.some((name, i) => name !== ctx[i])
+        expect(hasDifference).toBe(true)
+      }
+    })
+
+    it('returns same names as getMonthNames for non-inflected locales', () => {
+      for (const locale of ['en-US', 'el']) {
+        const sa = getMonthNames('long', locale)
+        const ctx = getMonthNamesInContext('long', locale)
+        expect(ctx).toEqual(sa)
+      }
+    })
+  })
+
+  describe('parseDate accepts both stand-alone and format-context forms', () => {
+    it('parses stand-alone month names for inflected locales', () => {
+      for (const locale of ['pl', 'ru']) {
+        const sa = getMonthNames('long', locale)
+        for (let i = 0; i < 12; i++) {
+          const input = `15 ${sa[i]} 2026`
+          const d = parseDate(input, 'DD MMMM YYYY', locale)
+          expect(d).not.toBeNull()
+          expect(d?.month).toBe(i + 1)
+        }
+      }
+    })
+
+    it('parses format-context month names for inflected locales', () => {
+      for (const locale of ['pl', 'ru']) {
+        const ctx = getMonthNamesInContext('long', locale)
+        for (let i = 0; i < 12; i++) {
+          const input = `15 ${ctx[i]} 2026`
+          const d = parseDate(input, 'DD MMMM YYYY', locale)
+          expect(d).not.toBeNull()
+          expect(d?.month).toBe(i + 1)
+        }
+      }
+    })
+  })
+
+  describe('round-trip with non-English locales', () => {
+    const locales = ['pl', 'ru', 'el', 'tr']
+
+    for (const locale of locales) {
+      it(`round-trips all 12 months (MMMM) in ${locale}`, () => {
+        const fmt = 'DD MMMM YYYY'
+        for (let m = 1; m <= 12; m++) {
+          const original = new CalendarDate(2026, m, 15)
+          const formatted = formatDate(original, fmt, locale)
+          const parsed = parseDate(formatted, fmt, locale)
+          expect(parsed).not.toBeNull()
+          expect(parsed?.toISO()).toBe(original.toISO())
+        }
+      })
+
+      it(`round-trips all 12 months (MMM) in ${locale}`, () => {
+        const fmt = 'DD MMM YYYY'
+        for (let m = 1; m <= 12; m++) {
+          const original = new CalendarDate(2026, m, 15)
+          const formatted = formatDate(original, fmt, locale)
+          const parsed = parseDate(formatted, fmt, locale)
+          expect(parsed).not.toBeNull()
+          expect(parsed?.toISO()).toBe(original.toISO())
+        }
+      })
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Locale-aware case folding — Issue #3
+// ---------------------------------------------------------------------------
+
+describe('locale-aware case folding', () => {
+  it('parseMonthName accepts uppercased month names for any locale', () => {
+    for (const locale of ['en-US', 'el', 'tr', 'pl', 'ru']) {
+      const names = getMonthNames('long', locale)
+      for (let i = 0; i < 12; i++) {
+        const upper = (names[i] as string).toLocaleUpperCase(locale)
+        expect(parseMonthName(upper, locale)).toBe(i + 1)
+      }
+    }
+  })
+
+  it('parseMonthName accepts lowercased month names for any locale', () => {
+    for (const locale of ['en-US', 'el', 'tr', 'pl', 'ru']) {
+      const names = getMonthNames('long', locale)
+      for (let i = 0; i < 12; i++) {
+        const lower = (names[i] as string).toLocaleLowerCase(locale)
+        expect(parseMonthName(lower, locale)).toBe(i + 1)
+      }
+    }
+  })
+
+  it('parseDate accepts uppercased month input', () => {
+    for (const locale of ['en-US', 'el', 'tr', 'pl', 'ru']) {
+      const names = getMonthNamesInContext('long', locale)
+      const upper = (names[2] as string).toLocaleUpperCase(locale)
+      const d = parseDate(`15 ${upper} 2026`, 'DD MMMM YYYY', locale)
+      expect(d).not.toBeNull()
+      expect(d?.month).toBe(3)
+    }
   })
 })
