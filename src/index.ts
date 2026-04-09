@@ -99,5 +99,11 @@ export { parseDate, parseDateRange, parseDateMultiple } from './input/parser'
 export { formatDate, formatRange, formatMultiple } from './input/formatter'
 export { createMask, createMaskHandlers, attachMask, parseFormatToSlots } from './input/mask'
 export type { InputMask, MaskEventHandlers, MaskSlot } from './input/mask'
+export {
+  getMonthNames,
+  getMonthNamesInContext,
+  parseMonthName,
+  formatHasMonthName,
+} from './input/month-names'
 export { computePosition, autoUpdate } from './positioning/popup'
 export type { Placement, PositionOptions, PositionResult } from './positioning/popup'

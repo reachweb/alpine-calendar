@@ -79,9 +79,7 @@ describe('Build & Distribution Verification', () => {
     it('exports calendarPlugin as default', () => {
       const content = readDist('alpine-calendar.es.js')
       // Vite may emit `export default` or `calendarPlugin as default` in the export block
-      const hasDefaultExport =
-        content.includes('export default') ||
-        content.includes('as default')
+      const hasDefaultExport = content.includes('export default') || content.includes('as default')
       expect(hasDefaultExport).toBe(true)
     })
 
@@ -315,9 +313,9 @@ describe('Build & Distribution Verification', () => {
       expect(size).toBeLessThan(55_000)
     })
 
-    it('ESM bundle is under 110KB raw', () => {
+    it('ESM bundle is under 120KB raw', () => {
       const size = distFileSize('alpine-calendar.es.js')
-      expect(size).toBeLessThan(115_000)
+      expect(size).toBeLessThan(120_000)
     })
 
     it('UMD bundle is under 60KB raw', () => {
@@ -332,9 +330,7 @@ describe('Build & Distribution Verification', () => {
 
     it('CDN IIFE is reasonably sized (not bloated with Alpine)', () => {
       const cdnSize = distFileSize('alpine-calendar.cdn.js')
-      const esmSize = distFileSize('alpine-calendar.es.js')
-      // CDN should be smaller than ESM (ESM is not minified the same way)
-      // But CDN should not be >50KB which would indicate Alpine was bundled
+      // CDN should not be >50KB which would indicate Alpine was bundled
       // (Alpine alone is ~43KB minified)
       expect(cdnSize).toBeLessThan(55_000)
     })
@@ -402,10 +398,7 @@ describe('Build & Distribution Verification', () => {
 
     it('cdn.ts is idempotent (has registration guard)', () => {
       // The source uses a `registered` boolean flag
-      const cdnSource = fs.readFileSync(
-        path.resolve(__dirname, '../../src/cdn.ts'),
-        'utf-8',
-      )
+      const cdnSource = fs.readFileSync(path.resolve(__dirname, '../../src/cdn.ts'), 'utf-8')
       expect(cdnSource).toContain('registered')
       expect(cdnSource).toContain('if (registered) return')
     })
