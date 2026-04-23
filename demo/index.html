@@ -1084,6 +1084,143 @@
     </div>
   </div>
 
+  <!-- ============================================================
+       v0.9 Customization — slots, scoped themes, initial month, JSON-string config
+       ============================================================ -->
+  <div class="container section" id="customization">
+    <h2 class="section-title">Customization (v0.9)</h2>
+    <p class="section-desc">New surfaces: day-cell radius vars, header/footer slots, <code>data-rc-theme</code> scoping, <code>initialMonth</code>, and JSON-string array tolerance for templating engines.</p>
+
+    <style>
+      /* Square day cells via the new --radius-calendar-day var */
+      .rc-square-days {
+        --radius-calendar-day: 6px;
+        --radius-calendar-day-range-edge: 6px;
+        --radius-calendar-day-range-middle: 0;
+      }
+
+      /* Scoped theme via data-rc-theme — works for inline AND portal popups */
+      [data-rc-theme="black"] {
+        --color-calendar-primary: #111827;
+        --color-calendar-primary-text: #ffffff;
+        --color-calendar-today-ring: #6b7280;
+        --color-calendar-range: #f3f4f6;
+        --color-calendar-focus-ring: #111827;
+      }
+    </style>
+
+    <div class="examples examples-grid-2">
+
+      <!-- Square day cells -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Square day cells</div>
+          <div class="card-desc">Override <code>--radius-calendar-day</code> + range edge/middle to swap pill for rounded squares.</div>
+        </div>
+        <div class="card-body">
+          <div class="rc-square-days">
+            <div x-data="calendar({ mode: 'range' })"></div>
+          </div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>.rc-square-days {
+  --radius-calendar-day: 6px;
+  --radius-calendar-day-range-edge: 6px;
+  --radius-calendar-day-range-middle: 0;
+}</code></pre>
+        </details>
+      </div>
+
+      <!-- initialMonth -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Open at a specific month</div>
+          <div class="card-desc">Use <code>initialMonth</code> to land on April 2027 with no selection (useful for seasonal businesses).</div>
+        </div>
+        <div class="card-body">
+          <div x-data="calendar({ initialMonth: '2027-04' })"></div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({ initialMonth: '2027-04' })"&gt;&lt;/div&gt;</code></pre>
+        </details>
+      </div>
+
+      <!-- Footer slot inside popup -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Footer slot in popup</div>
+          <div class="card-desc"><code>&lt;template data-rc-slot="footer"&gt;</code> renders inside the calendar — survives the portal teleport.</div>
+        </div>
+        <div class="card-body">
+          <div x-data="calendar({ display: 'popup', mode: 'range' })">
+            <input x-ref="rc-input" type="text" placeholder="DD/MM/YYYY">
+            <template data-rc-slot="footer">
+              <p style="margin: 0;">
+                Most charters are Saturday to Saturday.
+                <a href="#contact">Contact us</a> for special dates.
+              </p>
+            </template>
+          </div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({ display: 'popup', mode: 'range' })"&gt;
+  &lt;input x-ref="rc-input"&gt;
+  &lt;template data-rc-slot="footer"&gt;
+    &lt;p&gt;Most charters are Saturday to Saturday.
+       &lt;a href="#contact"&gt;Contact us&lt;/a&gt;.&lt;/p&gt;
+  &lt;/template&gt;
+&lt;/div&gt;</code></pre>
+        </details>
+      </div>
+
+      <!-- data-rc-theme scoping that survives the portal -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Portal-safe scoped theme</div>
+          <div class="card-desc"><code>data-rc-theme="black"</code> is forwarded to the teleported overlay so scoped CSS still applies inside the popup.</div>
+        </div>
+        <div class="card-body">
+          <div x-data="calendar({ display: 'popup' })" data-rc-theme="black">
+            <input x-ref="rc-input" type="text" placeholder="DD/MM/YYYY">
+          </div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({ display: 'popup' })" data-rc-theme="black"&gt;
+  &lt;input x-ref="rc-input"&gt;
+&lt;/div&gt;
+
+/* CSS — applies inside the portal because data-rc-theme is forwarded */
+[data-rc-theme="black"] {
+  --color-calendar-primary: #111827;
+  --color-calendar-primary-text: #fff;
+}</code></pre>
+        </details>
+      </div>
+
+      <!-- JSON-string disabledDaysOfWeek (Blade interop) -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">JSON-string array config</div>
+          <div class="card-desc">Templating engines (Blade, Twig) often emit arrays as strings. v0.9 tolerates that.</div>
+        </div>
+        <div class="card-body">
+          <div x-data='calendar({ disabledDaysOfWeek: "[0,6]" })'></div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;!-- Both forms work in v0.9+ --&gt;
+&lt;div x-data='calendar({ disabledDaysOfWeek: [0, 6] })'&gt;&lt;/div&gt;
+&lt;div x-data='calendar({ disabledDaysOfWeek: "[0,6]" })'&gt;&lt;/div&gt;</code></pre>
+        </details>
+      </div>
+
+    </div>
+  </div>
+
   <!-- ===== Footer ===== -->
   <footer class="footer">
     <p>

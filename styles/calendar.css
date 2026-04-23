@@ -14,34 +14,43 @@
  *
  * ------------------------------------------------------------------------- */
 
-:root {
+/*
+ * Defaults are wrapped in `:where(:root)` so they have ZERO specificity.
+ * Any consumer override (`:root { --color-calendar-primary: … }`, scoped class,
+ * `[data-rc-theme]` attribute) wins regardless of stylesheet load order — no
+ * `!important` required. See README "Theming & Portal" for the full pattern.
+ */
+:where(:root) {
   /* Surface colors */
   --color-calendar-bg: #fff;
-  --color-calendar-text: oklch(21% .034 264.665);
-  --color-calendar-border: oklch(92.8% .006 264.531);
-  --color-calendar-hover: oklch(96.7% .003 264.542);
+  --color-calendar-text: oklch(21% 0.034 264.665);
+  --color-calendar-border: oklch(92.8% 0.006 264.531);
+  --color-calendar-hover: oklch(96.7% 0.003 264.542);
   --color-calendar-overlay: oklch(0 0 0 / 0.2);
 
   /* Primary accent (selected, active states) */
-  --color-calendar-primary: oklch(54.6% .245 262.881);
+  --color-calendar-primary: oklch(54.6% 0.245 262.881);
   --color-calendar-primary-text: #fff;
 
   /* Semantic colors */
-  --color-calendar-muted: oklch(44.6% .03 256.802);
+  --color-calendar-muted: oklch(44.6% 0.03 256.802);
   --color-calendar-disabled: var(--color-calendar-muted);
   --color-calendar-other-month: var(--color-calendar-muted);
   --color-calendar-weekday: var(--color-calendar-muted);
-  --color-calendar-range: oklch(97% .014 254.604);
-  --color-calendar-today-ring: oklch(70.7% .165 254.624);
+  --color-calendar-range: oklch(97% 0.014 254.604);
+  --color-calendar-today-ring: oklch(70.7% 0.165 254.624);
   --color-calendar-focus-ring: var(--color-calendar-primary);
 
   /* Metadata / availability states */
   --color-calendar-available: oklch(0.65 0.2 145);
   --color-calendar-available-bg: oklch(0.95 0.05 145);
-  --color-calendar-unavailable: oklch(70.7% .022 261.325);
+  --color-calendar-unavailable: oklch(70.7% 0.022 261.325);
 
   /* Layout tokens */
   --radius-calendar: 0.5rem;
+  --radius-calendar-day: 9999px;
+  --radius-calendar-day-range-edge: var(--radius-calendar-day);
+  --radius-calendar-day-range-middle: 0;
   --shadow-calendar: 0 10px 15px -3px #0000001a, 0 4px 6px -4px #0000001a;
 
   /* Typography */
@@ -96,8 +105,12 @@
   scrollbar-color: var(--color-calendar-border) transparent;
 }
 
-.rc-months--scroll::-webkit-scrollbar { width: 6px; }
-.rc-months--scroll::-webkit-scrollbar-track { background: transparent; }
+.rc-months--scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.rc-months--scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
 .rc-months--scroll::-webkit-scrollbar-thumb {
   background-color: var(--color-calendar-border);
   border-radius: 3px;
@@ -115,10 +128,17 @@
   border-top: 1px solid var(--color-calendar-border);
 }
 
-.rc-header--scroll:first-child { border-top: none; padding-top: 0; }
+.rc-header--scroll:first-child {
+  border-top: none;
+  padding-top: 0;
+}
 
-.rc-header__label--scroll { cursor: default; }
-.rc-header__label--scroll:hover { background-color: transparent; }
+.rc-header__label--scroll {
+  cursor: default;
+}
+.rc-header__label--scroll:hover {
+  background-color: transparent;
+}
 
 /* ---------------------------------------------------------------------------
  * Month header (nav arrows + month/year label)
@@ -165,12 +185,20 @@
 }
 
 /* Dual-month nav arrow responsive visibility */
-.rc-nav--dual-hidden { visibility: hidden; }
-.rc-nav--dual-next-first { visibility: hidden; } /* hidden on desktop: next arrow is on 2nd month */
+.rc-nav--dual-hidden {
+  visibility: hidden;
+}
+.rc-nav--dual-next-first {
+  visibility: hidden;
+} /* hidden on desktop: next arrow is on 2nd month */
 
 @media (max-width: 639px) {
-  .rc-nav--dual-next-first { visibility: visible; }  /* show on mobile: both arrows on top month */
-  .rc-nav--dual-next-last { visibility: hidden; }     /* hide on mobile: no arrows on bottom month */
+  .rc-nav--dual-next-first {
+    visibility: visible;
+  } /* show on mobile: both arrows on top month */
+  .rc-nav--dual-next-last {
+    visibility: hidden;
+  } /* hide on mobile: no arrows on bottom month */
 }
 
 /* ---------------------------------------------------------------------------
@@ -223,14 +251,18 @@
   aspect-ratio: 1;
   min-height: 2.25rem; /* 36px baseline touch target */
   font-size: 0.875rem;
-  border-radius: 9999px;
+  border-radius: var(--radius-calendar-day);
   cursor: pointer;
-  transition: background-color 150ms, color 150ms;
+  transition:
+    background-color 150ms,
+    color 150ms;
   user-select: none;
   -webkit-user-select: none;
 }
 
-.rc-day:hover:not(.rc-day--disabled):not(.rc-day--selected):not(.rc-day--range-start):not(.rc-day--range-end) {
+.rc-day:hover:not(.rc-day--disabled):not(.rc-day--selected):not(.rc-day--range-start):not(
+    .rc-day--range-end
+  ) {
   background-color: var(--color-calendar-hover);
 }
 
@@ -262,22 +294,24 @@
 /* In-range (between start and end) */
 .rc-day--in-range {
   background-color: var(--color-calendar-range);
-  border-radius: 0;
+  border-radius: var(--radius-calendar-day-range-middle);
 }
 
 /* Range start: pill on left */
 .rc-day--range-start {
-  border-radius: 9999px 0 0 9999px;
+  border-radius: var(--radius-calendar-day-range-edge) var(--radius-calendar-day-range-middle)
+    var(--radius-calendar-day-range-middle) var(--radius-calendar-day-range-edge);
 }
 
 /* Range end: pill on right */
 .rc-day--range-end {
-  border-radius: 0 9999px 9999px 0;
+  border-radius: var(--radius-calendar-day-range-middle) var(--radius-calendar-day-range-edge)
+    var(--radius-calendar-day-range-edge) var(--radius-calendar-day-range-middle);
 }
 
 /* When both start and end are same day */
 .rc-day--range-start.rc-day--range-end {
-  border-radius: 9999px;
+  border-radius: var(--radius-calendar-day);
 }
 
 /* Disabled */
@@ -426,6 +460,24 @@
 }
 
 /* ---------------------------------------------------------------------------
+ * Slots — consumer-supplied content via <template data-rc-slot="header|footer">
+ * ------------------------------------------------------------------------- */
+
+.rc-calendar__header {
+  padding: 0 0 0.5rem;
+  font-size: 0.875rem;
+  color: var(--color-calendar-text);
+}
+
+.rc-calendar__footer {
+  padding: 0.5rem 0 0;
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--color-calendar-border);
+  font-size: 0.8125rem;
+  color: var(--color-calendar-muted);
+}
+
+/* ---------------------------------------------------------------------------
  * Month picker (3×4 grid of months)
  * ------------------------------------------------------------------------- */
 
@@ -444,7 +496,9 @@
   font-size: 0.875rem;
   border-radius: var(--radius-calendar);
   cursor: pointer;
-  transition: background-color 150ms, color 150ms;
+  transition:
+    background-color 150ms,
+    color 150ms;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -494,7 +548,9 @@
   font-size: 0.875rem;
   border-radius: var(--radius-calendar);
   cursor: pointer;
-  transition: background-color 150ms, color 150ms;
+  transition:
+    background-color 150ms,
+    color 150ms;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -579,7 +635,9 @@
   border: 1px solid var(--color-calendar-border);
   border-radius: var(--radius-calendar);
   cursor: pointer;
-  transition: background-color 150ms, border-color 150ms;
+  transition:
+    background-color 150ms,
+    border-color 150ms;
   user-select: none;
   -webkit-user-select: none;
   white-space: nowrap;
@@ -604,13 +662,25 @@
 }
 
 @keyframes rc-slide-in-from-right {
-  from { transform: translateX(100%); opacity: 0; }
-  to   { transform: translateX(0); opacity: 1; }
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 @keyframes rc-slide-in-from-left {
-  from { transform: translateX(-100%); opacity: 0; }
-  to   { transform: translateX(0); opacity: 1; }
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 .rc-grid--slide-next {
@@ -626,8 +696,14 @@
  * ------------------------------------------------------------------------- */
 
 @keyframes rc-view-enter {
-  from { opacity: 0; transform: scale(0.96); }
-  to   { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .rc-view-enter {
@@ -639,8 +715,14 @@
  * ------------------------------------------------------------------------- */
 
 @keyframes rc-popup-enter {
-  from { opacity: 0; transform: scale(0.95); }
-  to   { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .rc-popup-overlay .rc-calendar {
@@ -677,7 +759,9 @@
   height: 0.5rem;
   border-radius: 9999px;
   background-color: var(--color-calendar-border);
-  transition: background-color 200ms, transform 200ms;
+  transition:
+    background-color 200ms,
+    transform 200ms;
 }
 
 .rc-wizard-step--active {
@@ -729,7 +813,9 @@
   padding-top: 0.5rem;
   margin-top: 0.5rem;
   border-top: 1px solid var(--color-calendar-border);
-  transition: opacity 200ms ease, transform 200ms ease;
+  transition:
+    opacity 200ms ease,
+    transform 200ms ease;
 }
 
 /* Wizard: larger touch targets for month/year cells */

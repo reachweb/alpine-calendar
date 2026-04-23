@@ -133,6 +133,13 @@ export interface CalendarConfig {
   /** Show ISO 8601 week numbers on the left side of the day grid. Default: false. */
   showWeekNumbers?: boolean
   /**
+   * Month to display when the calendar first opens, without affecting selection.
+   * Accepts an ISO month (`'2027-04'`) or full date (`'2027-04-15'`); only year/month are used.
+   * Precedence for initial view: explicit selection (`value`) > `initialMonth` > today.
+   * Has no effect in wizard year-month / full mode (those center on `today.year - 30`).
+   */
+  initialMonth?: string
+  /**
    * Predefined date range presets (e.g., "Today", "Last 7 Days", "This Month").
    * Displayed as quick-select buttons alongside the calendar. Only meaningful in range or single mode.
    */
@@ -273,13 +280,55 @@ function parseConfigRule(rule: CalendarConfigRule): DateConstraintRule | null {
 // Config validation
 // ---------------------------------------------------------------------------
 
+const warn = (msg: string) => console.warn(`[reach-calendar] ${msg}`)
+
+/**
+ * Keys whose values are arrays at runtime but commonly stringified by templating
+ * engines (Blade, Twig, etc.). When a JSON-string is supplied we tolerate it,
+ * parse it, and warn loudly on malformed input. The TypeScript signature on
+ * CalendarConfig stays as the array type — string input is a runtime convenience
+ * for non-TS hosts.
+ */
+const COERCIBLE_ARRAY_KEYS = [
+  'disabledDates',
+  'disabledDaysOfWeek',
+  'enabledDates',
+  'enabledDaysOfWeek',
+  'disabledMonths',
+  'enabledMonths',
+  'disabledYears',
+  'enabledYears',
+] as const
+
+function coerceConfigArrays(config: CalendarConfig): void {
+  const cfg = config as Record<string, unknown>
+  for (const key of COERCIBLE_ARRAY_KEYS) {
+    const value = cfg[key]
+    if (value === undefined || value === null || Array.isArray(value)) continue
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value)
+        if (Array.isArray(parsed)) {
+          cfg[key] = parsed
+          continue
+        }
+        warn(`${key}: JSON string did not parse to an array, got: ${value}`)
+      } catch {
+        warn(`${key}: invalid JSON string, got: ${value}`)
+      }
+      cfg[key] = undefined
+    } else {
+      warn(`${key}: expected array or JSON-array string, got ${typeof value}`)
+      cfg[key] = undefined
+    }
+  }
+}
+
 /**
  * Validate calendar configuration and warn about invalid combinations.
  * Does not throw — the component still initialises with best-effort defaults.
  */
 function validateConfig(config: CalendarConfig): void {
-  const warn = (msg: string) => console.warn(`[reach-calendar] ${msg}`)
-
   // months must be a positive integer
   if (config.months !== undefined && (config.months < 1 || !Number.isInteger(config.months))) {
     warn(`months must be a positive integer, got: ${config.months}`)
@@ -350,6 +399,27 @@ function validateConfig(config: CalendarConfig): void {
       warn(`invalid timezone: "${config.timezone}"`)
     }
   }
+
+  // initialMonth must parse as an ISO month or date
+  if (config.initialMonth && !parseInitialMonth(config.initialMonth)) {
+    warn(`invalid initialMonth: "${config.initialMonth}" (expected 'YYYY-MM' or 'YYYY-MM-DD')`)
+  }
+}
+
+/**
+ * Parse an `initialMonth` config value into a CalendarDate anchored at day 1.
+ * Accepts `'YYYY-MM'` or any ISO date string (`'YYYY-MM-DD'`); only year/month are used.
+ * Returns null on invalid input — caller is responsible for warning + fallback.
+ */
+function parseInitialMonth(value: string): CalendarDate | null {
+  const monthMatch = /^(\d{4})-(\d{2})$/.exec(value)
+  if (monthMatch) {
+    const year = Number(monthMatch[1])
+    const month = Number(monthMatch[2])
+    if (month < 1 || month > 12) return null
+    return new CalendarDate(year, month, 1)
+  }
+  return CalendarDate.fromISO(value)?.startOfMonth() ?? null
 }
 
 // ---------------------------------------------------------------------------
@@ -474,6 +544,9 @@ export function createCalendarData(
   config: CalendarConfig = {},
   Alpine?: { initTree: (el: HTMLElement) => void },
 ) {
+  // --- Normalize JSON-string array inputs (Blade/Twig interop) before validation ---
+  coerceConfigArrays(config)
+
   // --- Validate config ---
   validateConfig(config)
 
@@ -585,8 +658,12 @@ export function createCalendarData(
   const today = CalendarDate.today(timezone)
 
   // --- Determine initial viewing month/year ---
+  // Precedence: explicit selection > initialMonth hint > today.
   const initialDates = selection.toArray()
-  const defaultViewDate = (initialDates.length > 0 ? initialDates[0] : today) as CalendarDate
+  const initialMonthDate = config.initialMonth ? parseInitialMonth(config.initialMonth) : null
+  const defaultViewDate = (
+    initialDates.length > 0 ? initialDates[0] : (initialMonthDate ?? today)
+  ) as CalendarDate
 
   // Wizard: center year picker around ~30 years ago (full & year-month modes)
   const viewDate =
@@ -858,6 +935,24 @@ export function createCalendarData(
       const el = this._rootEl
       const hasCalendar = el.querySelector('.rc-calendar') !== null
       if (!hasCalendar && config.template !== false && this._Alpine?.initTree) {
+        // Extract consumer-supplied header/footer markup from
+        // `<template data-rc-slot="header|footer">` siblings inside the x-data
+        // root. Captured templates are removed from the DOM so they don't sit
+        // around as orphans (the auto-rendered template will hold the markup).
+        let headerSlot: string | undefined
+        let footerSlot: string | undefined
+        const slotTemplates = el.querySelectorAll(
+          'template[data-rc-slot]',
+        ) as NodeListOf<HTMLTemplateElement>
+        slotTemplates.forEach((tpl) => {
+          const name = tpl.getAttribute('data-rc-slot')
+          const html = tpl.innerHTML.trim()
+          if (!html) return
+          if (name === 'header' && headerSlot === undefined) headerSlot = html
+          else if (name === 'footer' && footerSlot === undefined) footerSlot = html
+        })
+        slotTemplates.forEach((tpl) => tpl.remove())
+
         const fragment = document.createRange().createContextualFragment(
           generateCalendarTemplate({
             display: this.display,
@@ -868,6 +963,8 @@ export function createCalendarData(
             hasPresets: this.presets.length > 0,
             isScrollable: this.isScrollable,
             scrollHeight: this._scrollHeight,
+            headerSlot,
+            footerSlot,
           }),
         )
         const newElements = Array.from(fragment.children).filter(
@@ -890,6 +987,9 @@ export function createCalendarData(
             if (xEl._x_dataStack) xOverlay._x_dataStack = xEl._x_dataStack
             document.body.appendChild(overlay)
             this._popupOverlayEl = overlay
+            // Forward data-rc-theme so consumer-scoped CSS still applies inside
+            // the portal (the overlay is no longer a descendant of the x-data root).
+            this._syncPortalTheme()
           }
         }
       }
@@ -1400,11 +1500,16 @@ export function createCalendarData(
       if (mode === 'single') {
         const parsed = parseDate(value, format, locale) ?? CalendarDate.fromISO(value)
         if (parsed && !this._isEffectivelyDisabled(parsed)) {
-          this._selection.clear()
-          this._selection.toggle(parsed)
-          this.month = parsed.month
-          this.year = parsed.year
-          changed = true
+          const current = this._selection.toArray()
+          const isSame =
+            current.length === 1 && (current[0] as CalendarDate).toKey() === parsed.toKey()
+          if (!isSame) {
+            this._selection.clear()
+            this._selection.toggle(parsed)
+            this.month = parsed.month
+            this.year = parsed.year
+            changed = true
+          }
         }
       } else if (mode === 'range') {
         const range = parseDateRange(value, format, locale)
@@ -1420,11 +1525,18 @@ export function createCalendarData(
             !this._isEffectivelyDisabled(end) &&
             this._isRangeValid(start, end)
           ) {
-            this._selection.clear()
-            ;(this._selection as RangeSelection).setRange(start, end)
-            this.month = start.month
-            this.year = start.year
-            changed = true
+            const current = this._selection.toArray()
+            const isSame =
+              current.length === 2 &&
+              (current[0] as CalendarDate).toKey() === start.toKey() &&
+              (current[1] as CalendarDate).toKey() === end.toKey()
+            if (!isSame) {
+              this._selection.clear()
+              ;(this._selection as RangeSelection).setRange(start, end)
+              this.month = start.month
+              this.year = start.year
+              changed = true
+            }
           }
         }
       } else if (mode === 'multiple') {
@@ -1514,6 +1626,22 @@ export function createCalendarData(
     /** Dispatch a CustomEvent on the component root element (not the evaluation context). */
     _dispatchOnRoot(event: string, detail?: Record<string, unknown>) {
       this._rootEl?.dispatchEvent(new CustomEvent(event, { detail: detail ?? null, bubbles: true }))
+    },
+
+    /**
+     * Mirror `data-rc-theme` from the component root onto the teleported overlay.
+     * No-op for inline display (overlay is null) — for popups, this is what keeps
+     * consumer scoped CSS like `[data-rc-theme="dark"] .rc-day--selected { ... }`
+     * working after the overlay is appended to document.body.
+     */
+    _syncPortalTheme() {
+      if (!this._popupOverlayEl || !this._rootEl) return
+      const theme = this._rootEl.getAttribute('data-rc-theme')
+      if (theme !== null) {
+        this._popupOverlayEl.setAttribute('data-rc-theme', theme)
+      } else {
+        this._popupOverlayEl.removeAttribute('data-rc-theme')
+      }
     },
 
     /**
@@ -2100,6 +2228,8 @@ export function createCalendarData(
 
       this.isOpen = true
       this._inputEl?.setAttribute('aria-expanded', 'true')
+      // Pick up any data-rc-theme change the consumer may have made between opens.
+      this._syncPortalTheme()
       this._dispatchOnRoot('calendar:open')
 
       // CSS handles centered modal layout via `.rc-popup-overlay`

@@ -11,6 +11,10 @@ export interface TemplateOptions {
   hasPresets: boolean
   isScrollable: boolean
   scrollHeight: number
+  /** Raw HTML extracted from `<template data-rc-slot="header">`. Optional. */
+  headerSlot?: string
+  /** Raw HTML extracted from `<template data-rc-slot="footer">`. Optional. */
+  footerSlot?: string
 }
 
 // Close icon SVG (inline, no external deps)
@@ -222,6 +226,14 @@ function presetsBlock(): string {
 </div>`
 }
 
+function headerSlotBlock(html: string): string {
+  return `<div class="rc-calendar__header" data-rc-slot="header">${html}</div>`
+}
+
+function footerSlotBlock(html: string): string {
+  return `<div class="rc-calendar__footer" data-rc-slot="footer">${html}</div>`
+}
+
 function hiddenInputs(): string {
   return `<template x-if="inputName">
   <template x-for="val in hiddenInputValues" :key="val">
@@ -244,6 +256,8 @@ export function generateCalendarTemplate(options: TemplateOptions): string {
     hasPresets,
     isScrollable,
     scrollHeight,
+    headerSlot,
+    footerSlot,
   } = options
   const isPopup = display === 'popup'
 
@@ -256,6 +270,11 @@ export function generateCalendarTemplate(options: TemplateOptions): string {
   // Popup header (close button + title)
   if (isPopup) {
     parts.push(popupHeader(isWizard))
+  }
+
+  // Consumer header slot (sits below the close button, above wizard chrome / views)
+  if (headerSlot) {
+    parts.push(headerSlotBlock(headerSlot))
   }
 
   // Wizard chrome (step dots, label, back button)
@@ -280,6 +299,11 @@ export function generateCalendarTemplate(options: TemplateOptions): string {
   // Wizard summary bar
   if (isWizard) {
     parts.push(wizardSummary())
+  }
+
+  // Consumer footer slot (sits at the very bottom of visible content)
+  if (footerSlot) {
+    parts.push(footerSlotBlock(footerSlot))
   }
 
   // Hidden form inputs

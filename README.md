@@ -173,6 +173,7 @@ All options are passed via `x-data="calendar({ ... })"`.
 | `showWeekNumbers` | `boolean` | `false` | Show ISO 8601 week numbers alongside the day grid |
 | `inputId` | `string` | — | ID for the popup input (allows external `<label for="...">`) |
 | `inputRef` | `string` | `'rc-input'` | Alpine `x-ref` name for the input element |
+| `initialMonth` | `string` | — | Month to display on first paint (`'YYYY-MM'` or `'YYYY-MM-DD'`); selection wins if also set |
 | `scrollHeight` | `number` | `400` | Max height (px) of scrollable container when `months >= 3` |
 | `presets` | `RangePreset[]` | — | Predefined date range shortcuts (see [Range Presets](#range-presets)) |
 | `constraintMessages` | `ConstraintMessages` | — | Custom tooltip strings for disabled dates |
@@ -218,6 +219,8 @@ Month-name tokens (`MMM`, `MMMM`) use the `locale` config option for localizatio
 | `minRange` | `number` | Minimum range length in days (inclusive) |
 | `maxRange` | `number` | Maximum range length in days (inclusive) |
 | `rules` | `CalendarConfigRule[]` | Period-specific constraint overrides |
+
+> **Templating-engine interop**: every array option above also accepts a JSON-encoded string (e.g. `disabledDaysOfWeek="[0,6]"`). Useful when the value comes from Blade, Twig, or any engine that stringifies arrays into HTML attributes. Malformed input is logged via `console.warn` and silently ignored.
 
 ### Period-Specific Rules
 
@@ -437,8 +440,33 @@ The calendar uses CSS custom properties for all visual styles. Override them in 
   --color-calendar-focus-ring: #4f46e5;
   --color-calendar-overlay: rgba(0, 0, 0, 0.2);
   --radius-calendar: 0.5rem;
+  --radius-calendar-day: 9999px;                                 /* day cell shape (default: pill) */
+  --radius-calendar-day-range-edge: var(--radius-calendar-day);  /* outer corners of range start/end */
+  --radius-calendar-day-range-middle: 0;                          /* in-range cells between endpoints */
   --shadow-calendar: 0 10px 15px -3px rgb(0 0 0 / 0.1);
   --font-calendar: system-ui, -apple-system, sans-serif;
+}
+```
+
+Defaults are declared inside `:where(:root)` (zero specificity), so any consumer override wins regardless of stylesheet load order — no `!important` needed.
+
+#### Day-cell shape
+
+Switch between pill, rounded square, and sharp by overriding the three day-radius variables together:
+
+```css
+/* Rounded square */
+:root {
+  --radius-calendar-day: 6px;
+  --radius-calendar-day-range-edge: 6px;
+  --radius-calendar-day-range-middle: 0;
+}
+
+/* Sharp / square */
+:root {
+  --radius-calendar-day: 0;
+  --radius-calendar-day-range-edge: 0;
+  --radius-calendar-day-range-middle: 0;
 }
 ```
 
@@ -471,6 +499,7 @@ All classes use the `.rc-` prefix:
 | `.rc-nav--dual-next-last` | Next arrow on 2nd month (visible on desktop, hidden on mobile) |
 | `.rc-popup-overlay` | Popup backdrop |
 | `.rc-popup-header` / `.rc-popup-header__close` | Popup close header bar |
+| `.rc-calendar__header` / `.rc-calendar__footer` | Consumer-provided header/footer slot containers |
 | `.rc-calendar--wizard` | Wizard mode container |
 | `.rc-row--week-numbers` / `.rc-week-number` | Week number row and cell |
 | `.rc-grid--week-numbers` | Grid with week number column |
@@ -478,6 +507,67 @@ All classes use the `.rc-` prefix:
 | `.rc-months--scroll` | Scrollable multi-month container |
 | `.rc-header--scroll-sticky` | Sticky header in scrollable layout |
 | `.rc-sr-only` | Screen reader only utility |
+
+## Theming & Portal
+
+The popup display mode is teleported to `document.body` after render so it can escape ancestors with `overflow: hidden`, transforms, or fixed-position containing blocks. That escape has two implications worth knowing.
+
+### Cascade-safe defaults
+
+All theme tokens are declared inside `:where(:root)` (zero specificity). Any consumer override wins at any stylesheet load order — even when the consumer's CSS bundle is loaded *before* `alpine-calendar.css`. No `!important` required.
+
+### Scoping styles to specific calendar instances
+
+Use the `data-rc-theme` attribute on the `x-data` root. The library forwards it to the teleported overlay so your scoped CSS keeps working inside the portal:
+
+```html
+<div x-data="calendar({ display: 'popup' })" data-rc-theme="black">
+  <input x-ref="rc-input" type="text">
+</div>
+```
+
+```css
+/* Works for both inline calendars (descendant selector) and portal popups
+   (the overlay carries data-rc-theme after teleport). */
+[data-rc-theme="black"] {
+  --color-calendar-primary: #111827;
+  --color-calendar-primary-text: #ffffff;
+}
+
+[data-rc-theme="black"] .rc-day--selected {
+  background: #000;
+}
+```
+
+A common pitfall: a wrapper *class* like `.calendar-black .rc-day--selected { … }` works for inline calendars but stops working in popup mode because the overlay leaves the wrapper's subtree. `data-rc-theme` is the supported way to solve this — it survives the teleport.
+
+The library re-syncs `data-rc-theme` on every `open()` call, so toggling the attribute reactively (e.g. via `:data-rc-theme="theme"`) takes effect on the next open.
+
+### Header / footer slots
+
+Place arbitrary HTML inside the calendar — including inside the teleported popup — using `<template data-rc-slot="…">`:
+
+```html
+<div x-data="calendar({ display: 'popup', mode: 'range' })">
+  <input x-ref="rc-input" type="text">
+
+  <template data-rc-slot="header">
+    <p>Charters operate Saturday to Saturday.</p>
+  </template>
+
+  <template data-rc-slot="footer">
+    <p>Need help? <a href="/contact">Contact us</a>.</p>
+  </template>
+</div>
+```
+
+Slot HTML is rendered inside `.rc-calendar__header` / `.rc-calendar__footer` containers. Header sits above the day grid (below the popup close button); footer sits below the grid and any presets. Slot content shares Alpine scope with the calendar — `x-show`, `x-text`, and bindings work normally and survive the teleport.
+
+If both slot tags are present, the first occurrence per name wins; whitespace-only templates are ignored.
+
+### What works inside the portal
+
+Every `.rc-*` class and every `--color-calendar-*` / `--radius-calendar-*` variable applies inside the popup. The only thing that doesn't traverse is *ancestor selectors that no longer match after teleport* — that's the case `data-rc-theme` solves.
 
 ## Global Defaults
 
