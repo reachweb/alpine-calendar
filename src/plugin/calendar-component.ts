@@ -1516,13 +1516,42 @@ export function createCalendarData(
       this._rootEl?.dispatchEvent(new CustomEvent(event, { detail: detail ?? null, bubbles: true }))
     },
 
-    /** Dispatch calendar:change event with current selection state. */
+    /**
+     * Dispatch calendar:select (always) and calendar:change (on committed state only).
+     *
+     * `calendar:select` fires on every selection update — including partial range
+     * (first click of two). Use this for UIs that need to track each click.
+     *
+     * `calendar:change` fires only when the selection is in a committed state:
+     * - single: always (every toggle is a commit)
+     * - multiple: always (every add/remove is a commit)
+     * - range: only when complete (2 dates) or cleared to 0 — NOT on the first
+     *   click of a two-click range
+     *
+     * This makes `calendar:change` a "settled value" signal suitable for form
+     * submission, analytics, and consumers that only care about final values.
+     */
     _emitChange() {
-      this._dispatchOnRoot('calendar:change', {
+      const detail = {
         value: this._selection.toValue(),
         dates: this._selection.toArray().map((d: CalendarDate) => d.toISO()),
         formatted: this.formattedValue,
-      })
+      }
+      this._dispatchOnRoot('calendar:select', detail)
+      if (this._isCommittedSelection()) {
+        this._dispatchOnRoot('calendar:change', detail)
+      }
+    },
+
+    /**
+     * Whether the current selection represents a "committed" (settled) state.
+     * See `_emitChange()` for the definition per mode.
+     */
+    _isCommittedSelection(): boolean {
+      if (mode === 'range') {
+        return !(this._selection as RangeSelection).isPartial()
+      }
+      return true
     },
 
     /** Dispatch calendar:navigate event on month/year change. */
