@@ -78,7 +78,7 @@ async function runAxe(options: TemplateOptions): Promise<axe.AxeResults> {
       // Color contrast can't be computed in jsdom (no rendering engine)
       'color-contrast': { enabled: false },
       // No page-level landmark structure in unit tests
-      'region': { enabled: false },
+      region: { enabled: false },
       'landmark-one-main': { enabled: false },
       'page-has-heading-one': { enabled: false },
       // Duplicate IDs expected since Alpine x-for generates unique IDs at runtime
@@ -112,12 +112,13 @@ describe('axe-core accessibility audits', () => {
   it('inline single-month calendar has no violations', async () => {
     const results = await runAxe({
       display: 'inline',
-      isDualMonth: false,
+      isDualChrome: false,
       isWizard: false,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: false,
-      isScrollable: false,
+      needsDayView: true,
+      needsScrollableView: false,
       scrollHeight: 300,
     })
     expect(results.violations, formatViolations(results.violations)).toHaveLength(0)
@@ -126,12 +127,13 @@ describe('axe-core accessibility audits', () => {
   it('inline dual-month calendar has no violations', async () => {
     const results = await runAxe({
       display: 'inline',
-      isDualMonth: true,
+      isDualChrome: true,
       isWizard: false,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: false,
-      isScrollable: false,
+      needsDayView: true,
+      needsScrollableView: false,
       scrollHeight: 300,
     })
     expect(results.violations, formatViolations(results.violations)).toHaveLength(0)
@@ -140,12 +142,13 @@ describe('axe-core accessibility audits', () => {
   it('popup calendar has no violations', async () => {
     const results = await runAxe({
       display: 'popup',
-      isDualMonth: false,
+      isDualChrome: false,
       isWizard: false,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: false,
-      isScrollable: false,
+      needsDayView: true,
+      needsScrollableView: false,
       scrollHeight: 300,
     })
     expect(results.violations, formatViolations(results.violations)).toHaveLength(0)
@@ -154,12 +157,13 @@ describe('axe-core accessibility audits', () => {
   it('wizard calendar has no violations', async () => {
     const results = await runAxe({
       display: 'inline',
-      isDualMonth: false,
+      isDualChrome: false,
       isWizard: true,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: false,
-      isScrollable: false,
+      needsDayView: true,
+      needsScrollableView: false,
       scrollHeight: 300,
     })
     expect(results.violations, formatViolations(results.violations)).toHaveLength(0)
@@ -168,12 +172,13 @@ describe('axe-core accessibility audits', () => {
   it('calendar with presets has no violations', async () => {
     const results = await runAxe({
       display: 'inline',
-      isDualMonth: false,
+      isDualChrome: false,
       isWizard: false,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: true,
-      isScrollable: false,
+      needsDayView: true,
+      needsScrollableView: false,
       scrollHeight: 300,
     })
     expect(results.violations, formatViolations(results.violations)).toHaveLength(0)
@@ -182,12 +187,13 @@ describe('axe-core accessibility audits', () => {
   it('calendar with week numbers has no violations', async () => {
     const results = await runAxe({
       display: 'inline',
-      isDualMonth: false,
+      isDualChrome: false,
       isWizard: false,
       hasName: false,
       showWeekNumbers: true,
       hasPresets: false,
-      isScrollable: false,
+      needsDayView: true,
+      needsScrollableView: false,
       scrollHeight: 300,
     })
     expect(results.violations, formatViolations(results.violations)).toHaveLength(0)
@@ -196,12 +202,13 @@ describe('axe-core accessibility audits', () => {
   it('scrollable calendar has no violations', async () => {
     const results = await runAxe({
       display: 'inline',
-      isDualMonth: false,
+      isDualChrome: false,
       isWizard: false,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: false,
-      isScrollable: true,
+      needsDayView: false,
+      needsScrollableView: true,
       scrollHeight: 400,
     })
     expect(results.violations, formatViolations(results.violations)).toHaveLength(0)
@@ -210,12 +217,13 @@ describe('axe-core accessibility audits', () => {
   it('popup wizard calendar has no violations', async () => {
     const results = await runAxe({
       display: 'popup',
-      isDualMonth: false,
+      isDualChrome: false,
       isWizard: true,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: false,
-      isScrollable: false,
+      needsDayView: true,
+      needsScrollableView: false,
       scrollHeight: 300,
     })
     expect(results.violations, formatViolations(results.violations)).toHaveLength(0)

@@ -4,12 +4,16 @@
 
 export interface TemplateOptions {
   display: 'inline' | 'popup'
-  isDualMonth: boolean
+  /** Emit the dual/single day-view branch (needed when any active monthCount is ≤ 2). */
+  needsDayView: boolean
+  /** Emit the scrollable day-view branch (needed when any active monthCount is ≥ 3). */
+  needsScrollableView: boolean
+  /** Include dual-month chrome (nav-arrow visibility classes, rc-months--dual binding). */
+  isDualChrome: boolean
   isWizard: boolean
   hasName: boolean
   showWeekNumbers: boolean
   hasPresets: boolean
-  isScrollable: boolean
   scrollHeight: number
   /** Raw HTML extracted from `<template data-rc-slot="header">`. Optional. */
   headerSlot?: string
@@ -95,13 +99,20 @@ function monthPickerView(): string {
 </template>`
 }
 
-function dayView(isDual: boolean, showWeekNumbers: boolean): string {
+function dayView(
+  isDual: boolean,
+  showWeekNumbers: boolean,
+  coexistsWithScrollable: boolean,
+): string {
   // For dual-month: CSS classes control arrow visibility (responsive for mobile)
   const prevClass = isDual ? ` :class="{ 'rc-nav--dual-hidden': gi > 0 }"` : ''
   const nextClass = isDual
     ? ` :class="{ 'rc-nav--dual-next-first': gi === 0, 'rc-nav--dual-next-last': gi > 0 }"`
     : ''
   const monthsClass = isDual ? ' :class="{ \'rc-months--dual\': monthCount === 2 }"' : ''
+  const viewCondition = coexistsWithScrollable
+    ? `view === 'days' && !isScrollable`
+    : `view === 'days'`
 
   const gridClassBinding = `:class="{ 'rc-grid--slide-next': _navDirection === 'next', 'rc-grid--slide-prev': _navDirection === 'prev' }"`
 
@@ -124,7 +135,7 @@ function dayView(isDual: boolean, showWeekNumbers: boolean): string {
   // Unrolled rows — each row is a static DOM element with its own x-for
   const rows = dayRows(showWeekNumbers)
 
-  return `<template x-if="view === 'days'">
+  return `<template x-if="${viewCondition}">
   <div class="rc-months${isDual ? '' : ' rc-view-enter'}"${monthsClass}${isDual ? '' : ''}>
     <template x-for="(mg, gi) in grid" :key="mg.year + '-' + mg.month">
       <div${isDual ? '' : ''}>
@@ -145,7 +156,12 @@ function dayView(isDual: boolean, showWeekNumbers: boolean): string {
 </template>`
 }
 
-function scrollableDayView(showWeekNumbers: boolean, scrollHeight: number): string {
+function scrollableDayView(
+  showWeekNumbers: boolean,
+  scrollHeight: number,
+  coexistsWithDayView: boolean,
+): string {
+  const viewCondition = coexistsWithDayView ? `view === 'days' && isScrollable` : `view === 'days'`
   const weekdayBlock = showWeekNumbers
     ? `<div class="rc-weekdays rc-weekdays--week-numbers">
           <span class="rc-weekday rc-week-label"></span>
@@ -164,7 +180,7 @@ function scrollableDayView(showWeekNumbers: boolean, scrollHeight: number): stri
   // Unrolled rows
   const rows = dayRows(showWeekNumbers)
 
-  return `<template x-if="view === 'days'">
+  return `<template x-if="${viewCondition}">
   <div>
     <div class="rc-header rc-header--scroll-sticky">
       <span class="rc-header__label rc-header__label--scroll" x-text="scrollHeaderLabel"></span>
@@ -249,17 +265,19 @@ function hiddenInputs(): string {
 export function generateCalendarTemplate(options: TemplateOptions): string {
   const {
     display,
-    isDualMonth,
+    needsDayView,
+    needsScrollableView,
+    isDualChrome,
     isWizard,
     hasName,
     showWeekNumbers,
     hasPresets,
-    isScrollable,
     scrollHeight,
     headerSlot,
     footerSlot,
   } = options
   const isPopup = display === 'popup'
+  const coexist = needsDayView && needsScrollableView
 
   const calendarClass = isWizard ? 'rc-calendar rc-calendar--wizard' : 'rc-calendar'
   const ariaLabel = isWizard ? 'Birth date wizard' : 'Calendar'
@@ -285,10 +303,11 @@ export function generateCalendarTemplate(options: TemplateOptions): string {
   // Views — always include all three (guarded by x-if)
   parts.push(yearPickerView())
   parts.push(monthPickerView())
-  if (isScrollable) {
-    parts.push(scrollableDayView(showWeekNumbers, scrollHeight))
-  } else {
-    parts.push(dayView(isDualMonth, showWeekNumbers))
+  if (needsDayView) {
+    parts.push(dayView(isDualChrome, showWeekNumbers, coexist))
+  }
+  if (needsScrollableView) {
+    parts.push(scrollableDayView(showWeekNumbers, scrollHeight, coexist))
   }
 
   // Range presets (below the calendar grid, above wizard summary)

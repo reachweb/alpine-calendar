@@ -339,13 +339,6 @@ function validateConfig(config: CalendarConfig): void {
     if (config.mobileMonths < 1 || !Number.isInteger(config.mobileMonths)) {
       warn(`mobileMonths must be a positive integer, got: ${config.mobileMonths}`)
     }
-    const months = config.months ?? 1
-    if (config.mobileMonths >= months) {
-      warn(`mobileMonths (${config.mobileMonths}) should be less than months (${months})`)
-    }
-    if (months !== 2) {
-      warn(`mobileMonths is only supported when months is 2; current months: ${months}`)
-    }
   }
 
   // wizard + scrollable combo
@@ -567,13 +560,22 @@ export function createCalendarData(
   const rawMonthCount = config.months ?? 1
   // Force months: 1 when wizard + scrollable
   const desktopMonthCount = wizardConfig && rawMonthCount >= 3 ? 1 : rawMonthCount
-  const isScrollable = desktopMonthCount >= 3
 
-  // mobileMonths: only applies when months === 2
-  const hasMobileMonths = desktopMonthCount === 2 && config.mobileMonths !== undefined
+  // mobileMonths: now applies for any desktop count; mobile count can be smaller or larger.
+  // Wizard still forces 1 month; if wizard is on, a mobileMonths ≥ 3 would break the wizard layout,
+  // so we clamp it to desktopMonthCount (i.e. 1) under wizard mode.
+  const rawMobileMonths = config.mobileMonths
+  const hasMobileMonths = rawMobileMonths !== undefined && rawMobileMonths !== desktopMonthCount
   const mobileMonthCount = hasMobileMonths
-    ? Math.max(1, Math.min(config.mobileMonths as number, desktopMonthCount))
+    ? wizardConfig
+      ? desktopMonthCount
+      : Math.max(1, rawMobileMonths as number)
     : desktopMonthCount
+
+  // Which template branches are needed across breakpoints?
+  const needsDayView = Math.min(mobileMonthCount, desktopMonthCount) <= 2
+  const needsScrollableView = Math.max(mobileMonthCount, desktopMonthCount) >= 3
+  const isDualChrome = needsDayView && (mobileMonthCount === 2 || desktopMonthCount === 2)
 
   // Reuse a single MediaQueryList for both initial detection and listener setup
   const mobileMql =
@@ -584,6 +586,7 @@ export function createCalendarData(
       ? window.matchMedia(MOBILE_BREAKPOINT)
       : null
   const monthCount = mobileMql?.matches ? mobileMonthCount : desktopMonthCount
+  const isScrollable = monthCount >= 3
   const scrollHeight = config.scrollHeight ?? 400
   const wizard = !!wizardConfig
   const wizardMode: 'none' | 'full' | 'year-month' | 'month-day' =
@@ -961,12 +964,13 @@ export function createCalendarData(
         const fragment = document.createRange().createContextualFragment(
           generateCalendarTemplate({
             display: this.display,
-            isDualMonth: desktopMonthCount === 2,
+            needsDayView,
+            needsScrollableView,
+            isDualChrome,
             isWizard: this.wizardMode !== 'none',
             hasName: !!this.inputName,
             showWeekNumbers: this.showWeekNumbers,
             hasPresets: this.presets.length > 0,
-            isScrollable: this.isScrollable,
             scrollHeight: this._scrollHeight,
             headerSlot,
             footerSlot,
@@ -1050,13 +1054,31 @@ export function createCalendarData(
         }
       })
 
-      // Set up responsive monthCount listener for dual-month with mobileMonths
+      // Set up responsive monthCount listener when mobileMonths differs from desktop.
+      // Supports crossing the 3-month scrollable threshold in either direction by
+      // flipping the reactive isScrollable flag; Alpine's x-if swaps the active view.
       if (mobileMql) {
         const handler = (e: MediaQueryListEvent) => {
           const newCount = e.matches ? mobileMonthCount : desktopMonthCount
-          if (newCount !== this.monthCount) {
-            this.monthCount = newCount
-            this._rebuildGrid()
+          if (newCount === this.monthCount) return
+          const wasScrollable = this.isScrollable
+          this.monthCount = newCount
+          this.isScrollable = newCount >= 3
+          this._rebuildGrid()
+          if (this.isScrollable && !wasScrollable) {
+            // Crossed into scrollable — attach scroll observer once the new DOM is mounted
+            alpine(this).$nextTick(() => {
+              alpine(this).$nextTick(() => {
+                this._initScrollListener()
+              })
+            })
+          } else if (!this.isScrollable && wasScrollable) {
+            // Crossed out of scrollable — tear down the observer
+            if (this._scrollObserver) {
+              this._scrollObserver.disconnect()
+              this._scrollObserver = null
+            }
+            this._scrollContainerEl = null
           }
         }
         mobileMql.addEventListener('change', handler)
