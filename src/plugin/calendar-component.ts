@@ -942,7 +942,7 @@ export function createCalendarData(
         let headerSlot: string | undefined
         let footerSlot: string | undefined
         const slotTemplates = el.querySelectorAll(
-          'template[data-rc-slot]',
+          ':scope > template[data-rc-slot]',
         ) as NodeListOf<HTMLTemplateElement>
         slotTemplates.forEach((tpl) => {
           const name = tpl.getAttribute('data-rc-slot')
