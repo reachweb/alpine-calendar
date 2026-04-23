@@ -330,7 +330,7 @@ describe('Build & Distribution Verification', () => {
 
     it('CDN IIFE is reasonably sized (not bloated with Alpine)', () => {
       const cdnSize = distFileSize('alpine-calendar.cdn.js')
-      // Alpine alone is ~43KB minified; if the CDN bundle ever crosses ~80KB
+      // Alpine alone is ~43KB minified; if the CDN bundle ever crosses ~75KB
       // it almost certainly means we accidentally bundled Alpine itself.
       expect(cdnSize).toBeLessThan(75_000)
     })

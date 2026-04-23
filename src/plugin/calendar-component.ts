@@ -946,12 +946,17 @@ export function createCalendarData(
         ) as NodeListOf<HTMLTemplateElement>
         slotTemplates.forEach((tpl) => {
           const name = tpl.getAttribute('data-rc-slot')
+          if (name !== 'header' && name !== 'footer') {
+            warn(`unknown data-rc-slot="${name ?? ''}"; expected "header" or "footer"`)
+            return
+          }
           const html = tpl.innerHTML.trim()
-          if (!html) return
-          if (name === 'header' && headerSlot === undefined) headerSlot = html
-          else if (name === 'footer' && footerSlot === undefined) footerSlot = html
+          if (html) {
+            if (name === 'header' && headerSlot === undefined) headerSlot = html
+            else if (name === 'footer' && footerSlot === undefined) footerSlot = html
+          }
+          tpl.remove()
         })
-        slotTemplates.forEach((tpl) => tpl.remove())
 
         const fragment = document.createRange().createContextualFragment(
           generateCalendarTemplate({
@@ -2094,6 +2099,10 @@ export function createCalendarData(
      * ```
      */
     updateConstraints(updates: Partial<CalendarConfig>) {
+      // Apply the same Blade/Twig JSON-string tolerance the init path has, so
+      // reactive bindings that feed HTML-attribute-stringified arrays in here
+      // don't silently degrade into character-iterated Sets.
+      coerceConfigArrays(updates as CalendarConfig)
       // Merge: explicit undefined removes a key, otherwise overlay on existing
       const merged = { ...this._constraintConfig }
       for (const key of CONSTRAINT_KEYS) {

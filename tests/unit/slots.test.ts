@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import { createCalendarData } from '../../src/plugin/calendar-component'
 import { withAlpineMocks } from '../helpers'
 
@@ -135,6 +135,24 @@ describe('header / footer slots — extraction & rendering', () => {
     flushNextTick()
 
     expect(el.querySelector('.rc-calendar__footer')).toBeNull()
+  })
+
+  it('warns and leaves unknown slot names in place for debuggability', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    const el = document.createElement('div')
+    const typoTpl = document.createElement('template')
+    typoTpl.setAttribute('data-rc-slot', 'heder')
+    typoTpl.innerHTML = '<p>typo</p>'
+    el.appendChild(typoTpl)
+
+    const c = createCalendarData({ display: 'inline' }, mockAlpine)
+    const { flushNextTick } = withAlpineMocks(c, { el })
+    c.init()
+    flushNextTick()
+
+    expect(el.querySelector('template[data-rc-slot="heder"]')).not.toBeNull()
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('unknown data-rc-slot="heder"'))
+    warnSpy.mockRestore()
   })
 
   it('only honors the first occurrence per slot name (additional templates ignored)', () => {

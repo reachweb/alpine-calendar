@@ -220,7 +220,7 @@ Month-name tokens (`MMM`, `MMMM`) use the `locale` config option for localizatio
 | `maxRange` | `number` | Maximum range length in days (inclusive) |
 | `rules` | `CalendarConfigRule[]` | Period-specific constraint overrides |
 
-> **Templating-engine interop**: every array option above also accepts a JSON-encoded string (e.g. `disabledDaysOfWeek="[0,6]"`). Useful when the value comes from Blade, Twig, or any engine that stringifies arrays into HTML attributes. Malformed input is logged via `console.warn` and silently ignored.
+> **Templating-engine interop**: every array option above **except `rules`** also accepts a JSON-encoded string (e.g. `disabledDaysOfWeek="[0,6]"`). Useful when the value comes from Blade, Twig, or any engine that stringifies arrays into HTML attributes. `rules` must be passed as a real array in JS config. Malformed input is logged via `console.warn` and silently ignored.
 
 ### Period-Specific Rules
 

@@ -74,6 +74,19 @@ describe('config array coercion', () => {
     )
   })
 
+  it('coerces JSON-string arrays passed through updateConstraints() at runtime', () => {
+    const c = createCalendarData({}, mockAlpine)
+    const { flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+    expect(isWeekendDisabled(c)).toBe(false)
+
+    // Simulate a reactive binding / Livewire handoff that passes a stringified array
+    c.updateConstraints({ disabledDaysOfWeek: '[0,6]' as unknown as number[] })
+    expect(isWeekendDisabled(c)).toBe(true)
+    expect(warnSpy).not.toHaveBeenCalled()
+  })
+
   it('coerces all listed array keys (smoke check)', () => {
     const c = createCalendarData(
       {
