@@ -82,6 +82,79 @@ describe('BUG-3: handleBlur multiple mode', () => {
 })
 
 // ---------------------------------------------------------------------------
+// BUG: handleBlur re-emits calendar:change with identical selection
+// (single and range modes)
+// ---------------------------------------------------------------------------
+describe('handleBlur does not re-emit calendar:change for identical selection', () => {
+  it('single mode: no change event when parsed date matches current selection', () => {
+    const c = createCalendarData({ mode: 'single', format: 'YYYY-MM-DD' })
+    const { dispatchSpy } = withAlpineMocks(c)
+    c.init()
+    c.selectDate('2026-03-10')
+    expect(c.selectedDates).toHaveLength(1)
+    dispatchSpy.mockClear()
+
+    c.inputValue = '2026-03-10'
+    c.handleBlur()
+    const changeEvents = dispatchSpy.mock.calls.filter(
+      (call: [string, unknown]) => call[0] === 'calendar:change',
+    )
+    expect(changeEvents).toHaveLength(0)
+  })
+
+  it('range mode: no change event when parsed range matches current selection', () => {
+    const c = createCalendarData({ mode: 'range', format: 'YYYY-MM-DD' })
+    const { dispatchSpy } = withAlpineMocks(c)
+    c.init()
+    c.selectDate('2026-03-10')
+    c.selectDate('2026-03-17')
+    expect(c.selectedDates).toHaveLength(2)
+    dispatchSpy.mockClear()
+
+    // Blur re-parses the input text produced by the committed selection.
+    // With closeOnSelect + auto-completed range this is what fires after the
+    // popup closes — it should be a no-op, not a duplicate emit.
+    c.inputValue = c.formattedValue
+    c.handleBlur()
+    const changeEvents = dispatchSpy.mock.calls.filter(
+      (call: [string, unknown]) => call[0] === 'calendar:change',
+    )
+    expect(changeEvents).toHaveLength(0)
+  })
+
+  it('single mode: still emits when parsed date differs from current selection', () => {
+    const c = createCalendarData({ mode: 'single', format: 'YYYY-MM-DD' })
+    const { dispatchSpy } = withAlpineMocks(c)
+    c.init()
+    c.selectDate('2026-03-10')
+    dispatchSpy.mockClear()
+
+    c.inputValue = '2026-03-11'
+    c.handleBlur()
+    const changeEvents = dispatchSpy.mock.calls.filter(
+      (call: [string, unknown]) => call[0] === 'calendar:change',
+    )
+    expect(changeEvents).toHaveLength(1)
+  })
+
+  it('range mode: still emits when parsed range differs from current selection', () => {
+    const c = createCalendarData({ mode: 'range', format: 'YYYY-MM-DD' })
+    const { dispatchSpy } = withAlpineMocks(c)
+    c.init()
+    c.selectDate('2026-03-10')
+    c.selectDate('2026-03-17')
+    dispatchSpy.mockClear()
+
+    c.inputValue = '2026-03-10 – 2026-03-18'
+    c.handleBlur()
+    const changeEvents = dispatchSpy.mock.calls.filter(
+      (call: [string, unknown]) => call[0] === 'calendar:change',
+    )
+    expect(changeEvents).toHaveLength(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // BUG-4: Half-open range rules
 // ---------------------------------------------------------------------------
 describe('BUG-4: half-open range rules', () => {
@@ -133,7 +206,7 @@ describe('BUG-6: _moveFocusByMonths disabled date skipping', () => {
     c._moveFocusByMonths(1) // Would land on April 15 (disabled)
     // Should skip to April 16
     expect(c.focusedDate).not.toBeNull()
-    expect(c.focusedDate!.toISO()).toBe('2026-04-16')
+    expect((c.focusedDate as CalendarDate).toISO()).toBe('2026-04-16')
   })
 
   it('skips past fully disabled month to next available date', () => {
@@ -150,7 +223,7 @@ describe('BUG-6: _moveFocusByMonths disabled date skipping', () => {
     c.init()
     c.focusedDate = new CalendarDate(2026, 3, 15)
     c._moveFocusByMonths(1) // All April dates disabled → skips to May 1
-    expect(c.focusedDate!.toISO()).toBe('2026-05-01')
+    expect((c.focusedDate as CalendarDate).toISO()).toBe('2026-05-01')
   })
 })
 
@@ -174,9 +247,7 @@ describe('PERF-1: weekdayHeaders caching', () => {
 // ---------------------------------------------------------------------------
 describe('PERF-2: metadata cache', () => {
   it('calls metadata provider once per date per render cycle', () => {
-    const provider = vi.fn((d: CalendarDate) =>
-      d.day === 10 ? { label: 'Test' } : undefined,
-    )
+    const provider = vi.fn((d: CalendarDate) => (d.day === 10 ? { label: 'Test' } : undefined))
     const c = createCalendarData({
       dateMetadata: provider,
       defaultDate: '2026-03-01',

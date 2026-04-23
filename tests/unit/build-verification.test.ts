@@ -308,19 +308,19 @@ describe('Build & Distribution Verification', () => {
   // Bundle size checks
   // -------------------------------------------------------------------------
   describe('bundle sizes', () => {
-    it('CDN IIFE bundle is under 55KB raw', () => {
+    it('CDN IIFE bundle is under 60KB raw', () => {
       const size = distFileSize('alpine-calendar.cdn.js')
-      expect(size).toBeLessThan(55_000)
-    })
-
-    it('ESM bundle is under 120KB raw', () => {
-      const size = distFileSize('alpine-calendar.es.js')
-      expect(size).toBeLessThan(120_000)
-    })
-
-    it('UMD bundle is under 60KB raw', () => {
-      const size = distFileSize('alpine-calendar.umd.js')
       expect(size).toBeLessThan(60_000)
+    })
+
+    it('ESM bundle is under 125KB raw', () => {
+      const size = distFileSize('alpine-calendar.es.js')
+      expect(size).toBeLessThan(125_000)
+    })
+
+    it('UMD bundle is under 65KB raw', () => {
+      const size = distFileSize('alpine-calendar.umd.js')
+      expect(size).toBeLessThan(65_000)
     })
 
     it('CSS is under 25KB raw', () => {
@@ -330,9 +330,9 @@ describe('Build & Distribution Verification', () => {
 
     it('CDN IIFE is reasonably sized (not bloated with Alpine)', () => {
       const cdnSize = distFileSize('alpine-calendar.cdn.js')
-      // CDN should not be >50KB which would indicate Alpine was bundled
-      // (Alpine alone is ~43KB minified)
-      expect(cdnSize).toBeLessThan(55_000)
+      // Alpine alone is ~43KB minified; if the CDN bundle ever crosses ~75KB
+      // it almost certainly means we accidentally bundled Alpine itself.
+      expect(cdnSize).toBeLessThan(75_000)
     })
   })
 

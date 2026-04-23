@@ -725,7 +725,7 @@ describe('CSS regression guards', () => {
   const css = readFileSync(cssPath, 'utf-8')
 
   it('muted base color uses gray-600 equivalent for sufficient contrast', () => {
-    expect(css).toContain('--color-calendar-muted: oklch(44.6% .03 256.802)')
+    expect(css).toContain('--color-calendar-muted: oklch(44.6% 0.03 256.802)')
   })
 
   it('disabled text inherits muted color', () => {
