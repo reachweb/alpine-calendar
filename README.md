@@ -380,13 +380,18 @@ range mode and want the old per-click behavior, switch to `calendar:select`.
 
 ## Popup Teleport and Outside-Click
 
-In `display: 'popup'` mode the calendar overlay is teleported to
-`document.body` to escape CSS containing-block issues (transforms, `overflow:
-hidden`, etc.). The overlay is marked with a `data-rc-portal` attribute.
+In `display: 'popup'` mode, when the component auto-renders its template, the
+calendar overlay is teleported to `document.body` to escape CSS containing-block
+issues (transforms, `overflow: hidden`, etc.). In that auto-rendered case, the
+overlay is marked with a `data-rc-portal` attribute.
+
+If you provide your own `.rc-calendar` markup or use `template: false`, the
+library does not teleport or tag the overlay automatically — the portal
+behavior applies only to the library-managed popup template.
 
 If your application has a document-level outside-click handler (for drawers,
 dropdowns, modals), treat clicks inside the portal as "inside" by whitelisting
-that attribute:
+that attribute (when using the auto-rendered popup overlay):
 
 ```js
 document.addEventListener('click', (e) => {

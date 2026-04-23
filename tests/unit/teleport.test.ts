@@ -125,17 +125,22 @@ describe('popup teleport to document.body', () => {
     c.init()
     flushNextTick()
 
-    const overlay = document.body.querySelector('.rc-popup-overlay') as HTMLElement
+    const overlay = document.body.querySelector('.rc-popup-overlay')
+    expect(overlay).not.toBeNull()
+    if (!overlay) throw new Error('Expected teleported overlay to exist')
+
     let documentClicked = false
     const handler = () => {
       documentClicked = true
     }
     document.addEventListener('click', handler)
 
-    overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    expect(documentClicked).toBe(true)
-
-    document.removeEventListener('click', handler)
-    c.destroy()
+    try {
+      overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      expect(documentClicked).toBe(true)
+    } finally {
+      document.removeEventListener('click', handler)
+      c.destroy()
+    }
   })
 })
