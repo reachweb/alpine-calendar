@@ -106,6 +106,32 @@ describe('mobileMonths config validation', () => {
     )
     expect(mobileWarnings).toHaveLength(0)
   })
+
+  it('warns when mobileMonths is unusually large (> 24)', () => {
+    createCalendarData({ months: 2, mobileMonths: 36 })
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('unusually large'))
+  })
+
+  it('does not warn at the 24-month upper boundary', () => {
+    createCalendarData({ months: 2, mobileMonths: 24 })
+    const mobileWarnings = warnSpy.mock.calls.filter(
+      ([msg]) => typeof msg === 'string' && msg.includes('unusually large'),
+    )
+    expect(mobileWarnings).toHaveLength(0)
+  })
+
+  it('warns when mobileMonths is used together with wizard', () => {
+    createCalendarData({ wizard: true, months: 1, mobileMonths: 3 })
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('ignored in wizard mode'))
+  })
+
+  it('does not warn when wizard is set without mobileMonths', () => {
+    createCalendarData({ wizard: true })
+    const mobileWarnings = warnSpy.mock.calls.filter(
+      ([msg]) => typeof msg === 'string' && msg.includes('ignored in wizard mode'),
+    )
+    expect(mobileWarnings).toHaveLength(0)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -494,5 +520,31 @@ describe('mobileMonths crossing scrollable threshold', () => {
     expect(disconnectSpy).toHaveBeenCalledTimes(1)
     expect(c._scrollObserver).toBeNull()
     expect(c._scrollContainerEl).toBeNull()
+  })
+
+  it('rebinds scroll observer when both sides are scrollable but counts differ', () => {
+    // Both desktop (6) and mobile (3) are ≥ 3 → isScrollable stays true on resize.
+    // The existing observer is bound to stale x-for children after the grid rebuild,
+    // so the handler must disconnect + re-init via _rebindScrollObserver.
+    mockMatchMedia(false) // start on desktop (6 months)
+    const c = createCalendarData({ months: 6, mobileMonths: 3 })
+    const el = createElWithCalendar()
+    const { flushNextTick } = withAlpineMocks(c, { el })
+    c.init()
+    flushNextTick()
+
+    expect(c.monthCount).toBe(6)
+    expect(c.isScrollable).toBe(true)
+
+    const disconnectSpy = vi.fn()
+    c._scrollObserver = { disconnect: disconnectSpy } as unknown as IntersectionObserver
+
+    triggerMediaChange(true) // mobile (3 months, still scrollable)
+    flushNextTick()
+    flushNextTick() // second $nextTick for x-for inside x-if
+
+    expect(c.monthCount).toBe(3)
+    expect(c.isScrollable).toBe(true)
+    expect(disconnectSpy).toHaveBeenCalledTimes(1)
   })
 })

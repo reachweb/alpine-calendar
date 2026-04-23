@@ -338,6 +338,14 @@ function validateConfig(config: CalendarConfig): void {
   if (config.mobileMonths !== undefined) {
     if (config.mobileMonths < 1 || !Number.isInteger(config.mobileMonths)) {
       warn(`mobileMonths must be a positive integer, got: ${config.mobileMonths}`)
+    } else if (config.mobileMonths > 24) {
+      warn(
+        `mobileMonths (${config.mobileMonths}) is unusually large and will generate a very long scrollable grid`,
+      )
+    }
+    const months = config.months ?? 1
+    if (config.wizard && config.mobileMonths !== months) {
+      warn('mobileMonths is ignored in wizard mode; wizard forces a single month on all viewports')
     }
   }
 
@@ -561,16 +569,17 @@ export function createCalendarData(
   // Force months: 1 when wizard + scrollable
   const desktopMonthCount = wizardConfig && rawMonthCount >= 3 ? 1 : rawMonthCount
 
-  // mobileMonths: now applies for any desktop count; mobile count can be smaller or larger.
-  // Wizard still forces 1 month; if wizard is on, a mobileMonths ≥ 3 would break the wizard layout,
-  // so we clamp it to desktopMonthCount (i.e. 1) under wizard mode.
+  // mobileMonths: applies for any desktop count; mobile count can be smaller or larger.
+  // Wizard mode always forces a single month — any mobileMonths value is ignored there
+  // (validateConfig warns if the user supplied one anyway).
   const rawMobileMonths = config.mobileMonths
   const hasMobileMonths = rawMobileMonths !== undefined && rawMobileMonths !== desktopMonthCount
-  const mobileMonthCount = hasMobileMonths
-    ? wizardConfig
-      ? desktopMonthCount
-      : Math.max(1, rawMobileMonths as number)
-    : desktopMonthCount
+  let mobileMonthCount: number
+  if (!hasMobileMonths || wizardConfig) {
+    mobileMonthCount = desktopMonthCount
+  } else {
+    mobileMonthCount = Math.max(1, rawMobileMonths as number)
+  }
 
   // Which template branches are needed across breakpoints?
   const needsDayView = Math.min(mobileMonthCount, desktopMonthCount) <= 2
@@ -1045,8 +1054,9 @@ export function createCalendarData(
             `[reach-calendar] Popup mode requires an <input x-ref="${inputRef}"> inside the component container.`,
           )
         }
-        // Init scroll listener for scrollable multi-month (double $nextTick
-        // to ensure x-for elements are rendered after Alpine.initTree)
+        // Init scroll listener for scrollable multi-month. Single $nextTick is enough
+        // here: Alpine.initTree has already rendered the x-for by the time this runs,
+        // so we only need to wait one reactive pass for the DOM to settle.
         if (this.isScrollable) {
           alpine(this).$nextTick(() => {
             this._initScrollListener()
@@ -1065,14 +1075,16 @@ export function createCalendarData(
           this.monthCount = newCount
           this.isScrollable = newCount >= 3
           this._rebuildGrid()
-          if (this.isScrollable && !wasScrollable) {
-            // Crossed into scrollable — attach scroll observer once the new DOM is mounted
+          if (this.isScrollable) {
+            // Scrollable (newly crossed in OR staying scrollable with a different count).
+            // Double $nextTick: first for Alpine's x-if to mount the scrollable branch,
+            // second for the inner x-for to render the month elements we need to observe.
             alpine(this).$nextTick(() => {
               alpine(this).$nextTick(() => {
-                this._initScrollListener()
+                this._rebindScrollObserver()
               })
             })
-          } else if (!this.isScrollable && wasScrollable) {
+          } else if (wasScrollable) {
             // Crossed out of scrollable — tear down the observer
             if (this._scrollObserver) {
               this._scrollObserver.disconnect()
