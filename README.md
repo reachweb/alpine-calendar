@@ -356,11 +356,48 @@ Listen with Alpine's `@` syntax on the calendar container:
 
 | Event | Detail | Description |
 |-------|--------|-------------|
-| `calendar:change` | `{ value, dates, formatted }` | Selection changed |
+| `calendar:change` | `{ value, dates, formatted }` | Selection settled on a committed value |
+| `calendar:select` | `{ value, dates, formatted }` | Selection updated (every click, including partial range) |
 | `calendar:navigate` | `{ year, month, view }` | Month/year navigation |
 | `calendar:open` | — | Popup opened |
 | `calendar:close` | — | Popup closed |
 | `calendar:view-change` | `{ view, year, month }` | View switched (days/months/years) |
+
+### `calendar:change` vs `calendar:select`
+
+`calendar:change` fires only when the selection is in a **committed** state —
+the value is final and safe to persist, submit, or send to analytics:
+
+- **Single mode** — every toggle (one click commits the value)
+- **Multiple mode** — every add/remove (each click commits a new set)
+- **Range mode** — only when both endpoints are chosen (or the range is cleared).
+  The first click of a two-click range does **not** fire `calendar:change`.
+
+`calendar:select` fires on every selection update, including the partial
+first-click of a range. Use it for UIs that need per-click feedback (live
+previews, step counters). If you previously listened for `calendar:change` in
+range mode and want the old per-click behavior, switch to `calendar:select`.
+
+## Popup Teleport and Outside-Click
+
+In `display: 'popup'` mode the calendar overlay is teleported to
+`document.body` to escape CSS containing-block issues (transforms, `overflow:
+hidden`, etc.). The overlay is marked with a `data-rc-portal` attribute.
+
+If your application has a document-level outside-click handler (for drawers,
+dropdowns, modals), treat clicks inside the portal as "inside" by whitelisting
+that attribute:
+
+```js
+document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-rc-portal]')) return // click came from the calendar
+  if (!e.target.closest('.my-drawer')) closeDrawer()
+})
+```
+
+The library intentionally does **not** call `stopPropagation` on overlay
+clicks — that would silently break analytics click tracking and other
+legitimate document-level listeners.
 
 ## Keyboard Navigation
 

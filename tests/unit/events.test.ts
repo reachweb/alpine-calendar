@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { createCalendarData } from '../../src/plugin/calendar-component'
 import { CalendarDate } from '../../src/core/calendar-date'
 import { withAlpineMocks } from '../helpers'
@@ -48,14 +48,186 @@ describe('calendar:change event', () => {
     c.selectDate(new CalendarDate(2025, 6, 10))
     c.selectDate(new CalendarDate(2025, 6, 15))
 
-    const lastCall = dispatchSpy.mock.calls.filter(
-      (call: unknown[]) => call[0] === 'calendar:change',
-    ).pop()
-    expect(lastCall![1]).toEqual(
+    const lastCall = dispatchSpy.mock.calls
+      .filter((call: unknown[]) => call[0] === 'calendar:change')
+      .pop()
+    expect(lastCall?.[1]).toEqual(
       expect.objectContaining({
         dates: expect.arrayContaining(['2025-06-10', '2025-06-15']),
       }),
     )
+  })
+
+  // ---- Range mode commit gating (BC break from 0.7.x) ----
+
+  it('does NOT fire on partial range (first click only)', () => {
+    const c = createCalendarData({ mode: 'range' })
+    const { dispatchSpy, flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+    dispatchSpy.mockClear()
+
+    c.selectDate(new CalendarDate(2025, 6, 10))
+
+    const changeCalls = dispatchSpy.mock.calls.filter(
+      (call: unknown[]) => call[0] === 'calendar:change',
+    )
+    expect(changeCalls).toHaveLength(0)
+  })
+
+  it('fires on committed range (second click completes)', () => {
+    const c = createCalendarData({ mode: 'range' })
+    const { dispatchSpy, flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+    dispatchSpy.mockClear()
+
+    c.selectDate(new CalendarDate(2025, 6, 10))
+    c.selectDate(new CalendarDate(2025, 6, 20))
+
+    const changeCalls = dispatchSpy.mock.calls.filter(
+      (call: unknown[]) => call[0] === 'calendar:change',
+    )
+    expect(changeCalls).toHaveLength(1)
+    expect(changeCalls[0]?.[1]).toEqual({
+      value: '2025-06-10 – 2025-06-20',
+      dates: ['2025-06-10', '2025-06-20'],
+      formatted: '10/06/2025 – 20/06/2025',
+    })
+  })
+
+  it('does NOT fire when starting a new range (third click)', () => {
+    const c = createCalendarData({ mode: 'range' })
+    const { dispatchSpy, flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+
+    c.selectDate(new CalendarDate(2025, 6, 10))
+    c.selectDate(new CalendarDate(2025, 6, 20))
+    dispatchSpy.mockClear()
+
+    // Third click starts a new partial range
+    c.selectDate(new CalendarDate(2025, 7, 5))
+
+    const changeCalls = dispatchSpy.mock.calls.filter(
+      (call: unknown[]) => call[0] === 'calendar:change',
+    )
+    expect(changeCalls).toHaveLength(0)
+  })
+
+  it('fires when deselecting start (click start twice clears to empty)', () => {
+    const c = createCalendarData({ mode: 'range' })
+    const { dispatchSpy, flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+
+    const start = new CalendarDate(2025, 6, 10)
+    c.selectDate(start)
+    dispatchSpy.mockClear()
+
+    // Clicking the same date again deselects — committed empty state
+    c.selectDate(start)
+
+    const changeCalls = dispatchSpy.mock.calls.filter(
+      (call: unknown[]) => call[0] === 'calendar:change',
+    )
+    expect(changeCalls).toHaveLength(1)
+    expect(changeCalls[0]?.[1]).toMatchObject({ dates: [] })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// calendar:select (per-click signal, fires on every selection update)
+// ---------------------------------------------------------------------------
+
+describe('calendar:select event', () => {
+  it('fires on every click in range mode, including partial', () => {
+    const c = createCalendarData({ mode: 'range' })
+    const { dispatchSpy, flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+    dispatchSpy.mockClear()
+
+    c.selectDate(new CalendarDate(2025, 6, 10))
+
+    const selectCalls = dispatchSpy.mock.calls.filter(
+      (call: unknown[]) => call[0] === 'calendar:select',
+    )
+    expect(selectCalls).toHaveLength(1)
+    expect(selectCalls[0]?.[1]).toMatchObject({ dates: ['2025-06-10'] })
+
+    c.selectDate(new CalendarDate(2025, 6, 20))
+
+    const selectCallsAfter = dispatchSpy.mock.calls.filter(
+      (call: unknown[]) => call[0] === 'calendar:select',
+    )
+    expect(selectCallsAfter).toHaveLength(2)
+    expect(selectCallsAfter[1]?.[1]).toMatchObject({
+      dates: ['2025-06-10', '2025-06-20'],
+    })
+  })
+
+  it('fires alongside calendar:change in single mode', () => {
+    const c = createCalendarData({ mode: 'single' })
+    const { dispatchSpy, flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+    dispatchSpy.mockClear()
+
+    c.selectDate(new CalendarDate(2025, 6, 15))
+
+    const types = dispatchSpy.mock.calls.map((call: unknown[]) => call[0])
+    expect(types).toContain('calendar:select')
+    expect(types).toContain('calendar:change')
+  })
+
+  it('fires on clearSelection', () => {
+    const c = createCalendarData({ mode: 'single', value: '2025-06-15' })
+    const { dispatchSpy, flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+    dispatchSpy.mockClear()
+
+    c.clearSelection()
+
+    expect(dispatchSpy).toHaveBeenCalledWith('calendar:select', {
+      value: '',
+      dates: [],
+      formatted: '',
+    })
+  })
+
+  it('fires on setValue', () => {
+    const c = createCalendarData({ mode: 'single' })
+    const { dispatchSpy, flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+    dispatchSpy.mockClear()
+
+    c.setValue('2025-06-15')
+
+    const selectCalls = dispatchSpy.mock.calls.filter(
+      (call: unknown[]) => call[0] === 'calendar:select',
+    )
+    expect(selectCalls).toHaveLength(1)
+  })
+
+  it('has same detail shape as calendar:change', () => {
+    const c = createCalendarData({ mode: 'single', format: 'DD/MM/YYYY' })
+    const { dispatchSpy, flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+    dispatchSpy.mockClear()
+
+    c.selectDate(new CalendarDate(2025, 6, 15))
+
+    const selectCall = dispatchSpy.mock.calls.find(
+      (call: unknown[]) => call[0] === 'calendar:select',
+    )
+    const changeCall = dispatchSpy.mock.calls.find(
+      (call: unknown[]) => call[0] === 'calendar:change',
+    )
+    expect(selectCall?.[1]).toEqual(changeCall?.[1])
   })
 })
 

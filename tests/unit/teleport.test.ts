@@ -2,7 +2,12 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { createCalendarData } from '../../src/plugin/calendar-component'
 import { withAlpineMocks } from '../helpers'
 
-const mockAlpine = { initTree: () => {} }
+const mockAlpine = { initTree: () => undefined }
+
+interface CalendarInternals {
+  _popupOverlayEl: HTMLElement | null
+  _autoRendered: boolean
+}
 
 describe('popup teleport to document.body', () => {
   afterEach(() => {
@@ -26,7 +31,7 @@ describe('popup teleport to document.body', () => {
     expect(overlay).not.toBeNull()
 
     // Internal reference should be set
-    expect((c as any)._popupOverlayEl).toBe(overlay)
+    expect((c as unknown as CalendarInternals)._popupOverlayEl).toBe(overlay)
 
     c.destroy()
   })
@@ -44,7 +49,7 @@ describe('popup teleport to document.body', () => {
     c.destroy()
 
     expect(document.body.querySelector('.rc-popup-overlay')).toBeNull()
-    expect((c as any)._popupOverlayEl).toBeNull()
+    expect((c as unknown as CalendarInternals)._popupOverlayEl).toBeNull()
   })
 
   it('does not teleport in inline display mode', () => {
@@ -57,7 +62,7 @@ describe('popup teleport to document.body', () => {
 
     // No overlay on body for inline mode
     expect(document.body.querySelector('.rc-popup-overlay')).toBeNull()
-    expect((c as any)._popupOverlayEl).toBeNull()
+    expect((c as unknown as CalendarInternals)._popupOverlayEl).toBeNull()
 
     // Calendar should still be rendered inside the element
     expect(el.querySelector('.rc-calendar')).not.toBeNull()
@@ -78,7 +83,7 @@ describe('popup teleport to document.body', () => {
 
     // No teleporting since auto-rendering didn't happen
     expect(document.body.querySelector('.rc-popup-overlay')).toBeNull()
-    expect((c as any)._popupOverlayEl).toBeNull()
+    expect((c as unknown as CalendarInternals)._popupOverlayEl).toBeNull()
   })
 
   it('_autoRendered is true after popup auto-rendering with teleport', () => {
@@ -89,8 +94,48 @@ describe('popup teleport to document.body', () => {
     c.init()
     flushNextTick()
 
-    expect((c as any)._autoRendered).toBe(true)
+    expect((c as unknown as CalendarInternals)._autoRendered).toBe(true)
 
+    c.destroy()
+  })
+
+  it('teleported overlay has data-rc-portal attribute for host outside-click whitelisting', () => {
+    const el = document.createElement('div')
+    const c = createCalendarData({ display: 'popup' }, mockAlpine)
+    const { flushNextTick } = withAlpineMocks(c, { el })
+
+    c.init()
+    flushNextTick()
+
+    const overlay = document.body.querySelector('.rc-popup-overlay') as HTMLElement
+    expect(overlay).not.toBeNull()
+    expect(overlay.hasAttribute('data-rc-portal')).toBe(true)
+
+    c.destroy()
+  })
+
+  it('clicks inside the teleported overlay still bubble to document', () => {
+    // The library does NOT call stopPropagation. Host apps with document-level
+    // click handlers (analytics, custom outside-click) receive clicks from the
+    // calendar and can whitelist them via the data-rc-portal attribute.
+    const el = document.createElement('div')
+    const c = createCalendarData({ display: 'popup' }, mockAlpine)
+    const { flushNextTick } = withAlpineMocks(c, { el })
+
+    c.init()
+    flushNextTick()
+
+    const overlay = document.body.querySelector('.rc-popup-overlay') as HTMLElement
+    let documentClicked = false
+    const handler = () => {
+      documentClicked = true
+    }
+    document.addEventListener('click', handler)
+
+    overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(documentClicked).toBe(true)
+
+    document.removeEventListener('click', handler)
     c.destroy()
   })
 })
