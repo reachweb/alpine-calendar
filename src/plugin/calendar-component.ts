@@ -1045,7 +1045,8 @@ export function createCalendarData(
         // Re-entering the day view in scrollable mode: the scroll container may have
         // just been (re)mounted by x-if, so any existing observer's element references
         // are stale, or — if the breakpoint flipped while view was 'months'/'years' —
-        // no observer was ever bound. Rebinding here handles both cases idempotently.
+        // no observer was ever bound. _initScrollListener retries internally if the
+        // DOM isn't ready, so a single tick is sufficient here.
         if (value === 'days' && this.isScrollable) {
           alpine(this).$nextTick(() => {
             this._rebindScrollObserver()
@@ -1115,12 +1116,9 @@ export function createCalendarData(
           }
           if (this.isScrollable) {
             // Scrollable (newly crossed in OR staying scrollable with a different count).
-            // Double $nextTick: first for Alpine's x-if to mount the scrollable branch,
-            // second for the inner x-for to render the month elements we need to observe.
+            // _initScrollListener retries internally until the x-if/x-for chain renders.
             alpine(this).$nextTick(() => {
-              alpine(this).$nextTick(() => {
-                this._rebindScrollObserver()
-              })
+              this._rebindScrollObserver()
             })
           } else if (wasScrollable) {
             // Crossed out of scrollable — tear down the observer
@@ -2501,16 +2499,35 @@ export function createCalendarData(
       return d.format({ month: 'long', year: 'numeric' }, locale)
     },
 
-    /** Attach an IntersectionObserver that updates the sticky header as the user scrolls. */
-    _initScrollListener() {
+    /**
+     * Attach an IntersectionObserver that updates the sticky header as the user scrolls.
+     *
+     * Rendering is driven by Alpine's x-if (scrollable wrapper) → x-for (month nodes)
+     * chain, and the number of reactive ticks between a state change and the final DOM
+     * varies by entry path (init, view switch, breakpoint flip). Rather than hard-code
+     * tick counts at every call site, retry internally: if the container or its month
+     * children aren't present yet, reschedule on the next tick. Bounded at 3 retries
+     * so a genuinely-missing container (e.g., non-scrollable view) exits cleanly.
+     */
+    _initScrollListener(retriesLeft = 3) {
       if (typeof IntersectionObserver === 'undefined') return
       const searchRoot = this._popupOverlayEl ?? alpine(this).$el
       const container = searchRoot.querySelector('.rc-months--scroll') as HTMLElement | null
-      if (!container) return
+      if (!container) {
+        if (retriesLeft > 0 && this.isScrollable && this.view === 'days') {
+          alpine(this).$nextTick(() => this._initScrollListener(retriesLeft - 1))
+        }
+        return
+      }
       this._scrollContainerEl = container
 
       const monthEls = container.querySelectorAll('[data-month-id]')
-      if (monthEls.length === 0) return
+      if (monthEls.length === 0) {
+        if (retriesLeft > 0) {
+          alpine(this).$nextTick(() => this._initScrollListener(retriesLeft - 1))
+        }
+        return
+      }
 
       const indexMap = new Map<Element, number>()
       monthEls.forEach((el, i) => indexMap.set(el, i))
