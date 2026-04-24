@@ -2543,7 +2543,17 @@ export function createCalendarData(
      */
     _initScrollListener(retriesLeft = 3, token?: number) {
       if (typeof IntersectionObserver === 'undefined') return
-      // First entry (no token passed) starts a new session.
+      // First entry (no token passed) starts a new session. Disconnect any existing
+      // observer before allocating a fresh one — if a caller reaches this function
+      // directly (init path) after another caller already bound an observer (e.g., a
+      // breakpoint handler that fired synchronously during startup), the prior
+      // observer would otherwise be overwritten in _scrollObserver and leak with no
+      // handle to disconnect it. Retries carry a token and skip this step.
+      const isFreshEntry = token === undefined
+      if (isFreshEntry && this._scrollObserver) {
+        this._scrollObserver.disconnect()
+        this._scrollObserver = null
+      }
       const myToken = token ?? ++this._scrollInitToken
       // Stale retry — a newer bind session has started, abandon this one.
       if (myToken !== this._scrollInitToken) return
