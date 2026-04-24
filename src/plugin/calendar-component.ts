@@ -1109,6 +1109,12 @@ export function createCalendarData(
               this.year = visible.year
               this.month = visible.month
             }
+            // After re-anchor, the previously-visible month sits at grid[0]. Reset
+            // the index synchronously so scrollHeaderLabel reads the correct entry
+            // (otherwise it reads grid[oldIndex], which is out of bounds when the
+            // new grid is shorter). Container scrollTop is reset below in the same
+            // $nextTick as the observer rebind.
+            this._scrollVisibleIndex = 0
           }
           this.monthCount = newCount
           this.isScrollable = willBeScrollable
@@ -1127,7 +1133,15 @@ export function createCalendarData(
           if (this.isScrollable) {
             // Scrollable (newly crossed in OR staying scrollable with a different count).
             // _initScrollListener retries internally until the x-if/x-for chain renders.
+            const didReanchor = wasScrollable && this.view === 'days'
             alpine(this).$nextTick(() => {
+              // Scroll the container back to the top so the re-anchored grid[0]
+              // is actually visible. Without this, scrollTop retains its old pixel
+              // offset from the previous (longer) grid and the viewport lands on
+              // the wrong month despite the correct index.
+              if (didReanchor && this._scrollContainerEl) {
+                this._scrollContainerEl.scrollTop = 0
+              }
               this._rebindScrollObserver()
             })
           } else if (wasScrollable) {
