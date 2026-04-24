@@ -1087,7 +1087,12 @@ export function createCalendarData(
           // (tracked by the scroll observer). this.year/this.month holds the grid's top
           // anchor, not the scroll position, so without this the rebuild jumps back to
           // the original start month.
-          if (wasScrollable) {
+          //
+          // Gate on view === 'days' because _scrollVisibleIndex is maintained only by
+          // the day-grid scroll observer. If the user is currently in the month or year
+          // picker, the index is stale relative to their picker context, and applying
+          // it would silently shift this.year/this.month mid-selection.
+          if (wasScrollable && this.view === 'days') {
             const visible = this.grid[this._scrollVisibleIndex]
             if (visible) {
               this.year = visible.year
