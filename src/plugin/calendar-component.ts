@@ -578,7 +578,7 @@ export function createCalendarData(
   if (!hasMobileMonths || wizardConfig) {
     mobileMonthCount = desktopMonthCount
   } else {
-    mobileMonthCount = Math.max(1, rawMobileMonths as number)
+    mobileMonthCount = Math.max(1, Math.floor(rawMobileMonths as number))
   }
 
   // Which template branches are needed across breakpoints?
@@ -1082,10 +1082,12 @@ export function createCalendarData(
           if (newCount === this.monthCount) return
           const wasScrollable = this.isScrollable
           const willBeScrollable = newCount >= 3
-          // When leaving scrollable mode, re-anchor to the month the user was actually
-          // viewing (tracked by the scroll observer) — this.year/this.month holds the
-          // grid's top anchor, not the scroll position.
-          if (wasScrollable && !willBeScrollable) {
+          // When leaving scrollable mode — or rebuilding while still scrollable with a
+          // different count — re-anchor to the month the user was actually viewing
+          // (tracked by the scroll observer). this.year/this.month holds the grid's top
+          // anchor, not the scroll position, so without this the rebuild jumps back to
+          // the original start month.
+          if (wasScrollable) {
             const visible = this.grid[this._scrollVisibleIndex]
             if (visible) {
               this.year = visible.year
