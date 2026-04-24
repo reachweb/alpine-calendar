@@ -1879,7 +1879,17 @@ export function createCalendarData(
       const wasPartialRange = mode === 'range' && (this._selection as RangeSelection).isPartial()
 
       this._selection.toggle(date)
-      if (wizard) this._wizardDay = date.day
+      // Sync all three wizard fields from the actual selection. A user can reach
+      // selectDate() in wizard mode with a date whose month/year differs from the
+      // earlier month/year step — e.g., when months >= 2 (including mobileMonths)
+      // renders the adjacent month in the day grid — so relying on _wizardMonth /
+      // _wizardYear set by selectMonth()/selectYear() alone leaves the wizard
+      // summary disagreeing with the real selection.
+      if (wizard) {
+        this._wizardDay = date.day
+        this._wizardMonth = date.month
+        this._wizardYear = date.year
+      }
       // Bump reactive counter so Alpine re-evaluates dayClasses() bindings.
       // No grid rebuild needed — grid structure doesn't change on selection.
       this._selectionRev++
