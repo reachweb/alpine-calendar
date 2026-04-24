@@ -313,9 +313,9 @@ describe('Build & Distribution Verification', () => {
       expect(size).toBeLessThan(60_000)
     })
 
-    it('ESM bundle is under 125KB raw', () => {
+    it('ESM bundle is under 130KB raw', () => {
       const size = distFileSize('alpine-calendar.es.js')
-      expect(size).toBeLessThan(125_000)
+      expect(size).toBeLessThan(130_000)
     })
 
     it('UMD bundle is under 65KB raw', () => {

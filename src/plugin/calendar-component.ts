@@ -343,9 +343,8 @@ function validateConfig(config: CalendarConfig): void {
         `mobileMonths (${config.mobileMonths}) is unusually large and will generate a very long scrollable grid`,
       )
     }
-    const months = config.months ?? 1
-    if (config.wizard && config.mobileMonths !== months) {
-      warn('mobileMonths is ignored in wizard mode; wizard forces a single month on all viewports')
+    if (config.wizard && config.mobileMonths >= 3) {
+      warn('mobileMonths >= 3 is ignored in wizard mode; wizard cannot use a scrollable layout')
     }
   }
 
@@ -570,8 +569,9 @@ export function createCalendarData(
   const desktopMonthCount = wizardConfig && rawMonthCount >= 3 ? 1 : rawMonthCount
 
   // mobileMonths: applies for any desktop count; mobile count can be smaller or larger.
-  // Wizard mode always forces a single month — any mobileMonths value is ignored there
-  // (validateConfig warns if the user supplied one anyway).
+  // Wizard mode only conflicts with the scrollable (>=3) layout, not with a 1- or 2-month
+  // mobile count, so honor mobileMonths for non-scrollable wizard configs and fall back
+  // to desktopMonthCount only when the value would push mobile into scroll mode.
   const rawMobileMonths = config.mobileMonths
   const hasMobileMonths = rawMobileMonths !== undefined && rawMobileMonths !== desktopMonthCount
   let mobileMonthCount: number
@@ -579,10 +579,13 @@ export function createCalendarData(
   // but a bad value still reaches here through the `unknown ?? default` path. Without
   // the Number.isFinite guard, NaN would make both needsDayView and needsScrollableView
   // false (leaving no template branch rendered), and Infinity would hang _rebuildGrid.
-  if (!hasMobileMonths || wizardConfig || !Number.isFinite(rawMobileMonths)) {
+  if (!hasMobileMonths || !Number.isFinite(rawMobileMonths)) {
     mobileMonthCount = desktopMonthCount
   } else {
-    mobileMonthCount = Math.max(1, Math.floor(rawMobileMonths as number))
+    const normalized = Math.max(1, Math.floor(rawMobileMonths as number))
+    // Wizard + scrollable is incompatible (validateConfig warns above); drop the
+    // mobile value rather than render a broken wizard at the mobile breakpoint.
+    mobileMonthCount = wizardConfig && normalized >= 3 ? desktopMonthCount : normalized
   }
 
   // Which template branches are needed across breakpoints?
