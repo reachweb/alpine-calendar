@@ -575,7 +575,11 @@ export function createCalendarData(
   const rawMobileMonths = config.mobileMonths
   const hasMobileMonths = rawMobileMonths !== undefined && rawMobileMonths !== desktopMonthCount
   let mobileMonthCount: number
-  if (!hasMobileMonths || wizardConfig) {
+  // Fall back to desktop count for NaN / Infinity / -Infinity — validateConfig warns,
+  // but a bad value still reaches here through the `unknown ?? default` path. Without
+  // the Number.isFinite guard, NaN would make both needsDayView and needsScrollableView
+  // false (leaving no template branch rendered), and Infinity would hang _rebuildGrid.
+  if (!hasMobileMonths || wizardConfig || !Number.isFinite(rawMobileMonths)) {
     mobileMonthCount = desktopMonthCount
   } else {
     mobileMonthCount = Math.max(1, Math.floor(rawMobileMonths as number))
@@ -759,6 +763,12 @@ export function createCalendarData(
     _scrollHeight: scrollHeight,
     _scrollContainerEl: null as HTMLElement | null,
     _scrollObserver: null as IntersectionObserver | null,
+    /**
+     * Monotonic generation counter for _initScrollListener. Bumped on every fresh
+     * bind entry so queued retries from an earlier session can detect that they're
+     * stale and exit without double-binding an observer.
+     */
+    _scrollInitToken: 0,
     /** Index into grid[] of the month currently visible at top of scroll viewport. */
     _scrollVisibleIndex: 0,
     /**
@@ -2508,14 +2518,24 @@ export function createCalendarData(
      * tick counts at every call site, retry internally: if the container or its month
      * children aren't present yet, reschedule on the next tick. Bounded at 3 retries
      * so a genuinely-missing container (e.g., non-scrollable view) exits cleanly.
+     *
+     * Retries are tagged with a token captured on the initial entry. If another bind
+     * starts while a retry is queued, `_scrollInitToken` advances and the stale retry
+     * returns without running — preventing two observers being attached to the same
+     * container when a later call succeeds before an older queued retry fires.
      */
-    _initScrollListener(retriesLeft = 3) {
+    _initScrollListener(retriesLeft = 3, token?: number) {
       if (typeof IntersectionObserver === 'undefined') return
+      // First entry (no token passed) starts a new session.
+      const myToken = token ?? ++this._scrollInitToken
+      // Stale retry — a newer bind session has started, abandon this one.
+      if (myToken !== this._scrollInitToken) return
+
       const searchRoot = this._popupOverlayEl ?? alpine(this).$el
       const container = searchRoot.querySelector('.rc-months--scroll') as HTMLElement | null
       if (!container) {
         if (retriesLeft > 0 && this.isScrollable && this.view === 'days') {
-          alpine(this).$nextTick(() => this._initScrollListener(retriesLeft - 1))
+          alpine(this).$nextTick(() => this._initScrollListener(retriesLeft - 1, myToken))
         }
         return
       }
@@ -2524,7 +2544,7 @@ export function createCalendarData(
       const monthEls = container.querySelectorAll('[data-month-id]')
       if (monthEls.length === 0) {
         if (retriesLeft > 0) {
-          alpine(this).$nextTick(() => this._initScrollListener(retriesLeft - 1))
+          alpine(this).$nextTick(() => this._initScrollListener(retriesLeft - 1, myToken))
         }
         return
       }
