@@ -104,10 +104,13 @@ function dayView(
   showWeekNumbers: boolean,
   coexistsWithScrollable: boolean,
 ): string {
-  // For dual-month: CSS classes control arrow visibility (responsive for mobile)
-  const prevClass = isDual ? ` :class="{ 'rc-nav--dual-hidden': gi > 0 }"` : ''
+  // For dual-month: CSS classes control arrow visibility (responsive for mobile).
+  // Gate on `monthCount === 2` so breakpoints that drop to a single month (e.g. months:1,
+  // mobileMonths:2 on desktop) don't inherit the dual-layout visibility rules — otherwise
+  // rc-nav--dual-next-first would hide the only forward arrow on desktop.
+  const prevClass = isDual ? ` :class="{ 'rc-nav--dual-hidden': monthCount === 2 && gi > 0 }"` : ''
   const nextClass = isDual
-    ? ` :class="{ 'rc-nav--dual-next-first': gi === 0, 'rc-nav--dual-next-last': gi > 0 }"`
+    ? ` :class="{ 'rc-nav--dual-next-first': monthCount === 2 && gi === 0, 'rc-nav--dual-next-last': monthCount === 2 && gi > 0 }"`
     : ''
   const monthsClass = isDual ? ' :class="{ \'rc-months--dual\': monthCount === 2 }"' : ''
   const viewCondition = coexistsWithScrollable

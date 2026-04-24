@@ -1039,9 +1039,18 @@ export function createCalendarData(
           })
         }
       })
-      alpine(this).$watch('view', () => {
+      alpine(this).$watch('view', (value: unknown) => {
         this._emitViewChange()
         this._announceViewChange()
+        // Re-entering the day view in scrollable mode: the scroll container may have
+        // just been (re)mounted by x-if, so any existing observer's element references
+        // are stale, or — if the breakpoint flipped while view was 'months'/'years' —
+        // no observer was ever bound. Rebinding here handles both cases idempotently.
+        if (value === 'days' && this.isScrollable) {
+          alpine(this).$nextTick(() => {
+            this._rebindScrollObserver()
+          })
+        }
       })
 
       // Auto-bind to x-ref input if present
@@ -1072,8 +1081,19 @@ export function createCalendarData(
           const newCount = e.matches ? mobileMonthCount : desktopMonthCount
           if (newCount === this.monthCount) return
           const wasScrollable = this.isScrollable
+          const willBeScrollable = newCount >= 3
+          // When leaving scrollable mode, re-anchor to the month the user was actually
+          // viewing (tracked by the scroll observer) — this.year/this.month holds the
+          // grid's top anchor, not the scroll position.
+          if (wasScrollable && !willBeScrollable) {
+            const visible = this.grid[this._scrollVisibleIndex]
+            if (visible) {
+              this.year = visible.year
+              this.month = visible.month
+            }
+          }
           this.monthCount = newCount
-          this.isScrollable = newCount >= 3
+          this.isScrollable = willBeScrollable
           this._rebuildGrid()
           if (this.isScrollable) {
             // Scrollable (newly crossed in OR staying scrollable with a different count).
@@ -1091,6 +1111,7 @@ export function createCalendarData(
               this._scrollObserver = null
             }
             this._scrollContainerEl = null
+            this._scrollVisibleIndex = 0
           }
         }
         mobileMql.addEventListener('change', handler)
