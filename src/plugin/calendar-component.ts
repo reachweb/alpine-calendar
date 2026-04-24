@@ -1097,6 +1097,17 @@ export function createCalendarData(
           this.monthCount = newCount
           this.isScrollable = willBeScrollable
           this._rebuildGrid()
+          // If the user was keyboard-navigating, focusedDate may now point to a month
+          // that's no longer rendered (aria-activedescendant would reference a missing
+          // `day-<iso>` id). Clear it so the binding drops cleanly; the next navigation
+          // keypress re-inits focusedDate via the existing auto-init path.
+          if (this.focusedDate) {
+            const fd = this.focusedDate
+            const inGrid = this.grid.some((g) => g.year === fd.year && g.month === fd.month)
+            if (!inGrid) {
+              this.focusedDate = null
+            }
+          }
           if (this.isScrollable) {
             // Scrollable (newly crossed in OR staying scrollable with a different count).
             // Double $nextTick: first for Alpine's x-if to mount the scrollable branch,
