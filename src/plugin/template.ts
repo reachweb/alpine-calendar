@@ -159,10 +159,33 @@ function dayView(
 </template>`
 }
 
+/**
+ * Build the `max-height` value for the scroll container.
+ *
+ * Inline mode: fixed pixel cap — the calendar lives in normal page flow and
+ * shouldn't suddenly take 80% of the viewport.
+ *
+ * Popup mode: cap with `min(px, calc(100svh - reserve))` so on small screens
+ * the scroll area shrinks to fit the viewport. `svh` (small viewport height)
+ * is used over `dvh` to avoid layout shifts as the mobile browser chrome
+ * shows/hides. The 11rem reserve covers the popup close header, the calendar
+ * nav header, and the weekday row; `env(safe-area-inset-bottom)` keeps the
+ * last row clear of the iOS home indicator.
+ */
+function scrollMaxHeight(scrollHeight: number, isPopup: boolean): string {
+  if (!isPopup) return `${scrollHeight}px`
+  // Popup fills available viewport on phones — the popup is full-screen on
+  // mobile and a tight cap leaves a lot of empty overlay below the calendar.
+  // Capped at 1.5× scrollHeight so a desktop popup doesn't stretch absurdly.
+  const popupPx = Math.round(scrollHeight * 1.5)
+  return `min(${popupPx}px, calc(100svh - 11rem - env(safe-area-inset-bottom)))`
+}
+
 function scrollableDayView(
   showWeekNumbers: boolean,
   scrollHeight: number,
   coexistsWithDayView: boolean,
+  isPopup: boolean,
 ): string {
   const viewCondition = coexistsWithDayView ? `view === 'days' && isScrollable` : `view === 'days'`
   const weekdayBlock = showWeekNumbers
@@ -189,7 +212,7 @@ function scrollableDayView(
       <span class="rc-header__label rc-header__label--scroll" x-text="scrollHeaderLabel"></span>
     </div>
     ${weekdayBlock}
-    <div class="rc-months rc-months--scroll" style="max-height: ${scrollHeight}px">
+    <div class="rc-months rc-months--scroll" style="max-height: ${scrollMaxHeight(scrollHeight, isPopup)}">
       <template x-for="(mg, gi) in grid" :key="mg.year + '-' + mg.month">
         <div :data-month-id="'month-' + mg.year + '-' + mg.month">
           <div class="rc-header rc-header--scroll" x-show="gi > 0">
@@ -310,7 +333,7 @@ export function generateCalendarTemplate(options: TemplateOptions): string {
     parts.push(dayView(isDualChrome, showWeekNumbers, coexist))
   }
   if (needsScrollableView) {
-    parts.push(scrollableDayView(showWeekNumbers, scrollHeight, coexist))
+    parts.push(scrollableDayView(showWeekNumbers, scrollHeight, coexist, isPopup))
   }
 
   // Range presets (below the calendar grid, above wizard summary)

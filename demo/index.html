@@ -108,7 +108,8 @@
       padding: 0 1.5rem;
     }
     .section {
-      padding: 3rem 0;
+      padding-top: 3rem;
+      padding-bottom: 3rem;
     }
     .section-title {
       font-size: 1.5rem;
@@ -277,6 +278,21 @@
       }
     }
 
+    /* Tighter card padding on small screens */
+    @media (max-width: 640px) {
+      .card-header {
+        padding: 1rem 1rem 0;
+      }
+      .card-body {
+        padding: 1rem;
+      }
+      .card-code summary,
+      .card-code pre {
+        padding-left: 1rem;
+        padding-right: 1rem;
+      }
+    }
+
     /* scrollable demo constraint */
     .card-body--scroll {
       max-height: 500px;
@@ -288,7 +304,7 @@
       width: 100%;
       max-width: 260px;
       padding: 0.5rem 0.75rem;
-      font-size: 0.875rem;
+      font-size: 16px;
       font-family: inherit;
       color: var(--demo-text);
       background: var(--demo-surface);
@@ -494,21 +510,25 @@
     <div class="examples examples-grid-2">
 
       <!-- Popup Single -->
+      <!-- Note: this input uses `readonly` to suppress the mobile keyboard so users
+           interact via the calendar only. Remove `readonly` to allow direct typing
+           with the input mask. -->
       <div class="card">
         <div class="card-header">
           <div class="card-title">Popup — Single Date</div>
-          <div class="card-desc">Click the input to open the calendar dropdown.</div>
+          <div class="card-desc">Click the input to open the calendar dropdown. <code>readonly</code> is set to suppress the mobile keyboard.</div>
         </div>
         <div class="card-body">
           <div x-data="calendar({ mode: 'single', display: 'popup' })">
-            <input x-ref="rc-input" type="text" class="rc-input" placeholder="Pick a date...">
+            <input x-ref="rc-input" type="text" class="rc-input" placeholder="Pick a date..." readonly>
           </div>
         </div>
         <details class="card-code">
           <summary>View Code</summary>
           <pre><code>&lt;div x-data="calendar({ mode: 'single', display: 'popup' })"&gt;
+  &lt;!-- `readonly` suppresses the mobile keyboard; remove it to allow typing --&gt;
   &lt;input x-ref="rc-input" type="text" class="rc-input"
-         placeholder="Pick a date..."&gt;
+         placeholder="Pick a date..." readonly&gt;
 &lt;/div&gt;</code></pre>
         </details>
       </div>
@@ -990,14 +1010,13 @@
           <div class="card-desc">A full year of scrollable range selection.</div>
         </div>
         <div class="card-body">
-          <div x-data="calendar({ mode: 'range', months: 12, scrollHeight: 400 })"></div>
+          <div x-data="calendar({ mode: 'range', months: 12 })"></div>
         </div>
         <details class="card-code">
           <summary>View Code</summary>
           <pre><code>&lt;div x-data="calendar({
   mode: 'range',
-  months: 12,
-  scrollHeight: 400
+  months: 12
 })"&gt;&lt;/div&gt;</code></pre>
         </details>
       </div>
@@ -1008,15 +1027,14 @@
           <div class="card-desc">Compact dual view on desktop; full-year scrollable view on narrow screens. Resize your window across 640px to see the layout swap.</div>
         </div>
         <div class="card-body">
-          <div x-data="calendar({ mode: 'range', months: 2, mobileMonths: 12, scrollHeight: 400 })"></div>
+          <div x-data="calendar({ mode: 'range', months: 2, mobileMonths: 12 })"></div>
         </div>
         <details class="card-code">
           <summary>View Code</summary>
           <pre><code>&lt;div x-data="calendar({
   mode: 'range',
   months: 2,
-  mobileMonths: 12,
-  scrollHeight: 400
+  mobileMonths: 12
 })"&gt;&lt;/div&gt;</code></pre>
         </details>
       </div>
