@@ -139,9 +139,9 @@ function dayView(
   const rows = dayRows(showWeekNumbers)
 
   return `<template x-if="${viewCondition}">
-  <div class="rc-months${isDual ? '' : ' rc-view-enter'}"${monthsClass}${isDual ? '' : ''}>
+  <div class="rc-months${isDual ? '' : ' rc-view-enter'}"${monthsClass}>
     <template x-for="(mg, gi) in grid" :key="mg.year + '-' + mg.month">
-      <div${isDual ? '' : ''}>
+      <div>
         <div class="rc-header">
           <button class="rc-header__nav" @click="prev()" :disabled="!canGoPrev" aria-label="Previous month"${prevClass}>&#8249;</button>
           <button class="rc-header__label" @click="setView('months')" aria-label="Change view" x-text="monthYearLabel(gi)"></button>

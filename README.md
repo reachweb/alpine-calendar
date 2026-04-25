@@ -737,7 +737,7 @@ A sticky header tracks the currently visible month as you scroll. Default scroll
 <div x-data="calendar({ mode: 'single', months: 1, mobileMonths: 3 })"></div>
 ```
 
-The calendar listens for viewport changes at the 640px breakpoint and swaps layouts live — even when the new count crosses the 3-month scrollable threshold. Selection, visible month, and focus are preserved across the switch.
+The calendar listens for viewport changes at the 640px breakpoint and swaps layouts live — even when the new count crosses the 3-month scrollable threshold. Selection and visible month are preserved across the switch. Focus is preserved when the previously focused date remains in the rendered grid; otherwise it is cleared and reinitialized on the next keyboard navigation.
 
 ## Accessibility
 
