@@ -237,12 +237,13 @@ describe('Template ARIA attributes', () => {
   it('contains aria-live="polite" region with role="status"', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
-      isDualMonth: false,
+      isDualChrome: false,
       isWizard: false,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: false,
-      isScrollable: false,
+      needsDayView: true,
+      needsScrollableView: false,
       scrollHeight: 300,
     })
     expect(html).toContain('aria-live="polite"')
@@ -252,12 +253,13 @@ describe('Template ARIA attributes', () => {
   it('live region has rc-sr-only class', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
-      isDualMonth: false,
+      isDualChrome: false,
       isWizard: false,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: false,
-      isScrollable: false,
+      needsDayView: true,
+      needsScrollableView: false,
       scrollHeight: 300,
     })
     expect(html).toContain('class="rc-sr-only"')
@@ -280,12 +282,13 @@ describe('Template ARIA attributes', () => {
   it('popup wrapper has role="dialog" and aria-modal="true"', () => {
     const html = generateCalendarTemplate({
       display: 'popup',
-      isDualMonth: false,
+      isDualChrome: false,
       isWizard: false,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: false,
-      isScrollable: false,
+      needsDayView: true,
+      needsScrollableView: false,
       scrollHeight: 300,
     })
     expect(html).toContain('role="dialog"')
@@ -296,12 +299,13 @@ describe('Template ARIA attributes', () => {
   it('close SVG has aria-hidden="true"', () => {
     const html = generateCalendarTemplate({
       display: 'popup',
-      isDualMonth: false,
+      isDualChrome: false,
       isWizard: false,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: false,
-      isScrollable: false,
+      needsDayView: true,
+      needsScrollableView: false,
       scrollHeight: 300,
     })
     expect(html).toContain('aria-hidden="true"')
@@ -310,12 +314,13 @@ describe('Template ARIA attributes', () => {
   it('header labels are <button> elements in day view', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
-      isDualMonth: false,
+      isDualChrome: false,
       isWizard: false,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: false,
-      isScrollable: false,
+      needsDayView: true,
+      needsScrollableView: false,
       scrollHeight: 300,
     })
     // Day view header label should be a button
@@ -327,12 +332,13 @@ describe('Template ARIA attributes', () => {
   it('header labels are <button> elements in month view', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
-      isDualMonth: false,
+      isDualChrome: false,
       isWizard: false,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: false,
-      isScrollable: false,
+      needsDayView: true,
+      needsScrollableView: false,
       scrollHeight: 300,
     })
     // Month view header label should be a button
@@ -343,12 +349,13 @@ describe('Template ARIA attributes', () => {
   it('year view header label is a <span> (not clickable)', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
-      isDualMonth: false,
+      isDualChrome: false,
       isWizard: false,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: false,
-      isScrollable: false,
+      needsDayView: true,
+      needsScrollableView: false,
       scrollHeight: 300,
     })
     // Year view header is a span with x-text="decadeLabel" and no @click
@@ -358,12 +365,13 @@ describe('Template ARIA attributes', () => {
   it('calendar root has role="application" and aria-label', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
-      isDualMonth: false,
+      isDualChrome: false,
       isWizard: false,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: false,
-      isScrollable: false,
+      needsDayView: true,
+      needsScrollableView: false,
       scrollHeight: 300,
     })
     expect(html).toContain('role="application"')
@@ -379,12 +387,13 @@ describe('Preset ARIA roles', () => {
   it('presets container uses role="group" not role="list"', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
-      isDualMonth: false,
+      isDualChrome: false,
       isWizard: false,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: true,
-      isScrollable: false,
+      needsDayView: true,
+      needsScrollableView: false,
       scrollHeight: 300,
     })
     expect(html).toContain('role="group"')
@@ -395,12 +404,13 @@ describe('Preset ARIA roles', () => {
   it('preset buttons have no role="listitem"', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
-      isDualMonth: false,
+      isDualChrome: false,
       isWizard: false,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: true,
-      isScrollable: false,
+      needsDayView: true,
+      needsScrollableView: false,
       scrollHeight: 300,
     })
     expect(html).not.toContain('role="listitem"')
@@ -415,12 +425,13 @@ describe('Gridcell tabindex', () => {
   it('year cells have tabindex="-1"', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
-      isDualMonth: false,
+      isDualChrome: false,
       isWizard: false,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: false,
-      isScrollable: false,
+      needsDayView: true,
+      needsScrollableView: false,
       scrollHeight: 300,
     })
     // Year picker uses role="group" (no grid/gridcell)
@@ -431,12 +442,13 @@ describe('Gridcell tabindex', () => {
   it('month cells have tabindex="-1"', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
-      isDualMonth: false,
+      isDualChrome: false,
       isWizard: false,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: false,
-      isScrollable: false,
+      needsDayView: true,
+      needsScrollableView: false,
       scrollHeight: 300,
     })
     // Month picker uses role="group" (no grid/gridcell)
@@ -447,12 +459,13 @@ describe('Gridcell tabindex', () => {
   it('day options have tabindex="-1"', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
-      isDualMonth: false,
+      isDualChrome: false,
       isWizard: false,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: false,
-      isScrollable: false,
+      needsDayView: true,
+      needsScrollableView: false,
       scrollHeight: 300,
     })
     // Day grid uses role="listbox" > role="option" (no row wrappers needed)
@@ -463,12 +476,13 @@ describe('Gridcell tabindex', () => {
   it('week-number grid uses listbox with options', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
-      isDualMonth: false,
+      isDualChrome: false,
       isWizard: false,
       hasName: false,
       showWeekNumbers: true,
       hasPresets: false,
-      isScrollable: false,
+      needsDayView: true,
+      needsScrollableView: false,
       scrollHeight: 300,
     })
     expect(html).toContain('role="listbox"')
@@ -478,12 +492,13 @@ describe('Gridcell tabindex', () => {
   it('scrollable day options have tabindex="-1"', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
-      isDualMonth: false,
+      isDualChrome: false,
       isWizard: false,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: false,
-      isScrollable: true,
+      needsDayView: false,
+      needsScrollableView: true,
       scrollHeight: 300,
     })
     expect(html).toContain('role="listbox"')
@@ -493,12 +508,13 @@ describe('Gridcell tabindex', () => {
   it('scrollable week-number grid uses listbox with options', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
-      isDualMonth: false,
+      isDualChrome: false,
       isWizard: false,
       hasName: false,
       showWeekNumbers: true,
       hasPresets: false,
-      isScrollable: true,
+      needsDayView: false,
+      needsScrollableView: true,
       scrollHeight: 300,
     })
     expect(html).toContain('role="listbox"')
@@ -704,12 +720,13 @@ describe('Focus management', () => {
   it('aria-atomic="true" on live region ensures full text is read', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
-      isDualMonth: false,
+      isDualChrome: false,
       isWizard: false,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: false,
-      isScrollable: false,
+      needsDayView: true,
+      needsScrollableView: false,
       scrollHeight: 300,
     })
     expect(html).toContain('aria-atomic="true"')

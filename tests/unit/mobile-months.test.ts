@@ -37,7 +37,7 @@ function mockMatchMedia(matches: boolean) {
         mqlListeners.push(listener)
       }),
       removeEventListener: vi.fn((_event: string, listener: MqlListener) => {
-        mqlListeners = mqlListeners.filter(l => l !== listener)
+        mqlListeners = mqlListeners.filter((l) => l !== listener)
       }),
       dispatchEvent: vi.fn(),
     })),
@@ -59,7 +59,9 @@ describe('mobileMonths config validation', () => {
   let warnSpy: ReturnType<typeof vi.spyOn>
 
   beforeEach(() => {
-    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
+      /* suppress console output during tests */
+    })
     mockMatchMedia(false) // desktop
   })
 
@@ -81,25 +83,52 @@ describe('mobileMonths config validation', () => {
     )
   })
 
-  it('warns if mobileMonths >= months', () => {
-    createCalendarData({ months: 2, mobileMonths: 2 })
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('mobileMonths (2) should be less than months (2)'),
-    )
-  })
-
-  it('warns if mobileMonths used with months !== 2', () => {
-    createCalendarData({ months: 1, mobileMonths: 1 })
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('mobileMonths is only supported when months is 2'),
-    )
-  })
-
   it('does not warn for valid mobileMonths config', () => {
     createCalendarData({ months: 2, mobileMonths: 1 })
-    // Should not see mobileMonths-specific warnings
     const mobileWarnings = warnSpy.mock.calls.filter(
       ([msg]) => typeof msg === 'string' && msg.includes('mobileMonths'),
+    )
+    expect(mobileWarnings).toHaveLength(0)
+  })
+
+  it('does not warn when mobileMonths is greater than months (booking use case)', () => {
+    createCalendarData({ months: 2, mobileMonths: 12 })
+    const mobileWarnings = warnSpy.mock.calls.filter(
+      ([msg]) => typeof msg === 'string' && msg.includes('mobileMonths'),
+    )
+    expect(mobileWarnings).toHaveLength(0)
+  })
+
+  it('does not warn when mobileMonths is used with months !== 2', () => {
+    createCalendarData({ months: 1, mobileMonths: 3 })
+    const mobileWarnings = warnSpy.mock.calls.filter(
+      ([msg]) => typeof msg === 'string' && msg.includes('mobileMonths'),
+    )
+    expect(mobileWarnings).toHaveLength(0)
+  })
+
+  it('warns when mobileMonths is unusually large (> 24)', () => {
+    createCalendarData({ months: 2, mobileMonths: 36 })
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('unusually large'))
+  })
+
+  it('does not warn at the 24-month upper boundary', () => {
+    createCalendarData({ months: 2, mobileMonths: 24 })
+    const mobileWarnings = warnSpy.mock.calls.filter(
+      ([msg]) => typeof msg === 'string' && msg.includes('unusually large'),
+    )
+    expect(mobileWarnings).toHaveLength(0)
+  })
+
+  it('warns when mobileMonths is used together with wizard', () => {
+    createCalendarData({ wizard: true, months: 1, mobileMonths: 3 })
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('ignored in wizard mode'))
+  })
+
+  it('does not warn when wizard is set without mobileMonths', () => {
+    createCalendarData({ wizard: true })
+    const mobileWarnings = warnSpy.mock.calls.filter(
+      ([msg]) => typeof msg === 'string' && msg.includes('ignored in wizard mode'),
     )
     expect(mobileWarnings).toHaveLength(0)
   })
@@ -186,11 +215,11 @@ describe('mobileMonths responsive behavior', () => {
     c.init()
     flushNextTick()
 
-    const selectedBefore = c.selectedDates.map(d => d.toISO())
+    const selectedBefore = c.selectedDates.map((d) => d.toISO())
     expect(selectedBefore).toEqual(['2026-01-15'])
 
     triggerMediaChange(true) // mobile
-    const selectedAfter = c.selectedDates.map(d => d.toISO())
+    const selectedAfter = c.selectedDates.map((d) => d.toISO())
     expect(selectedAfter).toEqual(['2026-01-15'])
   })
 
@@ -301,12 +330,13 @@ describe('dual-month nav arrow CSS classes', () => {
   it('includes rc-nav--dual-hidden class binding for prev arrow', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
-      isDualMonth: true,
+      needsDayView: true,
+      needsScrollableView: false,
+      isDualChrome: true,
       isWizard: false,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: false,
-      isScrollable: false,
       scrollHeight: 400,
     })
     expect(html).toContain('rc-nav--dual-hidden')
@@ -315,12 +345,13 @@ describe('dual-month nav arrow CSS classes', () => {
   it('includes rc-nav--dual-next-first and rc-nav--dual-next-last class bindings', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
-      isDualMonth: true,
+      needsDayView: true,
+      needsScrollableView: false,
+      isDualChrome: true,
       isWizard: false,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: false,
-      isScrollable: false,
       scrollHeight: 400,
     })
     expect(html).toContain('rc-nav--dual-next-first')
@@ -330,12 +361,13 @@ describe('dual-month nav arrow CSS classes', () => {
   it('does not include dual nav classes for single-month template', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
-      isDualMonth: false,
+      needsDayView: true,
+      needsScrollableView: false,
+      isDualChrome: false,
       isWizard: false,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: false,
-      isScrollable: false,
       scrollHeight: 400,
     })
     expect(html).not.toContain('rc-nav--dual-hidden')
@@ -346,14 +378,173 @@ describe('dual-month nav arrow CSS classes', () => {
   it('does not use inline :style for visibility in dual-month', () => {
     const html = generateCalendarTemplate({
       display: 'inline',
-      isDualMonth: true,
+      needsDayView: true,
+      needsScrollableView: false,
+      isDualChrome: true,
       isWizard: false,
       hasName: false,
       showWeekNumbers: false,
       hasPresets: false,
-      isScrollable: false,
       scrollHeight: 400,
     })
     expect(html).not.toContain('visibility:hidden')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Tests: Generalized mobileMonths crossing the 3-month scrollable threshold
+// ---------------------------------------------------------------------------
+
+describe('mobileMonths crossing scrollable threshold', () => {
+  it('months: 2, mobileMonths: 12 on mobile viewport uses scrollable 12', () => {
+    mockMatchMedia(true) // mobile
+    const c = createCalendarData({ months: 2, mobileMonths: 12 })
+    const el = createElWithCalendar()
+    const { flushNextTick } = withAlpineMocks(c, { el })
+    c.init()
+    flushNextTick()
+
+    expect(c.monthCount).toBe(12)
+    expect(c.isScrollable).toBe(true)
+    expect(c.grid.length).toBe(12)
+  })
+
+  it('months: 2, mobileMonths: 12 on desktop viewport uses dual 2', () => {
+    mockMatchMedia(false) // desktop
+    const c = createCalendarData({ months: 2, mobileMonths: 12 })
+    const el = createElWithCalendar()
+    const { flushNextTick } = withAlpineMocks(c, { el })
+    c.init()
+    flushNextTick()
+
+    expect(c.monthCount).toBe(2)
+    expect(c.isScrollable).toBe(false)
+    expect(c.grid.length).toBe(2)
+  })
+
+  it('months: 1, mobileMonths: 3 on mobile viewport switches to scrollable', () => {
+    mockMatchMedia(true) // mobile
+    const c = createCalendarData({ months: 1, mobileMonths: 3 })
+    const el = createElWithCalendar()
+    const { flushNextTick } = withAlpineMocks(c, { el })
+    c.init()
+    flushNextTick()
+
+    expect(c.monthCount).toBe(3)
+    expect(c.isScrollable).toBe(true)
+    expect(c.grid.length).toBe(3)
+  })
+
+  it('emits both day-view branches when config crosses threshold', () => {
+    const html = generateCalendarTemplate({
+      display: 'inline',
+      needsDayView: true,
+      needsScrollableView: true,
+      isDualChrome: true,
+      isWizard: false,
+      hasName: false,
+      showWeekNumbers: false,
+      hasPresets: false,
+      scrollHeight: 400,
+    })
+    // Both branches present, each gated by the reactive isScrollable flag
+    expect(html).toContain(`view === 'days' && !isScrollable`)
+    expect(html).toContain(`view === 'days' && isScrollable`)
+    expect(html).toContain('rc-months--scroll')
+    expect(html).toContain('rc-nav--dual-hidden')
+  })
+
+  it('emits only the scrollable branch when day-view is not needed', () => {
+    const html = generateCalendarTemplate({
+      display: 'inline',
+      needsDayView: false,
+      needsScrollableView: true,
+      isDualChrome: false,
+      isWizard: false,
+      hasName: false,
+      showWeekNumbers: false,
+      hasPresets: false,
+      scrollHeight: 400,
+    })
+    expect(html).toContain('rc-months--scroll')
+    expect(html).not.toContain('rc-nav--dual-hidden')
+    // Simple x-if condition when only one branch is present
+    expect(html).toContain(`x-if="view === 'days'"`)
+    expect(html).not.toContain(`view === 'days' && !isScrollable`)
+  })
+
+  it('preserves selection when resizing desktop → mobile across threshold', () => {
+    mockMatchMedia(false) // start on desktop
+    const c = createCalendarData({ months: 2, mobileMonths: 12, value: '15/01/2026' })
+    const el = createElWithCalendar()
+    const { flushNextTick } = withAlpineMocks(c, { el })
+    c.init()
+    flushNextTick()
+
+    expect(c.monthCount).toBe(2)
+    expect(c.isScrollable).toBe(false)
+    expect(c.selectedDates.map((d) => d.toISO())).toEqual(['2026-01-15'])
+
+    triggerMediaChange(true) // mobile
+    flushNextTick()
+
+    expect(c.monthCount).toBe(12)
+    expect(c.isScrollable).toBe(true)
+    expect(c.grid.length).toBe(12)
+    // Selection survives the layout swap
+    expect(c.selectedDates.map((d) => d.toISO())).toEqual(['2026-01-15'])
+    // Visible month preserved (grid starts at the same month as before)
+    expect(c.grid[0].year).toBe(c.year)
+    expect(c.grid[0].month).toBe(c.month)
+  })
+
+  it('disconnects scroll observer when resizing mobile → desktop across threshold', () => {
+    mockMatchMedia(true) // start on mobile (scrollable)
+    const c = createCalendarData({ months: 2, mobileMonths: 12 })
+    const el = createElWithCalendar()
+    const { flushNextTick } = withAlpineMocks(c, { el })
+    c.init()
+    flushNextTick()
+
+    // Simulate an attached scroll observer (jsdom has no IntersectionObserver)
+    const disconnectSpy = vi.fn()
+    c._scrollObserver = { disconnect: disconnectSpy } as unknown as IntersectionObserver
+    c._scrollContainerEl = document.createElement('div')
+
+    expect(c.isScrollable).toBe(true)
+    triggerMediaChange(false) // desktop
+    flushNextTick()
+
+    expect(c.monthCount).toBe(2)
+    expect(c.isScrollable).toBe(false)
+    expect(disconnectSpy).toHaveBeenCalledTimes(1)
+    expect(c._scrollObserver).toBeNull()
+    expect(c._scrollContainerEl).toBeNull()
+  })
+
+  it('rebinds scroll observer when both sides are scrollable but counts differ', () => {
+    // Both desktop (6) and mobile (3) are ≥ 3 → isScrollable stays true on resize.
+    // The existing observer is bound to stale x-for children after the grid rebuild,
+    // so the handler must disconnect + re-init via _rebindScrollObserver.
+    mockMatchMedia(false) // start on desktop (6 months)
+    const c = createCalendarData({ months: 6, mobileMonths: 3 })
+    const el = createElWithCalendar()
+    const { flushNextTick } = withAlpineMocks(c, { el })
+    c.init()
+    flushNextTick()
+
+    expect(c.monthCount).toBe(6)
+    expect(c.isScrollable).toBe(true)
+
+    const disconnectSpy = vi.fn()
+    c._scrollObserver = { disconnect: disconnectSpy } as unknown as IntersectionObserver
+
+    triggerMediaChange(true) // mobile (3 months, still scrollable)
+    flushNextTick()
+    flushNextTick() // second $nextTick for x-for inside x-if
+
+    expect(c.monthCount).toBe(3)
+    expect(c.isScrollable).toBe(true)
+    expect(disconnectSpy).toHaveBeenCalledTimes(1)
   })
 })

@@ -160,7 +160,7 @@ All options are passed via `x-data="calendar({ ... })"`.
 | `display` | `'inline' \| 'popup'` | `'inline'` | Inline calendar or popup with input |
 | `format` | `string` | `'DD/MM/YYYY'` | Date format (tokens: `DD`, `MM`, `YYYY`, `D`, `M`, `YY`, `MMM`, `MMMM`) |
 | `months` | `number` | `1` | Months to display (1=single, 2=dual side-by-side, 3+=scrollable) |
-| `mobileMonths` | `number` | — | Months to show on mobile (<640px). Only used when `months` is `2`. |
+| `mobileMonths` | `number` | — | Months to show on mobile (<640px). Works with any `months` value; the layout automatically switches between side-by-side and scrollable when the two counts cross the 3-month threshold. |
 | `firstDay` | `0–6` | `1` | First day of week (0=Sun, 1=Mon, ...) |
 | `mask` | `boolean` | `true` | Enable input masking |
 | `value` | `string` | — | Initial value (ISO or formatted string) |
@@ -718,19 +718,26 @@ A sticky header tracks the currently visible month as you scroll. Default scroll
 - **Mobile (<640px):** Popup renders as a centered fullscreen overlay. Touch-friendly targets (min 44px).
 - **Desktop (>=640px):** Popup renders as a centered modal with scale-in animation.
 - **Two months:** Side-by-side on desktop, stacked on mobile. Both nav arrows appear on the top month when stacked.
-- **`mobileMonths`:** Show fewer months on mobile (e.g., `mobileMonths: 1` with `months: 2` displays a single month on narrow viewports).
+- **`mobileMonths`:** Show a different number of months on mobile — fewer (e.g., `mobileMonths: 1` with `months: 2`) or more (e.g., `mobileMonths: 12` with `months: 2` for a booking calendar that's compact on desktop and long-scroll on mobile).
 - **Scrollable (3+ months):** Smooth scroll with `-webkit-overflow-scrolling: touch`.
 - **`prefers-reduced-motion`:** All animations are disabled.
 
 ### Mobile Months
 
-When using `months: 2`, the calendar shows two months side-by-side on desktop and stacks them vertically on mobile. Set `mobileMonths: 1` to show only a single month on mobile instead:
+`mobileMonths` lets you pick a different month count for narrow viewports (<640px). It works with any `months` value and can be smaller _or_ larger than the desktop count — the layout automatically switches between single, side-by-side, and scrollable as needed.
 
 ```html
+<!-- Simplify on mobile: 2 months on desktop, 1 month on mobile -->
 <div x-data="calendar({ mode: 'range', months: 2, mobileMonths: 1 })"></div>
+
+<!-- Booking calendar: 2 months side-by-side on desktop, 12-month scrollable list on mobile -->
+<div x-data="calendar({ mode: 'range', months: 2, mobileMonths: 12 })"></div>
+
+<!-- Single month on desktop, 3-month scrollable on mobile -->
+<div x-data="calendar({ mode: 'single', months: 1, mobileMonths: 3 })"></div>
 ```
 
-The calendar listens for viewport changes at the 640px breakpoint and switches between the desktop and mobile month counts automatically. Selection is preserved across viewport changes.
+The calendar listens for viewport changes at the 640px breakpoint and swaps layouts live — even when the new count crosses the 3-month scrollable threshold. Selection and visible month are preserved across the switch. Focus is preserved when the previously focused date remains in the rendered grid; otherwise it is cleared and reinitialized on the next keyboard navigation.
 
 ## Accessibility
 

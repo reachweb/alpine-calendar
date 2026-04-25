@@ -1002,6 +1002,25 @@
         </details>
       </div>
 
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Booking Calendar (Desktop: 2, Mobile: 12)</div>
+          <div class="card-desc">Compact dual view on desktop; full-year scrollable view on narrow screens. Resize your window across 640px to see the layout swap.</div>
+        </div>
+        <div class="card-body">
+          <div x-data="calendar({ mode: 'range', months: 2, mobileMonths: 12, scrollHeight: 400 })"></div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({
+  mode: 'range',
+  months: 2,
+  mobileMonths: 12,
+  scrollHeight: 400
+})"&gt;&lt;/div&gt;</code></pre>
+        </details>
+      </div>
+
     </div>
   </div>
 

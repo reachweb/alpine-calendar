@@ -338,13 +338,13 @@ function validateConfig(config: CalendarConfig): void {
   if (config.mobileMonths !== undefined) {
     if (config.mobileMonths < 1 || !Number.isInteger(config.mobileMonths)) {
       warn(`mobileMonths must be a positive integer, got: ${config.mobileMonths}`)
+    } else if (config.mobileMonths > 24) {
+      warn(
+        `mobileMonths (${config.mobileMonths}) is unusually large and will generate a very long scrollable grid`,
+      )
     }
-    const months = config.months ?? 1
-    if (config.mobileMonths >= months) {
-      warn(`mobileMonths (${config.mobileMonths}) should be less than months (${months})`)
-    }
-    if (months !== 2) {
-      warn(`mobileMonths is only supported when months is 2; current months: ${months}`)
+    if (config.wizard && config.mobileMonths >= 3) {
+      warn('mobileMonths >= 3 is ignored in wizard mode; wizard cannot use a scrollable layout')
     }
   }
 
@@ -567,13 +567,31 @@ export function createCalendarData(
   const rawMonthCount = config.months ?? 1
   // Force months: 1 when wizard + scrollable
   const desktopMonthCount = wizardConfig && rawMonthCount >= 3 ? 1 : rawMonthCount
-  const isScrollable = desktopMonthCount >= 3
 
-  // mobileMonths: only applies when months === 2
-  const hasMobileMonths = desktopMonthCount === 2 && config.mobileMonths !== undefined
-  const mobileMonthCount = hasMobileMonths
-    ? Math.max(1, Math.min(config.mobileMonths as number, desktopMonthCount))
-    : desktopMonthCount
+  // mobileMonths: applies for any desktop count; mobile count can be smaller or larger.
+  // Wizard mode only conflicts with the scrollable (>=3) layout, not with a 1- or 2-month
+  // mobile count, so honor mobileMonths for non-scrollable wizard configs and fall back
+  // to desktopMonthCount only when the value would push mobile into scroll mode.
+  const rawMobileMonths = config.mobileMonths
+  const hasMobileMonths = rawMobileMonths !== undefined && rawMobileMonths !== desktopMonthCount
+  let mobileMonthCount: number
+  // Fall back to desktop count for NaN / Infinity / -Infinity — validateConfig warns,
+  // but a bad value still reaches here through the `unknown ?? default` path. Without
+  // the Number.isFinite guard, NaN would make both needsDayView and needsScrollableView
+  // false (leaving no template branch rendered), and Infinity would hang _rebuildGrid.
+  if (!hasMobileMonths || !Number.isFinite(rawMobileMonths)) {
+    mobileMonthCount = desktopMonthCount
+  } else {
+    const normalized = Math.max(1, Math.floor(rawMobileMonths as number))
+    // Wizard + scrollable is incompatible (validateConfig warns above); drop the
+    // mobile value rather than render a broken wizard at the mobile breakpoint.
+    mobileMonthCount = wizardConfig && normalized >= 3 ? desktopMonthCount : normalized
+  }
+
+  // Which template branches are needed across breakpoints?
+  const needsDayView = Math.min(mobileMonthCount, desktopMonthCount) <= 2
+  const needsScrollableView = Math.max(mobileMonthCount, desktopMonthCount) >= 3
+  const isDualChrome = needsDayView && (mobileMonthCount === 2 || desktopMonthCount === 2)
 
   // Reuse a single MediaQueryList for both initial detection and listener setup
   const mobileMql =
@@ -584,6 +602,7 @@ export function createCalendarData(
       ? window.matchMedia(MOBILE_BREAKPOINT)
       : null
   const monthCount = mobileMql?.matches ? mobileMonthCount : desktopMonthCount
+  const isScrollable = monthCount >= 3
   const scrollHeight = config.scrollHeight ?? 400
   const wizard = !!wizardConfig
   const wizardMode: 'none' | 'full' | 'year-month' | 'month-day' =
@@ -747,6 +766,12 @@ export function createCalendarData(
     _scrollHeight: scrollHeight,
     _scrollContainerEl: null as HTMLElement | null,
     _scrollObserver: null as IntersectionObserver | null,
+    /**
+     * Monotonic generation counter for _initScrollListener. Bumped on every fresh
+     * bind entry so queued retries from an earlier session can detect that they're
+     * stale and exit without double-binding an observer.
+     */
+    _scrollInitToken: 0,
     /** Index into grid[] of the month currently visible at top of scroll viewport. */
     _scrollVisibleIndex: 0,
     /**
@@ -961,12 +986,13 @@ export function createCalendarData(
         const fragment = document.createRange().createContextualFragment(
           generateCalendarTemplate({
             display: this.display,
-            isDualMonth: desktopMonthCount === 2,
+            needsDayView,
+            needsScrollableView,
+            isDualChrome,
             isWizard: this.wizardMode !== 'none',
             hasName: !!this.inputName,
             showWeekNumbers: this.showWeekNumbers,
             hasPresets: this.presets.length > 0,
-            isScrollable: this.isScrollable,
             scrollHeight: this._scrollHeight,
             headerSlot,
             footerSlot,
@@ -1026,9 +1052,19 @@ export function createCalendarData(
           })
         }
       })
-      alpine(this).$watch('view', () => {
+      alpine(this).$watch('view', (value: unknown) => {
         this._emitViewChange()
         this._announceViewChange()
+        // Re-entering the day view in scrollable mode: the scroll container may have
+        // just been (re)mounted by x-if, so any existing observer's element references
+        // are stale, or — if the breakpoint flipped while view was 'months'/'years' —
+        // no observer was ever bound. _initScrollListener retries internally if the
+        // DOM isn't ready, so a single tick is sufficient here.
+        if (value === 'days' && this.isScrollable) {
+          alpine(this).$nextTick(() => {
+            this._rebindScrollObserver()
+          })
+        }
       })
 
       // Auto-bind to x-ref input if present
@@ -1041,8 +1077,9 @@ export function createCalendarData(
             `[reach-calendar] Popup mode requires an <input x-ref="${inputRef}"> inside the component container.`,
           )
         }
-        // Init scroll listener for scrollable multi-month (double $nextTick
-        // to ensure x-for elements are rendered after Alpine.initTree)
+        // Init scroll listener for scrollable multi-month. Single $nextTick is enough
+        // here: Alpine.initTree has already rendered the x-for by the time this runs,
+        // so we only need to wait one reactive pass for the DOM to settle.
         if (this.isScrollable) {
           alpine(this).$nextTick(() => {
             this._initScrollListener()
@@ -1050,13 +1087,74 @@ export function createCalendarData(
         }
       })
 
-      // Set up responsive monthCount listener for dual-month with mobileMonths
+      // Set up responsive monthCount listener when mobileMonths differs from desktop.
+      // Supports crossing the 3-month scrollable threshold in either direction by
+      // flipping the reactive isScrollable flag; Alpine's x-if swaps the active view.
       if (mobileMql) {
         const handler = (e: MediaQueryListEvent) => {
           const newCount = e.matches ? mobileMonthCount : desktopMonthCount
-          if (newCount !== this.monthCount) {
-            this.monthCount = newCount
-            this._rebuildGrid()
+          if (newCount === this.monthCount) return
+          const wasScrollable = this.isScrollable
+          const willBeScrollable = newCount >= 3
+          // When leaving scrollable mode — or rebuilding while still scrollable with a
+          // different count — re-anchor to the month the user was actually viewing
+          // (tracked by the scroll observer). this.year/this.month holds the grid's top
+          // anchor, not the scroll position, so without this the rebuild jumps back to
+          // the original start month.
+          //
+          // Gate on view === 'days' because _scrollVisibleIndex is maintained only by
+          // the day-grid scroll observer. If the user is currently in the month or year
+          // picker, the index is stale relative to their picker context, and applying
+          // it would silently shift this.year/this.month mid-selection.
+          if (wasScrollable && this.view === 'days') {
+            const visible = this.grid[this._scrollVisibleIndex]
+            if (visible) {
+              this.year = visible.year
+              this.month = visible.month
+            }
+            // After re-anchor, the previously-visible month sits at grid[0]. Reset
+            // the index synchronously so scrollHeaderLabel reads the correct entry
+            // (otherwise it reads grid[oldIndex], which is out of bounds when the
+            // new grid is shorter). Container scrollTop is reset below in the same
+            // $nextTick as the observer rebind.
+            this._scrollVisibleIndex = 0
+          }
+          this.monthCount = newCount
+          this.isScrollable = willBeScrollable
+          this._rebuildGrid()
+          // If the user was keyboard-navigating, focusedDate may now point to a month
+          // that's no longer rendered (aria-activedescendant would reference a missing
+          // `day-<iso>` id). Clear it so the binding drops cleanly; the next navigation
+          // keypress re-inits focusedDate via the existing auto-init path.
+          if (this.focusedDate) {
+            const fd = this.focusedDate
+            const inGrid = this.grid.some((g) => g.year === fd.year && g.month === fd.month)
+            if (!inGrid) {
+              this.focusedDate = null
+            }
+          }
+          if (this.isScrollable) {
+            // Scrollable (newly crossed in OR staying scrollable with a different count).
+            // _initScrollListener retries internally until the x-if/x-for chain renders.
+            const didReanchor = wasScrollable && this.view === 'days'
+            alpine(this).$nextTick(() => {
+              // Scroll the container back to the top so the re-anchored grid[0]
+              // is actually visible. Without this, scrollTop retains its old pixel
+              // offset from the previous (longer) grid and the viewport lands on
+              // the wrong month despite the correct index.
+              if (didReanchor && this._scrollContainerEl) {
+                this._scrollContainerEl.scrollTop = 0
+              }
+              this._rebindScrollObserver()
+            })
+          } else if (wasScrollable) {
+            // Crossed out of scrollable — tear down the observer
+            if (this._scrollObserver) {
+              this._scrollObserver.disconnect()
+              this._scrollObserver = null
+            }
+            this._scrollContainerEl = null
+            this._scrollVisibleIndex = 0
           }
         }
         mobileMql.addEventListener('change', handler)
@@ -1781,7 +1879,17 @@ export function createCalendarData(
       const wasPartialRange = mode === 'range' && (this._selection as RangeSelection).isPartial()
 
       this._selection.toggle(date)
-      if (wizard) this._wizardDay = date.day
+      // Sync all three wizard fields from the actual selection. A user can reach
+      // selectDate() in wizard mode with a date whose month/year differs from the
+      // earlier month/year step — e.g., when months >= 2 (including mobileMonths)
+      // renders the adjacent month in the day grid — so relying on _wizardMonth /
+      // _wizardYear set by selectMonth()/selectYear() alone leaves the wizard
+      // summary disagreeing with the real selection.
+      if (wizard) {
+        this._wizardDay = date.day
+        this._wizardMonth = date.month
+        this._wizardYear = date.year
+      }
       // Bump reactive counter so Alpine re-evaluates dayClasses() bindings.
       // No grid rebuild needed — grid structure doesn't change on selection.
       this._selectionRev++
@@ -2428,16 +2536,55 @@ export function createCalendarData(
       return d.format({ month: 'long', year: 'numeric' }, locale)
     },
 
-    /** Attach an IntersectionObserver that updates the sticky header as the user scrolls. */
-    _initScrollListener() {
+    /**
+     * Attach an IntersectionObserver that updates the sticky header as the user scrolls.
+     *
+     * Rendering is driven by Alpine's x-if (scrollable wrapper) → x-for (month nodes)
+     * chain, and the number of reactive ticks between a state change and the final DOM
+     * varies by entry path (init, view switch, breakpoint flip). Rather than hard-code
+     * tick counts at every call site, retry internally: if the container or its month
+     * children aren't present yet, reschedule on the next tick. Bounded at 3 retries
+     * so a genuinely-missing container (e.g., non-scrollable view) exits cleanly.
+     *
+     * Retries are tagged with a token captured on the initial entry. If another bind
+     * starts while a retry is queued, `_scrollInitToken` advances and the stale retry
+     * returns without running — preventing two observers being attached to the same
+     * container when a later call succeeds before an older queued retry fires.
+     */
+    _initScrollListener(retriesLeft = 3, token?: number) {
       if (typeof IntersectionObserver === 'undefined') return
+      // First entry (no token passed) starts a new session. Disconnect any existing
+      // observer before allocating a fresh one — if a caller reaches this function
+      // directly (init path) after another caller already bound an observer (e.g., a
+      // breakpoint handler that fired synchronously during startup), the prior
+      // observer would otherwise be overwritten in _scrollObserver and leak with no
+      // handle to disconnect it. Retries carry a token and skip this step.
+      const isFreshEntry = token === undefined
+      if (isFreshEntry && this._scrollObserver) {
+        this._scrollObserver.disconnect()
+        this._scrollObserver = null
+      }
+      const myToken = token ?? ++this._scrollInitToken
+      // Stale retry — a newer bind session has started, abandon this one.
+      if (myToken !== this._scrollInitToken) return
+
       const searchRoot = this._popupOverlayEl ?? alpine(this).$el
       const container = searchRoot.querySelector('.rc-months--scroll') as HTMLElement | null
-      if (!container) return
+      if (!container) {
+        if (retriesLeft > 0 && this.isScrollable && this.view === 'days') {
+          alpine(this).$nextTick(() => this._initScrollListener(retriesLeft - 1, myToken))
+        }
+        return
+      }
       this._scrollContainerEl = container
 
       const monthEls = container.querySelectorAll('[data-month-id]')
-      if (monthEls.length === 0) return
+      if (monthEls.length === 0) {
+        if (retriesLeft > 0) {
+          alpine(this).$nextTick(() => this._initScrollListener(retriesLeft - 1, myToken))
+        }
+        return
+      }
 
       const indexMap = new Map<Element, number>()
       monthEls.forEach((el, i) => indexMap.set(el, i))
