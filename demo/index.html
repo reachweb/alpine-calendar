@@ -1107,7 +1107,7 @@
        v0.9 Customization — slots, scoped themes, initial month, JSON-string config
        ============================================================ -->
   <div class="container section" id="customization">
-    <h2 class="section-title">Customization (v0.9)</h2>
+    <h2 class="section-title">Customization</h2>
     <p class="section-desc">New surfaces: day-cell radius vars, header/footer slots, <code>data-rc-theme</code> scoping, <code>initialMonth</code>, and JSON-string array tolerance for templating engines.</p>
 
     <style>
@@ -1174,7 +1174,7 @@
         </div>
         <div class="card-body">
           <div x-data="calendar({ display: 'popup', mode: 'range' })">
-            <input x-ref="rc-input" type="text" placeholder="DD/MM/YYYY">
+            <input x-ref="rc-input" type="text" class="rc-input" placeholder="DD/MM/YYYY">
             <template data-rc-slot="footer">
               <p style="margin: 0;">
                 Most charters are Saturday to Saturday.
@@ -1203,7 +1203,7 @@
         </div>
         <div class="card-body">
           <div x-data="calendar({ display: 'popup' })" data-rc-theme="black">
-            <input x-ref="rc-input" type="text" placeholder="DD/MM/YYYY">
+            <input x-ref="rc-input" type="text" class="rc-input" placeholder="DD/MM/YYYY">
           </div>
         </div>
         <details class="card-code">
