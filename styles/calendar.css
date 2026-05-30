@@ -513,6 +513,10 @@
 }
 
 /* Selected month (the month currently being viewed in day view) */
+.rc-month--focused:not(.rc-month--selected) {
+  box-shadow: 0 0 0 2px var(--color-calendar-focus-ring);
+}
+
 .rc-month--selected {
   background-color: var(--color-calendar-primary);
   color: var(--color-calendar-primary-text);

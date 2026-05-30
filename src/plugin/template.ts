@@ -11,6 +11,8 @@ export interface TemplateOptions {
   /** Include dual-month chrome (nav-arrow visibility classes, rc-months--dual binding). */
   isDualChrome: boolean
   isWizard: boolean
+  /** Month-precision picker: the months grid is the only view; no year-step affordance. */
+  precisionMonth?: boolean
   hasName: boolean
   showWeekNumbers: boolean
   hasPresets: boolean
@@ -82,17 +84,22 @@ function yearPickerView(): string {
 </template>`
 }
 
-function monthPickerView(): string {
+function monthPickerView(precisionMonth: boolean): string {
+  // Month-precision pickers have no year step to drill into, so the year label is a
+  // static span rather than a button that would switch to the (unreachable) year grid.
+  const yearLabelEl = precisionMonth
+    ? `<span class="rc-header__label" x-text="yearLabel"></span>`
+    : `<button class="rc-header__label" @click="setView('years')" aria-label="Change view" x-text="yearLabel"></button>`
   return `<template x-if="view === 'months'">
   <div class="rc-view-enter">
     <div class="rc-header">
       <button class="rc-header__nav" @click="prev()" :disabled="!canGoPrev" aria-label="Previous year">&#8249;</button>
-      <button class="rc-header__label" @click="setView('years')" aria-label="Change view" x-text="yearLabel"></button>
+      ${yearLabelEl}
       <button class="rc-header__nav" @click="next()" :disabled="!canGoNext" aria-label="Next year">&#8250;</button>
     </div>
-    <div class="rc-month-grid" role="group" :aria-label="yearLabel">
+    <div class="rc-month-grid" role="listbox" :aria-label="yearLabel">
       <template x-for="cell in monthGrid.flat()" :key="cell.month">
-        <div :class="monthClasses(cell)" :aria-disabled="cell.isDisabled" tabindex="-1" @click="!cell.isDisabled && selectMonth(cell.month)" x-text="cell.label"></div>
+        <div :class="monthClasses(cell)" :id="'month-' + cell.month" role="option" :aria-selected="_monthCellSelected(cell)" :aria-disabled="cell.isDisabled" tabindex="-1" @click="!cell.isDisabled && selectMonth(cell.month)" x-text="cell.label"></div>
       </template>
     </div>
   </div>
@@ -295,6 +302,7 @@ export function generateCalendarTemplate(options: TemplateOptions): string {
     needsScrollableView,
     isDualChrome,
     isWizard,
+    precisionMonth = false,
     hasName,
     showWeekNumbers,
     hasPresets,
@@ -328,7 +336,7 @@ export function generateCalendarTemplate(options: TemplateOptions): string {
 
   // Views — always include all three (guarded by x-if)
   parts.push(yearPickerView())
-  parts.push(monthPickerView())
+  parts.push(monthPickerView(precisionMonth))
   if (needsDayView) {
     parts.push(dayView(isDualChrome, showWeekNumbers, coexist))
   }
@@ -359,7 +367,7 @@ export function generateCalendarTemplate(options: TemplateOptions): string {
   const calendarInner = parts.join('\n')
 
   // Wrap in rc-calendar container
-  const calendarEl = `<div class="${calendarClass}" @keydown="handleKeydown($event)" tabindex="0" :aria-activedescendant="focusedDateISO ? 'day-' + focusedDateISO : null" role="application" aria-label="${ariaLabel}">
+  const calendarEl = `<div class="${calendarClass}" @keydown="handleKeydown($event)" tabindex="0" :aria-activedescendant="activeDescendantId" role="application" aria-label="${ariaLabel}">
 <div class="rc-sr-only" role="status" aria-live="polite" aria-atomic="true" x-text="_statusMessage"></div>
 ${calendarInner}
 </div>`

@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0]
+
+### Added
+
+- **`precision: 'month'` — a forward-looking month picker.** Opens directly on the months grid (with the year prev/next arrows), positioned by the usual `value` > `initialMonth` > today precedence and clamped into `[minDate, maxDate]`. Clicking a month commits the first day of that month as the single selection, emits `calendar:change` (`detail.dates[0]` = first-of-month), formats the input via `format` (e.g. `'MMMM YYYY'` → `"August 2026"`), and closes the popup — no day grid, no year step. The bound input becomes read-only (selection-only), `format` defaults to `'MM/YYYY'`, and a stored first-of-month `value` restores both the displayed string and the highlighted month. Designed to compose with `mode: 'single'`; combining with `range`/`multiple` or `wizard` warns (precision takes precedence over the wizard).
+
 ## [1.0.1]
 
 ### Fixed
@@ -16,4 +22,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `scrollableDayView()` template helper now takes an `isPopup` flag and routes through a new internal `scrollMaxHeight()` helper.
 - Demo (`demo/index.html`) updated to better showcase the responsive popup behavior.
 
+[1.1.0]: https://github.com/reachweb/alpine-calendar/releases/tag/v1.1.0
 [1.0.1]: https://github.com/reachweb/alpine-calendar/releases/tag/v1.0.1

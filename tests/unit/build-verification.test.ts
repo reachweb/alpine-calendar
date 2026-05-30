@@ -308,19 +308,25 @@ describe('Build & Distribution Verification', () => {
   // Bundle size checks
   // -------------------------------------------------------------------------
   describe('bundle sizes', () => {
-    it('CDN IIFE bundle is under 60KB raw', () => {
+    // Raw (unzipped) byte budgets — guardrails against accidental bloat, not hard
+    // product limits. Bumped as real features land; the precision-month picker, wizard
+    // precedence, and month keyboard navigation grew every bundle by a few KB. The
+    // separate 75KB "not bloated with Alpine" ceiling below stays put as the real
+    // regression alarm. Gzipped sizes (the number users actually download) are ~30KB
+    // ESM / ~17KB CDN.
+    it('CDN IIFE bundle is under 65KB raw', () => {
       const size = distFileSize('alpine-calendar.cdn.js')
-      expect(size).toBeLessThan(60_000)
-    })
-
-    it('ESM bundle is under 130KB raw', () => {
-      const size = distFileSize('alpine-calendar.es.js')
-      expect(size).toBeLessThan(130_000)
-    })
-
-    it('UMD bundle is under 65KB raw', () => {
-      const size = distFileSize('alpine-calendar.umd.js')
       expect(size).toBeLessThan(65_000)
+    })
+
+    it('ESM bundle is under 145KB raw', () => {
+      const size = distFileSize('alpine-calendar.es.js')
+      expect(size).toBeLessThan(145_000)
+    })
+
+    it('UMD bundle is under 70KB raw', () => {
+      const size = distFileSize('alpine-calendar.umd.js')
+      expect(size).toBeLessThan(70_000)
     })
 
     it('CSS is under 25KB raw', () => {

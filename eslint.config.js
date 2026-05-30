@@ -14,5 +14,13 @@ export default tseslint.config(
       '@typescript-eslint/consistent-type-imports': 'error',
     },
   },
+  {
+    // Test files routinely assert known-present values; non-null assertions are
+    // idiomatic here and used throughout the suite.
+    files: ['tests/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-non-null-assertion': 'off',
+    },
+  },
   { ignores: ['dist/', 'demo/', 'coverage/'] },
 )

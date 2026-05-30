@@ -31,6 +31,14 @@ import { generateCalendarTemplate } from './template'
 /** Mobile breakpoint media query. Must match the `@media (max-width: 639px)` rules in calendar.css. */
 const MOBILE_BREAKPOINT = '(max-width: 639px)'
 
+/**
+ * Upper bound on how many years month-precision prev()/next() will scan past
+ * disabled years before treating a direction as exhausted. Generously larger than
+ * any realistic month picker span; it only bounds wasted work at a min/max boundary
+ * where every year ahead is disabled (and so terminates the search).
+ */
+const MONTH_NAV_YEAR_SCAN = 120
+
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
@@ -76,6 +84,17 @@ export type { RangePreset } from '../core/presets'
 export interface CalendarConfig {
   /** Selection mode. Default: 'single'. */
   mode?: 'single' | 'multiple' | 'range'
+  /**
+   * Selection precision. Default: 'day'.
+   *
+   * `'month'` turns the calendar into a forward-looking month picker: it opens on the
+   * months grid, clicking a month commits the first day of that month as the selection
+   * (emitting `calendar:change` with `dates[0]` = first-of-month), and the day grid is
+   * never shown. The bound input becomes read-only (selection-only). Designed to compose
+   * with `mode: 'single'`. The opening month follows the usual precedence
+   * (`value` > `initialMonth` > today) and is clamped into `[minDate, maxDate]`.
+   */
+  precision?: 'day' | 'month'
   /** Display mode. Default: 'inline'. */
   display?: 'inline' | 'popup'
   /** Date format string (e.g. 'DD/MM/YYYY'). Default: 'DD/MM/YYYY'. */
@@ -404,6 +423,32 @@ function validateConfig(config: CalendarConfig): void {
   if (config.initialMonth && !parseInitialMonth(config.initialMonth)) {
     warn(`invalid initialMonth: "${config.initialMonth}" (expected 'YYYY-MM' or 'YYYY-MM-DD')`)
   }
+
+  // precision must be 'day' or 'month'
+  if (
+    config.precision !== undefined &&
+    config.precision !== 'day' &&
+    config.precision !== 'month'
+  ) {
+    warn(`invalid precision: "${config.precision}" (expected 'day' or 'month')`)
+  }
+
+  // precision: 'month' compatibility
+  if (config.precision === 'month') {
+    if (config.mode && config.mode !== 'single') {
+      warn(
+        `precision: 'month' is designed for single selection; mode "${config.mode}" may not work as expected`,
+      )
+    }
+    if (config.wizard) {
+      warn(`precision: 'month' overrides wizard mode; the wizard UI is ignored`)
+    }
+    if (config.format && /D/.test(config.format)) {
+      warn(
+        `precision: 'month' with a day-based format "${config.format}"; use a month-only format like 'MM/YYYY' or 'MMMM YYYY'`,
+      )
+    }
+  }
 }
 
 /**
@@ -552,8 +597,10 @@ export function createCalendarData(
 
   // --- Parse config with defaults ---
   const mode = config.mode ?? 'single'
+  const precision = config.precision ?? 'day'
   const display = config.display ?? 'inline'
-  const format = config.format ?? 'DD/MM/YYYY'
+  // Month-precision pickers default to a month-only display format.
+  const format = config.format ?? (precision === 'month' ? 'MM/YYYY' : 'DD/MM/YYYY')
   const firstDay = config.firstDay ?? 1
   let timezone = config.timezone
   if (timezone) {
@@ -563,7 +610,11 @@ export function createCalendarData(
       timezone = undefined
     }
   }
-  const wizardConfig = config.wizard ?? false
+  // precision: 'month' takes precedence over the wizard (validateConfig warns this).
+  // Neutralize the wizard at the source so every downstream derivation — wizard chrome
+  // in the template, the initial view, and the open() reopen path — ignores it
+  // consistently, rather than only some of them honoring the override.
+  const wizardConfig = precision === 'month' ? false : (config.wizard ?? false)
   const rawMonthCount = config.months ?? 1
   // Force months: 1 when wizard + scrollable
   const desktopMonthCount = wizardConfig && rawMonthCount >= 3 ? 1 : rawMonthCount
@@ -644,10 +695,35 @@ export function createCalendarData(
   const isInitDisabled = (d: CalendarDate) =>
     constraints.isDisabledDate(d) || initialGetDateMeta(d)?.availability === 'unavailable'
 
+  // Month-level disabled check for precision: 'month' restore. Mirrors the runtime
+  // _isMonthDisabled (the deep check in _wrapWithDeepChecks): a month is disabled when
+  // the shallow month constraint rejects it OR every day in it is effectively disabled.
+  const isInitMonthDisabled = (year: number, month: number): boolean => {
+    if (constraints.isMonthDisabled(year, month)) return true
+    const count = daysInMonth(year, month)
+    for (let day = 1; day <= count; day++) {
+      if (!isInitDisabled(new CalendarDate(year, month, day))) return false
+    }
+    return true
+  }
+
   if (config.value) {
     if (mode === 'single') {
       const d = parseDate(config.value, format, locale) ?? CalendarDate.fromISO(config.value)
-      if (d && !isInitDisabled(d)) selection.toggle(d)
+      if (d) {
+        if (precision === 'month') {
+          // The month is the unit of selection: accept the value when its month is
+          // selectable and normalize to the first of the month — matching the value
+          // _commitMonth() emits. The day-level isInitDisabled check would wrongly drop
+          // a first-of-month value that precedes a mid-month minDate (e.g. value
+          // 2026-06-01 with minDate 2026-06-15), even though the picker allows June.
+          if (!isInitMonthDisabled(d.year, d.month)) {
+            selection.toggle(new CalendarDate(d.year, d.month, 1))
+          }
+        } else if (!isInitDisabled(d)) {
+          selection.toggle(d)
+        }
+      }
     } else if (mode === 'range') {
       const range = parseDateRange(config.value, format, locale)
       if (range) {
@@ -684,11 +760,30 @@ export function createCalendarData(
     initialDates.length > 0 ? initialDates[0] : (initialMonthDate ?? today)
   ) as CalendarDate
 
-  // Wizard: center year picker around ~30 years ago (full & year-month modes)
+  // For precision: 'month', clamp the opening view into [minDate, maxDate] so the picker
+  // never opens on a fully out-of-range year (e.g. when today precedes minDate).
+  const minViewBound = config.minDate ? CalendarDate.fromISO(config.minDate) : null
+  const maxViewBound = config.maxDate ? CalendarDate.fromISO(config.maxDate) : null
+  const clampViewToRange = (d: CalendarDate): CalendarDate => {
+    if (minViewBound && d.isBefore(minViewBound.startOfMonth())) {
+      return new CalendarDate(minViewBound.year, minViewBound.month, 1)
+    }
+    if (maxViewBound && d.isAfter(maxViewBound.endOfMonth())) {
+      return new CalendarDate(maxViewBound.year, maxViewBound.month, 1)
+    }
+    return d
+  }
+
+  // Initial view position:
+  // - precision month: forward-looking; honors value > initialMonth > today, clamped to range.
+  // - wizard full/year-month: center year picker around ~30 years ago (birth-date default).
+  // - otherwise: the resolved defaultViewDate.
   const viewDate =
-    wizardMode === 'full' || wizardMode === 'year-month'
-      ? new CalendarDate(today.year - 30, today.month, today.day)
-      : defaultViewDate
+    precision === 'month'
+      ? clampViewToRange(defaultViewDate)
+      : wizardMode === 'full' || wizardMode === 'year-month'
+        ? new CalendarDate(today.year - 30, today.month, today.day)
+        : defaultViewDate
 
   // --- Compute initial inputValue ---
   function computeFormattedValue(sel: Selection): string {
@@ -728,7 +823,10 @@ export function createCalendarData(
     // --- Reactive state ---
     month: viewDate.month,
     year: viewDate.year,
-    view: (wizard ? wizardStartView : 'days') as 'days' | 'months' | 'years',
+    view: (precision === 'month' ? 'months' : wizard ? wizardStartView : 'days') as
+      | 'days'
+      | 'months'
+      | 'years',
     isOpen: display === 'inline',
     grid: [] as MonthGrid[],
     monthGrid: [] as MonthCell[][],
@@ -736,6 +834,7 @@ export function createCalendarData(
     inputValue: computeFormattedValue(selection),
     popupStyle: display === 'popup' ? 'position:fixed;inset:0;z-index:50;' : '',
     focusedDate: null as CalendarDate | null,
+    focusedMonth: null as number | null,
     hoverDate: null as CalendarDate | null,
     wizardStep: (wizard ? 1 : 0) as number,
     _wizardYear: null as number | null,
@@ -873,6 +972,19 @@ export function createCalendarData(
       return this.focusedDate ? this.focusedDate.toISO() : ''
     },
 
+    /**
+     * The id the calendar's `aria-activedescendant` should point at. Tracks the
+     * months grid while it is the active view (precision month, or the wizard's
+     * month step) and the day grid otherwise, so the focused cell is announced in
+     * every view that has keyboard navigation.
+     */
+    get activeDescendantId(): string | null {
+      if (this.view === 'months') {
+        return this.focusedMonth !== null ? `month-${this.focusedMonth}` : null
+      }
+      return this.focusedDateISO ? `day-${this.focusedDateISO}` : null
+    },
+
     /** ID for the popup input element (for external label association). */
     get inputId(): string | null {
       return inputId
@@ -990,6 +1102,7 @@ export function createCalendarData(
             needsScrollableView,
             isDualChrome,
             isWizard: this.wizardMode !== 'none',
+            precisionMonth: precision === 'month',
             hasName: !!this.inputName,
             showWeekNumbers: this.showWeekNumbers,
             hasPresets: this.presets.length > 0,
@@ -1280,6 +1393,10 @@ export function createCalendarData(
         return !this._isMonthDisabled(d.year, d.month)
       }
       if (this.view === 'months') {
+        // Month-precision pickers have no year grid to jump through, so prev()/next()
+        // skip disabled years — enable the arrow whenever any earlier year is reachable,
+        // not just when the immediately-previous one happens to be enabled.
+        if (precision === 'month') return this._nearestSelectableYear(-1) !== null
         return !this._isYearDisabled(this.year - 1)
       }
       if (this.view === 'years') {
@@ -1312,6 +1429,9 @@ export function createCalendarData(
         return !this._isMonthDisabled(d.year, d.month)
       }
       if (this.view === 'months') {
+        // See canGoPrev: month-precision navigation steps over disabled years, so the
+        // forward arrow stays live as long as a later selectable year is reachable.
+        if (precision === 'month') return this._nearestSelectableYear(1) !== null
         return !this._isYearDisabled(this.year + 1)
       }
       if (this.view === 'years') {
@@ -1342,13 +1462,29 @@ export function createCalendarData(
      * Compute CSS class object for a month cell in the month picker view.
      */
     monthClasses(cell: MonthCell): Record<string, boolean> {
-      const selected = this.month === cell.month && this.view === 'days'
       return {
         'rc-month': true,
         'rc-month--current': cell.isCurrentMonth,
-        'rc-month--selected': selected,
+        'rc-month--selected': this._monthCellSelected(cell),
         'rc-month--disabled': cell.isDisabled,
+        'rc-month--focused': this.focusedMonth === cell.month,
       }
+    },
+
+    /**
+     * Whether a month cell is the currently selected month. Drives both the
+     * `rc-month--selected` style and the cell's `aria-selected` state, so the two
+     * never drift apart.
+     */
+    _monthCellSelected(cell: MonthCell): boolean {
+      // Register the selection counter so Alpine re-evaluates on commit.
+      void this._selectionRev
+      if (precision === 'month') {
+        // Highlight the committed month regardless of view (drives restore from value).
+        const sel = this._selection.toArray()[0] as CalendarDate | undefined
+        return !!sel && sel.year === cell.year && sel.month === cell.month
+      }
+      return this.month === cell.month && this.view === 'days'
     },
 
     /**
@@ -1502,6 +1638,15 @@ export function createCalendarData(
       // Set initial value
       el.value = this.inputValue
 
+      // Month-precision pickers are selection-only: a 'MMMM YYYY' value can't be
+      // re-parsed from typed text, so make the input read-only (click to open).
+      // Capture the original state so detach restores it — the input may have been
+      // read-only for the consumer's own reasons, which we must not clobber.
+      const hadReadOnly = el.readOnly
+      if (precision === 'month') {
+        el.readOnly = true
+      }
+
       // Attach mask if enabled (auto-disabled for month-name formats)
       if (useMask && !formatHasMonthName(format)) {
         this._detachInput = attachMask(el, format)
@@ -1541,6 +1686,9 @@ export function createCalendarData(
       const prevDetach = this._detachInput
       this._detachInput = () => {
         prevDetach?.()
+        if (precision === 'month') {
+          el.readOnly = hadReadOnly
+        }
         el.removeEventListener('input', syncHandler)
         el.removeEventListener('focus', focusHandler)
         el.removeEventListener('blur', blurHandler)
@@ -1584,6 +1732,13 @@ export function createCalendarData(
      * Parses the typed value, updates selection if valid, and reformats the input.
      */
     handleBlur() {
+      // Month-precision pickers are read-only/selection-only; never re-parse typed text,
+      // just re-assert the canonical formatted value.
+      if (precision === 'month') {
+        this._syncInputFromSelection()
+        return
+      }
+
       const value = this._inputEl ? this._inputEl.value : this.inputValue
 
       // Empty input → clear selection
@@ -1806,6 +1961,16 @@ export function createCalendarData(
     // --- Navigation ---
 
     prev() {
+      // Month-precision: jump to the nearest earlier selectable year, skipping any
+      // disabled run. No-op (and no slide) when none is reachable, so the arrow never
+      // strands the user on an out-of-range year.
+      if (this.view === 'months' && precision === 'month') {
+        const target = this._nearestSelectableYear(-1)
+        if (target === null) return
+        this._navDirection = 'prev'
+        this.year = target
+        return
+      }
       this._navDirection = 'prev'
       if (this.view === 'days') {
         if (this.isScrollable) return
@@ -1820,6 +1985,13 @@ export function createCalendarData(
     },
 
     next() {
+      if (this.view === 'months' && precision === 'month') {
+        const target = this._nearestSelectableYear(1)
+        if (target === null) return
+        this._navDirection = 'next'
+        this.year = target
+        return
+      }
       this._navDirection = 'next'
       if (this.view === 'days') {
         if (this.isScrollable) return
@@ -1833,9 +2005,31 @@ export function createCalendarData(
       }
     },
 
+    /**
+     * Nearest selectable year in a direction (+1 forward, -1 back), skipping disabled
+     * years. Month-precision pickers expose no year grid, so the prev/next arrows are
+     * the only way across years; an adjacent-only check would strand a selectable year
+     * sitting behind a disabled one (e.g. `disabledYears: [2027]` makes 2028 unreachable
+     * from 2026). Returns null when no selectable year is reachable within
+     * MONTH_NAV_YEAR_SCAN steps (e.g. every year beyond maxDate is disabled).
+     */
+    _nearestSelectableYear(direction: 1 | -1): number | null {
+      for (let i = 1; i <= MONTH_NAV_YEAR_SCAN; i++) {
+        const y = this.year + direction * i
+        if (!this._isYearDisabled(y)) return y
+      }
+      return null
+    },
+
     goToToday() {
       this.month = this._today.month
       this.year = this._today.year
+      // Precision month is a month-only picker — never expose the day grid.
+      if (precision === 'month') {
+        this.view = 'months'
+        this._rebuildMonthGrid()
+        return
+      }
       this.view = 'days'
     },
 
@@ -2045,6 +2239,31 @@ export function createCalendarData(
     setValue(value: string | string[] | CalendarDate | CalendarDate[]) {
       this._selection.clear()
 
+      // Precision month: the month is the unit of selection. Accept the value when
+      // its month is selectable and normalize to the first of the month — matching
+      // what _commitMonth() emits and what the initial-value path stores. The
+      // day-level _isEffectivelyDisabled check would wrongly reject a first-of-month
+      // value that precedes a mid-month minDate (e.g. 2026-06-01 with minDate
+      // 2026-06-15), even though the picker offers that month.
+      if (precision === 'month') {
+        const raw = Array.isArray(value) ? value[0] : value
+        const d =
+          raw instanceof CalendarDate
+            ? raw
+            : typeof raw === 'string'
+              ? (CalendarDate.fromISO(raw) ?? parseDate(raw, format, locale))
+              : null
+        if (d && !this._isMonthDisabled(d.year, d.month)) {
+          this.year = d.year
+          this.month = d.month
+          this._selection.toggle(new CalendarDate(d.year, d.month, 1))
+        }
+        this._selectionRev++
+        this._emitChange()
+        this._syncInputFromSelection()
+        return
+      }
+
       const dates: CalendarDate[] = []
 
       if (typeof value === 'string') {
@@ -2127,6 +2346,13 @@ export function createCalendarData(
       this.year = year
       if (month !== undefined) {
         this.month = month
+      }
+      // Precision month is a month-only picker — keep callers on the months grid
+      // and refresh it for the new year instead of exposing the day grid.
+      if (precision === 'month') {
+        this.view = 'months'
+        this._rebuildMonthGrid()
+        return
       }
       this.view = 'days'
       if (this.isScrollable) {
@@ -2263,11 +2489,21 @@ export function createCalendarData(
     // --- View switching ---
 
     setView(newView: 'days' | 'months' | 'years') {
+      // Month precision is a single month-grid step: the day grid and year step are
+      // never part of its flow, so refuse to switch away from the months view.
+      if (precision === 'month' && newView !== 'months') return
       this.view = newView
     },
 
     selectMonth(targetMonth: number) {
       if (this._isMonthDisabled(this.year, targetMonth)) return
+
+      // Precision month: the month is the unit of selection — commit it and finish.
+      if (precision === 'month') {
+        this._commitMonth(this.year, targetMonth)
+        return
+      }
+
       this.month = targetMonth
       this._wizardMonth = targetMonth
 
@@ -2283,6 +2519,45 @@ export function createCalendarData(
       this.view = 'days'
       if (wizard) {
         this.wizardStep = wizardMode === 'month-day' ? 2 : 3
+      }
+    },
+
+    /**
+     * Commit the first day of the given month as the single selection.
+     *
+     * Used by `precision: 'month'`. The month is the unit of selection, so the
+     * month-level disabled check (not the day-level one) is authoritative: the
+     * representative day — the 1st — is committed even when it precedes `minDate`
+     * (e.g. minDate is mid-month). Emits `calendar:change` with `dates[0]` =
+     * first-of-month, syncs the formatted input, and closes the popup.
+     */
+    _commitMonth(year: number, month: number) {
+      if (this._isMonthDisabled(year, month)) return
+      const first = new CalendarDate(year, month, 1)
+
+      // beforeSelect hook — a month commit is always a 'select' action.
+      if (beforeSelectCb) {
+        const result = beforeSelectCb(first, {
+          mode,
+          selectedDates: this._selection.toArray(),
+          action: 'select',
+        })
+        if (result === false) return
+      }
+
+      this.year = year
+      this.month = month
+      this._selection.clear()
+      this._selection.toggle(first)
+      this._selectionRev++
+      this._emitChange()
+      this._syncInputFromSelection()
+
+      this._announce(first.format({ month: 'long', year: 'numeric' }, locale) + ' selected')
+
+      // Selecting a month is terminal — close the popup like a completed single selection.
+      if (closeOnSelect && display === 'popup' && this.isOpen) {
+        this.close()
       }
     },
 
@@ -2341,6 +2616,15 @@ export function createCalendarData(
           this.year = this._today.year - 30
           this._rebuildYearGrid()
         }
+      } else if (precision === 'month') {
+        // Always reopen on the months grid, repositioned onto the committed selection.
+        this.view = 'months'
+        const sel = this._selection.toArray()[0] as CalendarDate | undefined
+        if (sel) {
+          this.year = sel.year
+          this.month = sel.month
+        }
+        this._rebuildMonthGrid()
       }
 
       this.isOpen = true
@@ -2401,8 +2685,10 @@ export function createCalendarData(
           this.wizardBack()
           return
         }
-        // If in month or year picker, return to days view
-        if (this.view === 'months' || this.view === 'years') {
+        // If in month or year picker, return to days view. Month precision has no
+        // day view to fall back to — the months grid is the whole picker — so let
+        // Escape fall through to the popup-close behavior instead of exposing days.
+        if (precision !== 'month' && (this.view === 'months' || this.view === 'years')) {
           this.view = 'days'
           return
         }
@@ -2458,6 +2744,53 @@ export function createCalendarData(
             if (this.focusedDate) {
               e.preventDefault()
               this.selectDate(this.focusedDate)
+            }
+            return
+        }
+      }
+
+      // --- Month view keyboard navigation ---
+      // The months grid is the whole picker for precision month (and the wizard's
+      // month step), so it needs the same roving-focus model the day grid has.
+      if (this.view === 'months' && precision === 'month') {
+        const cols = this.monthGrid[0]?.length || 3
+        switch (e.key) {
+          case 'ArrowRight':
+          case 'ArrowLeft':
+          case 'ArrowDown':
+          case 'ArrowUp':
+          case 'Home':
+          case 'End': {
+            e.preventDefault()
+            const current = this.focusedMonth ?? this.month
+            let next = current
+            if (e.key === 'ArrowRight') next = current + 1
+            else if (e.key === 'ArrowLeft') next = current - 1
+            else if (e.key === 'ArrowDown') next = current + cols
+            else if (e.key === 'ArrowUp') next = current - cols
+            else if (e.key === 'Home') next = 1
+            else if (e.key === 'End') next = 12
+            this.focusedMonth = Math.min(12, Math.max(1, next))
+            return
+          }
+          // Page keys move between years, mirroring the day grid's month paging.
+          // Gate on canGoNext/canGoPrev so the keyboard path honours the same hard
+          // min/max limits that disable the header arrows — otherwise PageDown/PageUp
+          // would page onto an out-of-range year that the buttons forbid.
+          case 'PageDown':
+          case 'PageUp':
+            e.preventDefault()
+            if (e.key === 'PageDown') {
+              if (this.canGoNext) this.next()
+            } else if (this.canGoPrev) {
+              this.prev()
+            }
+            return
+          case 'Enter':
+          case ' ':
+            if (this.focusedMonth !== null) {
+              e.preventDefault()
+              this.selectMonth(this.focusedMonth)
             }
             return
         }
