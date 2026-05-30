@@ -76,6 +76,17 @@ export type { RangePreset } from '../core/presets'
 export interface CalendarConfig {
   /** Selection mode. Default: 'single'. */
   mode?: 'single' | 'multiple' | 'range'
+  /**
+   * Selection precision. Default: 'day'.
+   *
+   * `'month'` turns the calendar into a forward-looking month picker: it opens on the
+   * months grid, clicking a month commits the first day of that month as the selection
+   * (emitting `calendar:change` with `dates[0]` = first-of-month), and the day grid is
+   * never shown. The bound input becomes read-only (selection-only). Designed to compose
+   * with `mode: 'single'`. The opening month follows the usual precedence
+   * (`value` > `initialMonth` > today) and is clamped into `[minDate, maxDate]`.
+   */
+  precision?: 'day' | 'month'
   /** Display mode. Default: 'inline'. */
   display?: 'inline' | 'popup'
   /** Date format string (e.g. 'DD/MM/YYYY'). Default: 'DD/MM/YYYY'. */
@@ -404,6 +415,32 @@ function validateConfig(config: CalendarConfig): void {
   if (config.initialMonth && !parseInitialMonth(config.initialMonth)) {
     warn(`invalid initialMonth: "${config.initialMonth}" (expected 'YYYY-MM' or 'YYYY-MM-DD')`)
   }
+
+  // precision must be 'day' or 'month'
+  if (
+    config.precision !== undefined &&
+    config.precision !== 'day' &&
+    config.precision !== 'month'
+  ) {
+    warn(`invalid precision: "${config.precision}" (expected 'day' or 'month')`)
+  }
+
+  // precision: 'month' compatibility
+  if (config.precision === 'month') {
+    if (config.mode && config.mode !== 'single') {
+      warn(
+        `precision: 'month' is designed for single selection; mode "${config.mode}" may not work as expected`,
+      )
+    }
+    if (config.wizard) {
+      warn(`precision: 'month' overrides wizard mode; the wizard UI is ignored`)
+    }
+    if (config.format && /D/.test(config.format)) {
+      warn(
+        `precision: 'month' with a day-based format "${config.format}"; use a month-only format like 'MM/YYYY' or 'MMMM YYYY'`,
+      )
+    }
+  }
 }
 
 /**
@@ -552,8 +589,10 @@ export function createCalendarData(
 
   // --- Parse config with defaults ---
   const mode = config.mode ?? 'single'
+  const precision = config.precision ?? 'day'
   const display = config.display ?? 'inline'
-  const format = config.format ?? 'DD/MM/YYYY'
+  // Month-precision pickers default to a month-only display format.
+  const format = config.format ?? (precision === 'month' ? 'MM/YYYY' : 'DD/MM/YYYY')
   const firstDay = config.firstDay ?? 1
   let timezone = config.timezone
   if (timezone) {
@@ -684,11 +723,30 @@ export function createCalendarData(
     initialDates.length > 0 ? initialDates[0] : (initialMonthDate ?? today)
   ) as CalendarDate
 
-  // Wizard: center year picker around ~30 years ago (full & year-month modes)
+  // For precision: 'month', clamp the opening view into [minDate, maxDate] so the picker
+  // never opens on a fully out-of-range year (e.g. when today precedes minDate).
+  const minViewBound = config.minDate ? CalendarDate.fromISO(config.minDate) : null
+  const maxViewBound = config.maxDate ? CalendarDate.fromISO(config.maxDate) : null
+  const clampViewToRange = (d: CalendarDate): CalendarDate => {
+    if (minViewBound && d.isBefore(minViewBound.startOfMonth())) {
+      return new CalendarDate(minViewBound.year, minViewBound.month, 1)
+    }
+    if (maxViewBound && d.isAfter(maxViewBound.endOfMonth())) {
+      return new CalendarDate(maxViewBound.year, maxViewBound.month, 1)
+    }
+    return d
+  }
+
+  // Initial view position:
+  // - precision month: forward-looking; honors value > initialMonth > today, clamped to range.
+  // - wizard full/year-month: center year picker around ~30 years ago (birth-date default).
+  // - otherwise: the resolved defaultViewDate.
   const viewDate =
-    wizardMode === 'full' || wizardMode === 'year-month'
-      ? new CalendarDate(today.year - 30, today.month, today.day)
-      : defaultViewDate
+    precision === 'month'
+      ? clampViewToRange(defaultViewDate)
+      : wizardMode === 'full' || wizardMode === 'year-month'
+        ? new CalendarDate(today.year - 30, today.month, today.day)
+        : defaultViewDate
 
   // --- Compute initial inputValue ---
   function computeFormattedValue(sel: Selection): string {
@@ -728,7 +786,10 @@ export function createCalendarData(
     // --- Reactive state ---
     month: viewDate.month,
     year: viewDate.year,
-    view: (wizard ? wizardStartView : 'days') as 'days' | 'months' | 'years',
+    view: (precision === 'month' ? 'months' : wizard ? wizardStartView : 'days') as
+      | 'days'
+      | 'months'
+      | 'years',
     isOpen: display === 'inline',
     grid: [] as MonthGrid[],
     monthGrid: [] as MonthCell[][],
@@ -1342,7 +1403,16 @@ export function createCalendarData(
      * Compute CSS class object for a month cell in the month picker view.
      */
     monthClasses(cell: MonthCell): Record<string, boolean> {
-      const selected = this.month === cell.month && this.view === 'days'
+      // Register the selection counter so Alpine re-evaluates on commit.
+      void this._selectionRev
+      let selected: boolean
+      if (precision === 'month') {
+        // Highlight the committed month regardless of view (drives restore from value).
+        const sel = this._selection.toArray()[0] as CalendarDate | undefined
+        selected = !!sel && sel.year === cell.year && sel.month === cell.month
+      } else {
+        selected = this.month === cell.month && this.view === 'days'
+      }
       return {
         'rc-month': true,
         'rc-month--current': cell.isCurrentMonth,
@@ -1502,6 +1572,12 @@ export function createCalendarData(
       // Set initial value
       el.value = this.inputValue
 
+      // Month-precision pickers are selection-only: a 'MMMM YYYY' value can't be
+      // re-parsed from typed text, so make the input read-only (click to open).
+      if (precision === 'month') {
+        el.readOnly = true
+      }
+
       // Attach mask if enabled (auto-disabled for month-name formats)
       if (useMask && !formatHasMonthName(format)) {
         this._detachInput = attachMask(el, format)
@@ -1541,6 +1617,9 @@ export function createCalendarData(
       const prevDetach = this._detachInput
       this._detachInput = () => {
         prevDetach?.()
+        if (precision === 'month') {
+          el.readOnly = false
+        }
         el.removeEventListener('input', syncHandler)
         el.removeEventListener('focus', focusHandler)
         el.removeEventListener('blur', blurHandler)
@@ -1584,6 +1663,13 @@ export function createCalendarData(
      * Parses the typed value, updates selection if valid, and reformats the input.
      */
     handleBlur() {
+      // Month-precision pickers are read-only/selection-only; never re-parse typed text,
+      // just re-assert the canonical formatted value.
+      if (precision === 'month') {
+        this._syncInputFromSelection()
+        return
+      }
+
       const value = this._inputEl ? this._inputEl.value : this.inputValue
 
       // Empty input → clear selection
@@ -2268,6 +2354,13 @@ export function createCalendarData(
 
     selectMonth(targetMonth: number) {
       if (this._isMonthDisabled(this.year, targetMonth)) return
+
+      // Precision month: the month is the unit of selection — commit it and finish.
+      if (precision === 'month') {
+        this._commitMonth(this.year, targetMonth)
+        return
+      }
+
       this.month = targetMonth
       this._wizardMonth = targetMonth
 
@@ -2283,6 +2376,45 @@ export function createCalendarData(
       this.view = 'days'
       if (wizard) {
         this.wizardStep = wizardMode === 'month-day' ? 2 : 3
+      }
+    },
+
+    /**
+     * Commit the first day of the given month as the single selection.
+     *
+     * Used by `precision: 'month'`. The month is the unit of selection, so the
+     * month-level disabled check (not the day-level one) is authoritative: the
+     * representative day — the 1st — is committed even when it precedes `minDate`
+     * (e.g. minDate is mid-month). Emits `calendar:change` with `dates[0]` =
+     * first-of-month, syncs the formatted input, and closes the popup.
+     */
+    _commitMonth(year: number, month: number) {
+      if (this._isMonthDisabled(year, month)) return
+      const first = new CalendarDate(year, month, 1)
+
+      // beforeSelect hook — a month commit is always a 'select' action.
+      if (beforeSelectCb) {
+        const result = beforeSelectCb(first, {
+          mode,
+          selectedDates: this._selection.toArray(),
+          action: 'select',
+        })
+        if (result === false) return
+      }
+
+      this.year = year
+      this.month = month
+      this._selection.clear()
+      this._selection.toggle(first)
+      this._selectionRev++
+      this._emitChange()
+      this._syncInputFromSelection()
+
+      this._announce(first.format({ month: 'long', year: 'numeric' }, locale) + ' selected')
+
+      // Selecting a month is terminal — close the popup like a completed single selection.
+      if (closeOnSelect && display === 'popup' && this.isOpen) {
+        this.close()
       }
     },
 
@@ -2341,6 +2473,15 @@ export function createCalendarData(
           this.year = this._today.year - 30
           this._rebuildYearGrid()
         }
+      } else if (precision === 'month') {
+        // Always reopen on the months grid, repositioned onto the committed selection.
+        this.view = 'months'
+        const sel = this._selection.toArray()[0] as CalendarDate | undefined
+        if (sel) {
+          this.year = sel.year
+          this.month = sel.month
+        }
+        this._rebuildMonthGrid()
       }
 
       this.isOpen = true

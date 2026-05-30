@@ -81,6 +81,52 @@ To use a custom ref name:
 
 Wizard modes: `true` (or `'full'`) for Year → Month → Day, `'year-month'` for Year → Month, `'month-day'` for Month → Day.
 
+### Month Picker (departure-month)
+
+Set `precision: 'month'` to turn the calendar into a forward-looking **month picker**. It opens directly on the months grid (with the year prev/next arrows), and clicking a month commits the **first day of that month** as the selection — there is no day grid and no separate year step.
+
+```html
+<div x-data="calendar({
+  mode: 'single',
+  precision: 'month',
+  format: 'MMMM YYYY',
+  display: 'popup',
+  minDate: '2026-06-01',
+  maxDate: '2027-12-31',
+})">
+  <input x-ref="rc-input" type="text" class="rc-input">
+</div>
+```
+
+Behavior:
+
+- **Opens on the months grid**, positioned with the usual precedence: `value` > `initialMonth` > today. The opening month is clamped into `[minDate, maxDate]`, so the picker never opens on an out-of-range year.
+- **`minDate`/`maxDate` are hard limits.** The year arrows are disabled at the first/last in-range year, and months outside the range are disabled. With `minDate: '2026-06-01'` and `maxDate: '2027-12-31'`, only **2026** and **2027** are reachable and months before June 2026 are disabled.
+- **Clicking a month commits the 1st of that month**, emits `calendar:change` (with `detail.dates[0]` = first-of-month, e.g. `'2026-08-01'`), formats the input via `format` (e.g. `'MMMM YYYY'` → `"August 2026"`), and closes the popup.
+- The bound input is made **read-only** (selection-only) — a `'MMMM YYYY'` value can't be typed back in.
+- Set `name` to submit the value in a plain form — a hidden `<input>` carries the first-of-month ISO string (e.g. `2026-08-01`), no event wiring needed.
+- `format` defaults to `'MM/YYYY'` when omitted. Use a month-only format such as `'MM/YYYY'` or `'MMMM YYYY'`; a day-based format logs a warning.
+- Designed for `mode: 'single'`. Combining it with `range`/`multiple`, or with `wizard`, logs a warning (`precision: 'month'` takes precedence over the wizard).
+
+**Restoring a selection across pages.** Pass the stored first-of-month back as `value` (or the month as `initialMonth`):
+
+```html
+<!-- Reopens on August 2026, with August marked selected and "August 2026" in the input -->
+<div x-data="calendar({
+  mode: 'single',
+  precision: 'month',
+  format: 'MMMM YYYY',
+  display: 'popup',
+  minDate: '2026-06-01',
+  maxDate: '2027-12-31',
+  value: '2026-08-01',
+})">
+  <input x-ref="rc-input" type="text" class="rc-input">
+</div>
+```
+
+`value` both selects and displays the month; `initialMonth` (`'2026-08'`) only positions the view without selecting.
+
 ### Form Submission
 
 ```html
@@ -157,6 +203,7 @@ All options are passed via `x-data="calendar({ ... })"`.
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `mode` | `'single' \| 'multiple' \| 'range'` | `'single'` | Selection mode |
+| `precision` | `'day' \| 'month'` | `'day'` | Selection granularity. `'month'` is a month picker (see [Month Picker](#month-picker-departure-month)) |
 | `display` | `'inline' \| 'popup'` | `'inline'` | Inline calendar or popup with input |
 | `format` | `string` | `'DD/MM/YYYY'` | Date format (tokens: `DD`, `MM`, `YYYY`, `D`, `M`, `YY`, `MMM`, `MMMM`) |
 | `months` | `number` | `1` | Months to display (1=single, 2=dual side-by-side, 3+=scrollable) |
