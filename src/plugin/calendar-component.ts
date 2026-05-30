@@ -31,6 +31,14 @@ import { generateCalendarTemplate } from './template'
 /** Mobile breakpoint media query. Must match the `@media (max-width: 639px)` rules in calendar.css. */
 const MOBILE_BREAKPOINT = '(max-width: 639px)'
 
+/**
+ * Upper bound on how many years month-precision prev()/next() will scan past
+ * disabled years before treating a direction as exhausted. Generously larger than
+ * any realistic month picker span; it only bounds wasted work at a min/max boundary
+ * where every year ahead is disabled (and so terminates the search).
+ */
+const MONTH_NAV_YEAR_SCAN = 120
+
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
@@ -1385,6 +1393,10 @@ export function createCalendarData(
         return !this._isMonthDisabled(d.year, d.month)
       }
       if (this.view === 'months') {
+        // Month-precision pickers have no year grid to jump through, so prev()/next()
+        // skip disabled years — enable the arrow whenever any earlier year is reachable,
+        // not just when the immediately-previous one happens to be enabled.
+        if (precision === 'month') return this._nearestSelectableYear(-1) !== null
         return !this._isYearDisabled(this.year - 1)
       }
       if (this.view === 'years') {
@@ -1417,6 +1429,9 @@ export function createCalendarData(
         return !this._isMonthDisabled(d.year, d.month)
       }
       if (this.view === 'months') {
+        // See canGoPrev: month-precision navigation steps over disabled years, so the
+        // forward arrow stays live as long as a later selectable year is reachable.
+        if (precision === 'month') return this._nearestSelectableYear(1) !== null
         return !this._isYearDisabled(this.year + 1)
       }
       if (this.view === 'years') {
@@ -1946,6 +1961,16 @@ export function createCalendarData(
     // --- Navigation ---
 
     prev() {
+      // Month-precision: jump to the nearest earlier selectable year, skipping any
+      // disabled run. No-op (and no slide) when none is reachable, so the arrow never
+      // strands the user on an out-of-range year.
+      if (this.view === 'months' && precision === 'month') {
+        const target = this._nearestSelectableYear(-1)
+        if (target === null) return
+        this._navDirection = 'prev'
+        this.year = target
+        return
+      }
       this._navDirection = 'prev'
       if (this.view === 'days') {
         if (this.isScrollable) return
@@ -1960,6 +1985,13 @@ export function createCalendarData(
     },
 
     next() {
+      if (this.view === 'months' && precision === 'month') {
+        const target = this._nearestSelectableYear(1)
+        if (target === null) return
+        this._navDirection = 'next'
+        this.year = target
+        return
+      }
       this._navDirection = 'next'
       if (this.view === 'days') {
         if (this.isScrollable) return
@@ -1971,6 +2003,22 @@ export function createCalendarData(
       } else if (this.view === 'years') {
         this.year += 12
       }
+    },
+
+    /**
+     * Nearest selectable year in a direction (+1 forward, -1 back), skipping disabled
+     * years. Month-precision pickers expose no year grid, so the prev/next arrows are
+     * the only way across years; an adjacent-only check would strand a selectable year
+     * sitting behind a disabled one (e.g. `disabledYears: [2027]` makes 2028 unreachable
+     * from 2026). Returns null when no selectable year is reachable within
+     * MONTH_NAV_YEAR_SCAN steps (e.g. every year beyond maxDate is disabled).
+     */
+    _nearestSelectableYear(direction: 1 | -1): number | null {
+      for (let i = 1; i <= MONTH_NAV_YEAR_SCAN; i++) {
+        const y = this.year + direction * i
+        if (!this._isYearDisabled(y)) return y
+      }
+      return null
     },
 
     goToToday() {
@@ -2726,11 +2774,17 @@ export function createCalendarData(
             return
           }
           // Page keys move between years, mirroring the day grid's month paging.
+          // Gate on canGoNext/canGoPrev so the keyboard path honours the same hard
+          // min/max limits that disable the header arrows — otherwise PageDown/PageUp
+          // would page onto an out-of-range year that the buttons forbid.
           case 'PageDown':
           case 'PageUp':
             e.preventDefault()
-            if (e.key === 'PageDown') this.next()
-            else this.prev()
+            if (e.key === 'PageDown') {
+              if (this.canGoNext) this.next()
+            } else if (this.canGoPrev) {
+              this.prev()
+            }
             return
           case 'Enter':
           case ' ':

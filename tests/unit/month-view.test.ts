@@ -485,3 +485,122 @@ describe('month view navigation', () => {
     expect(c.view).toBe('days')
   })
 })
+
+// ---------------------------------------------------------------------------
+// Month-precision year navigation: limits + reachability (review P2 fixes)
+//
+// A month-precision picker has no year grid — the header year is a static label —
+// so the prev/next arrows (and PageUp/PageDown) are the only path across years.
+// These cover two regressions:
+//   1. Keyboard paging must honour the same hard min/max limits as the header arrows.
+//   2. A selectable year sitting behind a disabled run must stay reachable.
+// ---------------------------------------------------------------------------
+
+describe('month-precision year navigation — limits and reachability', () => {
+  function monthPicker(config: CalendarConfig, year: number) {
+    const c = createCalendarData({ precision: 'month', ...config })
+    withAlpineMocks(c)
+    c.init()
+    c.year = year
+    return c
+  }
+
+  function fireKey(
+    c: ReturnType<typeof createCalendarData>,
+    key: string,
+    extra?: Record<string, unknown>,
+  ) {
+    const e = new KeyboardEvent('keydown', { key, ...extra } as KeyboardEventInit)
+    vi.spyOn(e, 'preventDefault')
+    c.handleKeydown(e)
+    return e
+  }
+
+  describe('PageUp / PageDown honour min/max limits', () => {
+    it('PageDown does not page past the maxDate year', () => {
+      const c = monthPicker({ maxDate: '2027-12-31' }, 2027)
+      expect(c.canGoNext).toBe(false)
+
+      const e = fireKey(c, 'PageDown')
+
+      expect(c.year).toBe(2027) // stayed within the documented limit
+      expect(e.preventDefault).toHaveBeenCalled()
+    })
+
+    it('PageUp does not page before the minDate year', () => {
+      const c = monthPicker({ minDate: '2025-01-01' }, 2025)
+      expect(c.canGoPrev).toBe(false)
+
+      fireKey(c, 'PageUp')
+
+      expect(c.year).toBe(2025)
+    })
+
+    it('Shift+PageDown is bounded too (month view ignores shift paging)', () => {
+      const c = monthPicker({ maxDate: '2027-12-31' }, 2027)
+
+      fireKey(c, 'PageDown', { shiftKey: true })
+
+      expect(c.year).toBe(2027)
+    })
+
+    it('PageDown still pages within bounds', () => {
+      const c = monthPicker({ maxDate: '2030-12-31' }, 2027)
+
+      fireKey(c, 'PageDown')
+
+      expect(c.year).toBe(2028)
+    })
+  })
+
+  describe('navigation skips isolated disabled years', () => {
+    it('canGoNext stays live when a later year is reachable behind a disabled one', () => {
+      const c = monthPicker({ disabledYears: [2027] }, 2026)
+      expect(c.canGoNext).toBe(true)
+    })
+
+    it('next() skips a disabled year to the next selectable one', () => {
+      const c = monthPicker({ disabledYears: [2027] }, 2026)
+
+      c.next()
+
+      expect(c.year).toBe(2028)
+      expect(c._navDirection).toBe('next')
+    })
+
+    it('prev() skips a disabled year backward', () => {
+      const c = monthPicker({ disabledYears: [2027] }, 2028)
+      expect(c.canGoPrev).toBe(true)
+
+      c.prev()
+
+      expect(c.year).toBe(2026)
+    })
+
+    it('skips a multi-year disabled run', () => {
+      const c = monthPicker({ disabledYears: [2027, 2028] }, 2026)
+
+      c.next()
+
+      expect(c.year).toBe(2029)
+    })
+
+    it('PageDown reaches the year behind a disabled gap', () => {
+      const c = monthPicker({ disabledYears: [2027] }, 2026)
+
+      fireKey(c, 'PageDown')
+
+      expect(c.year).toBe(2028)
+    })
+
+    it('next() is a no-op when every later year is disabled', () => {
+      const c = monthPicker({ maxDate: '2026-12-31' }, 2026)
+      expect(c.canGoNext).toBe(false)
+
+      c.next()
+
+      expect(c.year).toBe(2026)
+      expect(c._navDirection).toBe('') // no phantom slide on a no-op
+    })
+  })
+})
