@@ -97,9 +97,9 @@ function monthPickerView(precisionMonth: boolean): string {
       ${yearLabelEl}
       <button class="rc-header__nav" @click="next()" :disabled="!canGoNext" aria-label="Next year">&#8250;</button>
     </div>
-    <div class="rc-month-grid" role="group" :aria-label="yearLabel">
+    <div class="rc-month-grid" role="listbox" :aria-label="yearLabel">
       <template x-for="cell in monthGrid.flat()" :key="cell.month">
-        <div :class="monthClasses(cell)" :aria-disabled="cell.isDisabled" tabindex="-1" @click="!cell.isDisabled && selectMonth(cell.month)" x-text="cell.label"></div>
+        <div :class="monthClasses(cell)" :id="'month-' + cell.month" role="option" :aria-selected="_monthCellSelected(cell)" :aria-disabled="cell.isDisabled" tabindex="-1" @click="!cell.isDisabled && selectMonth(cell.month)" x-text="cell.label"></div>
       </template>
     </div>
   </div>
@@ -367,7 +367,7 @@ export function generateCalendarTemplate(options: TemplateOptions): string {
   const calendarInner = parts.join('\n')
 
   // Wrap in rc-calendar container
-  const calendarEl = `<div class="${calendarClass}" @keydown="handleKeydown($event)" tabindex="0" :aria-activedescendant="focusedDateISO ? 'day-' + focusedDateISO : null" role="application" aria-label="${ariaLabel}">
+  const calendarEl = `<div class="${calendarClass}" @keydown="handleKeydown($event)" tabindex="0" :aria-activedescendant="activeDescendantId" role="application" aria-label="${ariaLabel}">
 <div class="rc-sr-only" role="status" aria-live="polite" aria-atomic="true" x-text="_statusMessage"></div>
 ${calendarInner}
 </div>`

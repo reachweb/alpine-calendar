@@ -826,6 +826,7 @@ export function createCalendarData(
     inputValue: computeFormattedValue(selection),
     popupStyle: display === 'popup' ? 'position:fixed;inset:0;z-index:50;' : '',
     focusedDate: null as CalendarDate | null,
+    focusedMonth: null as number | null,
     hoverDate: null as CalendarDate | null,
     wizardStep: (wizard ? 1 : 0) as number,
     _wizardYear: null as number | null,
@@ -961,6 +962,19 @@ export function createCalendarData(
     /** ISO string of focused date for aria-activedescendant binding. */
     get focusedDateISO(): string {
       return this.focusedDate ? this.focusedDate.toISO() : ''
+    },
+
+    /**
+     * The id the calendar's `aria-activedescendant` should point at. Tracks the
+     * months grid while it is the active view (precision month, or the wizard's
+     * month step) and the day grid otherwise, so the focused cell is announced in
+     * every view that has keyboard navigation.
+     */
+    get activeDescendantId(): string | null {
+      if (this.view === 'months') {
+        return this.focusedMonth !== null ? `month-${this.focusedMonth}` : null
+      }
+      return this.focusedDateISO ? `day-${this.focusedDateISO}` : null
     },
 
     /** ID for the popup input element (for external label association). */
@@ -1433,22 +1447,29 @@ export function createCalendarData(
      * Compute CSS class object for a month cell in the month picker view.
      */
     monthClasses(cell: MonthCell): Record<string, boolean> {
-      // Register the selection counter so Alpine re-evaluates on commit.
-      void this._selectionRev
-      let selected: boolean
-      if (precision === 'month') {
-        // Highlight the committed month regardless of view (drives restore from value).
-        const sel = this._selection.toArray()[0] as CalendarDate | undefined
-        selected = !!sel && sel.year === cell.year && sel.month === cell.month
-      } else {
-        selected = this.month === cell.month && this.view === 'days'
-      }
       return {
         'rc-month': true,
         'rc-month--current': cell.isCurrentMonth,
-        'rc-month--selected': selected,
+        'rc-month--selected': this._monthCellSelected(cell),
         'rc-month--disabled': cell.isDisabled,
+        'rc-month--focused': this.focusedMonth === cell.month,
       }
+    },
+
+    /**
+     * Whether a month cell is the currently selected month. Drives both the
+     * `rc-month--selected` style and the cell's `aria-selected` state, so the two
+     * never drift apart.
+     */
+    _monthCellSelected(cell: MonthCell): boolean {
+      // Register the selection counter so Alpine re-evaluates on commit.
+      void this._selectionRev
+      if (precision === 'month') {
+        // Highlight the committed month regardless of view (drives restore from value).
+        const sel = this._selection.toArray()[0] as CalendarDate | undefined
+        return !!sel && sel.year === cell.year && sel.month === cell.month
+      }
+      return this.month === cell.month && this.view === 'days'
     },
 
     /**
@@ -1955,6 +1976,12 @@ export function createCalendarData(
     goToToday() {
       this.month = this._today.month
       this.year = this._today.year
+      // Precision month is a month-only picker — never expose the day grid.
+      if (precision === 'month') {
+        this.view = 'months'
+        this._rebuildMonthGrid()
+        return
+      }
       this.view = 'days'
     },
 
@@ -2164,6 +2191,31 @@ export function createCalendarData(
     setValue(value: string | string[] | CalendarDate | CalendarDate[]) {
       this._selection.clear()
 
+      // Precision month: the month is the unit of selection. Accept the value when
+      // its month is selectable and normalize to the first of the month — matching
+      // what _commitMonth() emits and what the initial-value path stores. The
+      // day-level _isEffectivelyDisabled check would wrongly reject a first-of-month
+      // value that precedes a mid-month minDate (e.g. 2026-06-01 with minDate
+      // 2026-06-15), even though the picker offers that month.
+      if (precision === 'month') {
+        const raw = Array.isArray(value) ? value[0] : value
+        const d =
+          raw instanceof CalendarDate
+            ? raw
+            : typeof raw === 'string'
+              ? (CalendarDate.fromISO(raw) ?? parseDate(raw, format, locale))
+              : null
+        if (d && !this._isMonthDisabled(d.year, d.month)) {
+          this.year = d.year
+          this.month = d.month
+          this._selection.toggle(new CalendarDate(d.year, d.month, 1))
+        }
+        this._selectionRev++
+        this._emitChange()
+        this._syncInputFromSelection()
+        return
+      }
+
       const dates: CalendarDate[] = []
 
       if (typeof value === 'string') {
@@ -2246,6 +2298,13 @@ export function createCalendarData(
       this.year = year
       if (month !== undefined) {
         this.month = month
+      }
+      // Precision month is a month-only picker — keep callers on the months grid
+      // and refresh it for the new year instead of exposing the day grid.
+      if (precision === 'month') {
+        this.view = 'months'
+        this._rebuildMonthGrid()
+        return
       }
       this.view = 'days'
       if (this.isScrollable) {
@@ -2637,6 +2696,47 @@ export function createCalendarData(
             if (this.focusedDate) {
               e.preventDefault()
               this.selectDate(this.focusedDate)
+            }
+            return
+        }
+      }
+
+      // --- Month view keyboard navigation ---
+      // The months grid is the whole picker for precision month (and the wizard's
+      // month step), so it needs the same roving-focus model the day grid has.
+      if (this.view === 'months' && precision === 'month') {
+        const cols = this.monthGrid[0]?.length || 3
+        switch (e.key) {
+          case 'ArrowRight':
+          case 'ArrowLeft':
+          case 'ArrowDown':
+          case 'ArrowUp':
+          case 'Home':
+          case 'End': {
+            e.preventDefault()
+            const current = this.focusedMonth ?? this.month
+            let next = current
+            if (e.key === 'ArrowRight') next = current + 1
+            else if (e.key === 'ArrowLeft') next = current - 1
+            else if (e.key === 'ArrowDown') next = current + cols
+            else if (e.key === 'ArrowUp') next = current - cols
+            else if (e.key === 'Home') next = 1
+            else if (e.key === 'End') next = 12
+            this.focusedMonth = Math.min(12, Math.max(1, next))
+            return
+          }
+          // Page keys move between years, mirroring the day grid's month paging.
+          case 'PageDown':
+          case 'PageUp':
+            e.preventDefault()
+            if (e.key === 'PageDown') this.next()
+            else this.prev()
+            return
+          case 'Enter':
+          case ' ':
+            if (this.focusedMonth !== null) {
+              e.preventDefault()
+              this.selectMonth(this.focusedMonth)
             }
             return
         }
