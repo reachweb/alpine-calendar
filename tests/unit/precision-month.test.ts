@@ -1,7 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createCalendarData } from '../../src/plugin/calendar-component'
 import type { CalendarConfig } from '../../src/plugin/calendar-component'
+import { generateCalendarTemplate } from '../../src/plugin/template'
 import { withAlpineMocks } from '../helpers'
+
+/** Build an Escape keydown event with spied-on preventDefault/stopPropagation. */
+function escapeEvent(): KeyboardEvent {
+  const event = new KeyboardEvent('keydown', { key: 'Escape' })
+  Object.defineProperty(event, 'preventDefault', { value: vi.fn() })
+  Object.defineProperty(event, 'stopPropagation', { value: vi.fn() })
+  return event
+}
 
 /**
  * Mount a calendar through the full init() path. Pass `refs` to bind an input
@@ -26,6 +35,17 @@ function lastChangeDetail(dispatchSpy: ReturnType<typeof vi.fn>) {
 // ---------------------------------------------------------------------------
 
 describe('precision: month — initial view', () => {
+  // Freeze "today" so the clamp tests are deterministic: the fixed date sits after
+  // the clamp-DOWN maxDate (2020) and before the clamp-UP minDate (2030), and the
+  // "forward-positions on today" test reads the same frozen clock.
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 4, 30)) // 2026-05-30 (month is 0-indexed)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('opens on the months grid (not the day grid, not a year step)', () => {
     const { c } = createComponent({ precision: 'month' })
     expect(c.view).toBe('months')
@@ -60,7 +80,7 @@ describe('precision: month — initial view', () => {
   })
 
   it('clamps the opening view UP to minDate when today precedes it', () => {
-    // today (real run date) is well before 2030, so the clamp must engage.
+    // frozen today (2026) is before 2030, so the clamp must engage.
     const { c } = createComponent({
       precision: 'month',
       minDate: '2030-06-01',
@@ -227,6 +247,61 @@ describe('precision: month — restore from value', () => {
     expect(c.monthClasses(july)['rc-month--selected']).toBe(false)
   })
 
+  it('restores a first-of-month value that precedes a mid-month minDate', () => {
+    // The picker lets the user commit June (part of it is in range) and emits
+    // 2026-06-01. Reloading with that exact value must restore the selection even
+    // though day 1 precedes minDate — month precision accepts at month granularity.
+    const { c } = createComponent({
+      precision: 'month',
+      format: 'MMMM YYYY',
+      value: '2026-06-01',
+      minDate: '2026-06-15',
+      maxDate: '2027-12-31',
+    })
+    expect(c.selectedDates).toHaveLength(1)
+    expect(c.selectedDates[0]!.toISO()).toBe('2026-06-01')
+    expect(c.inputValue).toBe('June 2026')
+    const june = c.monthGrid.flat().find((cell) => cell.month === 6)!
+    expect(c.monthClasses(june)['rc-month--selected']).toBe(true)
+  })
+
+  it('round-trips: a committed month restores to the same selection', () => {
+    const { c: picker } = createComponent({
+      precision: 'month',
+      minDate: '2026-06-15',
+      maxDate: '2027-12-31',
+    })
+    picker.selectMonth(6)
+    const emitted = picker.selectedDates[0]!.toISO()
+    const { c: restored } = createComponent({
+      precision: 'month',
+      value: emitted,
+      minDate: '2026-06-15',
+      maxDate: '2027-12-31',
+    })
+    expect(restored.selectedDates[0]!.toISO()).toBe(emitted)
+  })
+
+  it('still rejects a value whose whole month is out of range', () => {
+    const { c } = createComponent({
+      precision: 'month',
+      value: '2026-05-01', // May: entirely before minDate
+      minDate: '2026-06-15',
+      maxDate: '2027-12-31',
+    })
+    expect(c.selectedDates).toHaveLength(0)
+  })
+
+  it('normalizes a non-first-of-month value to the first of the month', () => {
+    const { c } = createComponent({
+      precision: 'month',
+      value: '2026-08-20',
+      minDate: '2026-06-01',
+      maxDate: '2027-12-31',
+    })
+    expect(c.selectedDates[0]!.toISO()).toBe('2026-08-01')
+  })
+
   it('opens on the stored year', () => {
     const { c } = createComponent({
       precision: 'month',
@@ -313,6 +388,82 @@ describe('precision: month — year clamping to [minYear, maxYear]', () => {
 })
 
 // ---------------------------------------------------------------------------
+// View containment — the months grid is the only reachable view
+// ---------------------------------------------------------------------------
+
+describe('precision: month — view containment', () => {
+  it('setView ignores attempts to switch to the year step', () => {
+    const { c } = createComponent({ precision: 'month', initialMonth: '2026-01' })
+    c.setView('years')
+    expect(c.view).toBe('months')
+  })
+
+  it('setView ignores attempts to switch to the day grid', () => {
+    const { c } = createComponent({ precision: 'month', initialMonth: '2026-01' })
+    c.setView('days')
+    expect(c.view).toBe('months')
+  })
+
+  it('Escape in the months view does NOT drop to the day grid (inline)', () => {
+    const { c } = createComponent({ precision: 'month', initialMonth: '2026-01' })
+    expect(c.view).toBe('months')
+    c.handleKeydown(escapeEvent())
+    expect(c.view).toBe('months')
+  })
+
+  it('Escape closes the popup from the months view without exposing days', () => {
+    const input = document.createElement('input')
+    const { c } = createComponent(
+      { precision: 'month', display: 'popup', format: 'MMMM YYYY', initialMonth: '2026-01' },
+      { 'rc-input': input },
+    )
+    c.open()
+    expect(c.isOpen).toBe(true)
+    c.handleKeydown(escapeEvent())
+    expect(c.isOpen).toBe(false)
+    expect(c.view).toBe('months')
+  })
+
+  it('day-precision Escape still returns to the day grid (regression guard)', () => {
+    const { c } = createComponent({})
+    c.setView('months')
+    expect(c.view).toBe('months')
+    c.handleKeydown(escapeEvent())
+    expect(c.view).toBe('days')
+  })
+
+  it('the rendered month header has no year-step button', () => {
+    const monthHtml = generateCalendarTemplate({
+      display: 'inline',
+      needsDayView: true,
+      needsScrollableView: false,
+      isDualChrome: false,
+      isWizard: false,
+      precisionMonth: true,
+      hasName: false,
+      showWeekNumbers: false,
+      hasPresets: false,
+      scrollHeight: 400,
+    })
+    expect(monthHtml).not.toContain("setView('years')")
+
+    const dayHtml = generateCalendarTemplate({
+      display: 'inline',
+      needsDayView: true,
+      needsScrollableView: false,
+      isDualChrome: false,
+      isWizard: false,
+      precisionMonth: false,
+      hasName: false,
+      showWeekNumbers: false,
+      hasPresets: false,
+      scrollHeight: 400,
+    })
+    expect(dayHtml).toContain("setView('years')")
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Read-only input
 // ---------------------------------------------------------------------------
 
@@ -334,6 +485,30 @@ describe('precision: month — read-only input', () => {
     expect(input.readOnly).toBe(false)
   })
 
+  it('restores the input to NOT read-only on detach (original state)', () => {
+    const input = document.createElement('input')
+    const { c } = createComponent(
+      { precision: 'month', display: 'popup', format: 'MMMM YYYY' },
+      { 'rc-input': input },
+    )
+    expect(input.readOnly).toBe(true)
+    c._detachInput!()
+    expect(input.readOnly).toBe(false)
+  })
+
+  it('does not clobber an input that was already read-only on detach', () => {
+    const input = document.createElement('input')
+    input.readOnly = true // consumer set it read-only for their own reasons
+    const { c } = createComponent(
+      { precision: 'month', display: 'popup', format: 'MMMM YYYY' },
+      { 'rc-input': input },
+    )
+    expect(input.readOnly).toBe(true)
+    c._detachInput!()
+    // Must restore the consumer's original read-only state, not force false.
+    expect(input.readOnly).toBe(true)
+  })
+
   it('handleBlur never re-parses or clears the selection', () => {
     const input = document.createElement('input')
     const { c } = createComponent(
@@ -347,6 +522,47 @@ describe('precision: month — read-only input', () => {
     c.handleBlur()
     expect(c.selectedDates[0]!.toISO()).toBe('2026-08-01')
     expect(c.inputValue).toBe('August 2026')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Overrides the wizard
+// ---------------------------------------------------------------------------
+
+describe('precision: month — overrides the wizard', () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>
+  beforeEach(() => {
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+  })
+  afterEach(() => {
+    warnSpy.mockRestore()
+  })
+
+  it('neutralizes wizard state even when wizard: true is set', () => {
+    const { c } = createComponent({ precision: 'month', wizard: true, initialMonth: '2026-01' })
+    expect(c.wizard).toBe(false)
+    expect(c.wizardMode).toBe('none')
+    expect(c.view).toBe('months')
+  })
+
+  it('reopening the popup lands on the months grid, not the wizard flow', () => {
+    const input = document.createElement('input')
+    const { c } = createComponent(
+      {
+        precision: 'month',
+        wizard: true,
+        display: 'popup',
+        format: 'MMMM YYYY',
+        initialMonth: '2026-01',
+      },
+      { 'rc-input': input },
+    )
+    c.open()
+    expect(c.view).toBe('months')
+    c.close()
+    c.open()
+    expect(c.view).toBe('months')
+    expect(c.wizardStep).toBe(0)
   })
 })
 
