@@ -323,8 +323,8 @@ These properties are available in templates via Alpine's reactivity:
 | `yearLabel` | `string` | Current year as string |
 | `decadeLabel` | `string` | Decade range label (e.g., "2024 – 2035") |
 | `wizardStepLabel` | `string` | Current wizard step name |
-| `canGoPrev` | `boolean` | Whether backward navigation is possible |
-| `canGoNext` | `boolean` | Whether forward navigation is possible |
+| `canGoPrev` | `boolean` | Whether backward navigation is possible (skips fully-unavailable months, stops at `minDate`) |
+| `canGoNext` | `boolean` | Whether forward navigation is possible (skips fully-unavailable months, stops at `maxDate`) |
 
 ## Methods
 
@@ -460,7 +460,7 @@ legitimate document-level listeners.
 |-----|--------|
 | Arrow keys | Move focus between days |
 | Enter / Space | Select focused day |
-| Page Down / Up | Next / previous month |
+| Page Down / Up | Next / previous month (hops over fully-unavailable months, like the arrows) |
 | Shift + Page Down / Up | Next / previous year |
 | Home / End | First / last day of month |
 | Escape | Close popup or return to day view |
@@ -731,6 +731,8 @@ Use a function for computed metadata. Called for each visible date:
 | `cssClass` | `string` | Custom CSS class(es) added to the day cell |
 
 All properties are optional and work independently. Dates with `availability: 'unavailable'` cannot be selected regardless of constraint settings.
+
+When a whole month is `unavailable` (e.g. a booking calendar with departures only in certain months), the day-view prev/next arrows — and the `Page Up`/`Page Down` keys — **hop over the empty months** to the nearest month that still has a selectable day, rather than dead-ending at the gap. Navigation still hard-stops at `minDate`/`maxDate`.
 
 ### Runtime Updates
 

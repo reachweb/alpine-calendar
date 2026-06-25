@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0]
+
+### Fixed
+
+- **Day-view month navigation could not cross a gap of fully-unavailable months.** When `dateMetadata` marked entire months as `availability: 'unavailable'` (e.g. a booking calendar with departures Aug–Oct 2026, then nothing until May 2027), the "Next month" arrow disabled itself at the last month before the gap and the later, still-selectable months became unreachable — and likewise backward. `canGoPrev`/`canGoNext` and `prev()`/`next()` now scan for the nearest earlier/later month that has a selectable day and hop straight to it, skipping any run of fully-unavailable in-range months — mirroring the existing `precision: 'month'` year-skipping behavior. The keyboard `PageUp`/`PageDown` path (`_moveFocusByMonths`) hops the same gaps, so keyboard and pointer navigation stay consistent. Genuine `minDate`/`maxDate` bounds still stop navigation at the edges, and scrollable (mobile multi-month) mode is unchanged.
+
 ## [1.1.0]
 
 ### Added
@@ -22,5 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `scrollableDayView()` template helper now takes an `isPopup` flag and routes through a new internal `scrollMaxHeight()` helper.
 - Demo (`demo/index.html`) updated to better showcase the responsive popup behavior.
 
+[1.2.0]: https://github.com/reachweb/alpine-calendar/releases/tag/v1.2.0
 [1.1.0]: https://github.com/reachweb/alpine-calendar/releases/tag/v1.1.0
 [1.0.1]: https://github.com/reachweb/alpine-calendar/releases/tag/v1.0.1

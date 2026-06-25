@@ -39,6 +39,15 @@ const MOBILE_BREAKPOINT = '(max-width: 639px)'
  */
 const MONTH_NAV_YEAR_SCAN = 120
 
+/**
+ * Upper bound on how many months days-view prev()/next() will scan past disabled
+ * months before treating a direction as exhausted. Mirrors MONTH_NAV_YEAR_SCAN at
+ * month granularity (120 years × 12 months); it only bounds wasted work at a
+ * min/max boundary where every month ahead is disabled (and so terminates the
+ * search). Generously larger than any realistic gap of fully-unavailable months.
+ */
+const MONTH_NAV_MONTH_SCAN = MONTH_NAV_YEAR_SCAN * 12
+
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
@@ -1377,7 +1386,8 @@ export function createCalendarData(
     /**
      * Whether backward navigation is possible from the current position.
      *
-     * - Days view: checks if the previous month has any selectable dates.
+     * - Days view: checks if any earlier month has selectable dates, hopping over a
+     *   gap of fully-unavailable in-range months (stops only at minDate).
      * - Months view: checks if the previous year has any selectable months.
      * - Years view: checks if the previous 12-year block has any selectable years.
      *
@@ -1389,8 +1399,11 @@ export function createCalendarData(
     get canGoPrev(): boolean {
       if (this.view === 'days') {
         if (this.isScrollable) return false
-        const d = new CalendarDate(this.year, this.month, 1).addMonths(-1)
-        return !this._isMonthDisabled(d.year, d.month)
+        // Like the month-precision year jump, step over any run of fully-unavailable
+        // months: navigation stays live whenever some earlier selectable month is
+        // reachable, not only when the immediately-previous one happens to be. Months
+        // outside [minDate, maxDate] are shallow-disabled, so the range still bounds it.
+        return this._nearestSelectableMonth(-1) !== null
       }
       if (this.view === 'months') {
         // Month-precision pickers have no year grid to jump through, so prev()/next()
@@ -1413,7 +1426,8 @@ export function createCalendarData(
     /**
      * Whether forward navigation is possible from the current position.
      *
-     * - Days view: checks if the next month has any selectable dates.
+     * - Days view: checks if any later month has selectable dates, hopping over a
+     *   gap of fully-unavailable in-range months (stops only at maxDate).
      * - Months view: checks if the next year has any selectable months.
      * - Years view: checks if the next 12-year block has any selectable years.
      *
@@ -1425,8 +1439,10 @@ export function createCalendarData(
     get canGoNext(): boolean {
       if (this.view === 'days') {
         if (this.isScrollable) return false
-        const d = new CalendarDate(this.year, this.month, 1).addMonths(1)
-        return !this._isMonthDisabled(d.year, d.month)
+        // See canGoPrev: forward navigation hops over a gap of fully-unavailable
+        // in-range months, so it stays live as long as a later selectable month is
+        // reachable. Out-of-range months are shallow-disabled, keeping maxDate the bound.
+        return this._nearestSelectableMonth(1) !== null
       }
       if (this.view === 'months') {
         // See canGoPrev: month-precision navigation steps over disabled years, so the
@@ -1971,13 +1987,21 @@ export function createCalendarData(
         this.year = target
         return
       }
-      this._navDirection = 'prev'
       if (this.view === 'days') {
         if (this.isScrollable) return
-        const d = new CalendarDate(this.year, this.month, 1).addMonths(-1)
-        this.month = d.month
-        this.year = d.year
-      } else if (this.view === 'months') {
+        // Mirror the month-precision year jump above: hop to the nearest earlier
+        // selectable month, skipping any run of fully-unavailable months so a
+        // within-range gap can't wall off the reachable months behind it. No-op when
+        // none is reachable (defensive — the arrow is already disabled via canGoPrev).
+        const target = this._nearestSelectableMonth(-1)
+        if (target === null) return
+        this._navDirection = 'prev'
+        this.month = target.month
+        this.year = target.year
+        return
+      }
+      this._navDirection = 'prev'
+      if (this.view === 'months') {
         this.year--
       } else if (this.view === 'years') {
         this.year -= 12
@@ -1992,13 +2016,20 @@ export function createCalendarData(
         this.year = target
         return
       }
-      this._navDirection = 'next'
       if (this.view === 'days') {
         if (this.isScrollable) return
-        const d = new CalendarDate(this.year, this.month, 1).addMonths(1)
-        this.month = d.month
-        this.year = d.year
-      } else if (this.view === 'months') {
+        // See prev(): hop to the nearest later selectable month, skipping a gap of
+        // fully-unavailable in-range months. No-op when none is reachable (defensive —
+        // canGoNext already disables the arrow in that case).
+        const target = this._nearestSelectableMonth(1)
+        if (target === null) return
+        this._navDirection = 'next'
+        this.month = target.month
+        this.year = target.year
+        return
+      }
+      this._navDirection = 'next'
+      if (this.view === 'months') {
         this.year++
       } else if (this.view === 'years') {
         this.year += 12
@@ -2017,6 +2048,26 @@ export function createCalendarData(
       for (let i = 1; i <= MONTH_NAV_YEAR_SCAN; i++) {
         const y = this.year + direction * i
         if (!this._isYearDisabled(y)) return y
+      }
+      return null
+    },
+
+    /**
+     * Nearest selectable month in a direction (+1 forward, -1 back) from the current
+     * (year, month), skipping any run of disabled months. The days-view prev/next
+     * arrows are the only way across months, so an adjacent-only check would strand a
+     * selectable month sitting behind a gap of fully-unavailable months (e.g. a booking
+     * calendar with departures Aug–Oct then nothing until next May). Out-of-range months
+     * are shallow-disabled (hence deep-disabled), so [minDate, maxDate] still bounds the
+     * scan and an out-of-range month is never returned. Returns null when no selectable
+     * month is reachable within MONTH_NAV_MONTH_SCAN steps (e.g. every month past maxDate
+     * is disabled).
+     */
+    _nearestSelectableMonth(direction: 1 | -1): { year: number; month: number } | null {
+      const from = new CalendarDate(this.year, this.month, 1)
+      for (let i = 1; i <= MONTH_NAV_MONTH_SCAN; i++) {
+        const d = from.addMonths(direction * i)
+        if (!this._isMonthDisabled(d.year, d.month)) return { year: d.year, month: d.month }
       }
       return null
     },
@@ -2822,21 +2873,43 @@ export function createCalendarData(
 
     /**
      * Move focusedDate by a number of months, clamping the day to valid range.
+     * If the target month is fully unavailable, hops across the gap to the nearest
+     * selectable month — keeping PageUp/PageDown consistent with the header arrows.
      */
     _moveFocusByMonths(deltaMonths: number) {
       if (!this.focusedDate) return
-      let candidate = this.focusedDate.addMonths(deltaMonths)
+      const step = deltaMonths > 0 ? 1 : -1
+      const target = this.focusedDate.addMonths(deltaMonths)
 
-      // Skip disabled dates (up to 31 attempts), matching _moveFocus() behavior
+      // Skip disabled dates within/just past the target month (up to 31 attempts),
+      // matching _moveFocus() behavior.
+      let candidate = target
       let attempts = 0
       while (this._isEffectivelyDisabled(candidate) && attempts < 31) {
-        candidate = candidate.addDays(deltaMonths > 0 ? 1 : -1)
+        candidate = candidate.addDays(step)
         attempts++
       }
+      if (!this._isEffectivelyDisabled(candidate)) {
+        this._setFocusedDate(candidate)
+        return
+      }
 
-      if (this._isEffectivelyDisabled(candidate)) return
-
-      this._setFocusedDate(candidate)
+      // The target month is fully unavailable and the day-by-day skip couldn't escape it
+      // (a multi-month gap). Mirror the header arrows (canGoPrev/canGoNext → next()/prev()
+      // → _nearestSelectableMonth): hop across the run of unavailable months to the nearest
+      // selectable month in this direction and focus its first selectable day, so keyboard
+      // paging crosses the same gaps the arrows do instead of dead-ending at the gap.
+      // Out-of-range months are deep-disabled, so minDate/maxDate still bound the hop.
+      const base = new CalendarDate(target.year, target.month, 1)
+      for (let i = 0; i <= MONTH_NAV_MONTH_SCAN; i++) {
+        const m = base.addMonths(step * i)
+        if (this._isMonthDisabled(m.year, m.month)) continue
+        const day = this._firstSelectableDay(m.year, m.month)
+        if (day) {
+          this._setFocusedDate(day)
+          return
+        }
+      }
     },
 
     /**
