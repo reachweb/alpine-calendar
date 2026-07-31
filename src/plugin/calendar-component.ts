@@ -175,6 +175,18 @@ export interface CalendarConfig {
   /** Close popup after a date is selected. Default: true. */
   closeOnSelect?: boolean
   /**
+   * Whether clicking an already-selected date deselects it. Default: true.
+   *
+   * When `false`, re-clicking the selected date in single mode (or an
+   * already-selected date in multiple mode) keeps the selection: no toggle,
+   * no `calendar:change`. In popup display the click still closes the popup,
+   * exactly like a completed selection — it reads as "confirm this date".
+   *
+   * Only click/keyboard selection is affected; `clearSelection()`, `clear()`,
+   * `setValue()`, and range mode behave the same regardless of this option.
+   */
+  allowDeselect?: boolean
+  /**
    * Callback invoked before a date is selected. Return `false` to prevent the selection.
    *
    * Receives the date being selected and context about the current selection state.
@@ -682,6 +694,7 @@ export function createCalendarData(
   const inputRef = config.inputRef ?? 'rc-input'
   const locale = config.locale
   const closeOnSelect = config.closeOnSelect ?? mode !== 'multiple'
+  const allowDeselect = config.allowDeselect ?? true
   const beforeSelectCb = config.beforeSelect ?? null
 
   // --- Build constraint functions ---
@@ -2106,6 +2119,20 @@ export function createCalendarData(
           }
           if (!this._isRangeValid(start, end)) return
         }
+      }
+
+      // allowDeselect: false — re-clicking a selected date confirms it instead of
+      // toggling it off. Skips beforeSelect too (there is no 'deselect' action to
+      // veto), but still auto-closes the popup like a completed selection.
+      // Range mode is untouched: its toggle() re-click semantics are part of the
+      // start/end picking flow, not a deselection gesture.
+      if (
+        !allowDeselect &&
+        (mode === 'single' || mode === 'multiple') &&
+        this._selection.isSelected(date)
+      ) {
+        if (closeOnSelect && display === 'popup' && this.isOpen) this.close()
+        return
       }
 
       // beforeSelect callback: allow consumers to prevent selection

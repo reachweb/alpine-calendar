@@ -215,6 +215,7 @@ All options are passed via `x-data="calendar({ ... })"`.
 | `locale` | `string` | — | BCP 47 locale for month/day names |
 | `timezone` | `string` | — | IANA timezone for resolving "today" |
 | `closeOnSelect` | `boolean` | `true` | Close popup after selection |
+| `allowDeselect` | `boolean` | `true` | When `false`, re-clicking a selected date keeps the selection instead of toggling it off (single/multiple modes; the popup still closes as if the date was picked). Programmatic clearing (`clearSelection()`, `setValue()`) is unaffected |
 | `wizard` | `boolean \| 'year-month' \| 'month-day'` | `false` | Birth date wizard mode |
 | `beforeSelect` | `(date, ctx) => boolean` | — | Custom validation before selection |
 | `showWeekNumbers` | `boolean` | `false` | Show ISO 8601 week numbers alongside the day grid |
