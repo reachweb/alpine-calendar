@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **`allowDeselect: false` now lets range mode select a single day.** Re-clicking the range start before an end is picked completes a one-day range (start = end) instead of clearing the start: `calendar:change` fires, `beforeSelect` sees a `'select'`, and the popup closes. Re-clicking a completed one-day range keeps it, and re-clicking an endpoint of a longer range still starts a new range. A `minRange` above 1 blocks the one-day range: the hovered start shows as `rc-day--range-invalid`, and the click keeps the start. Range calendars with the default `allowDeselect: true` are unchanged.
+
 ## [1.3.0]
 
 ### Added

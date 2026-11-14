@@ -223,19 +223,80 @@ describe('allowDeselect default behavior (backward compatibility)', () => {
   })
 })
 
-describe('allowDeselect: false — range mode unaffected', () => {
-  it('clicking the partial-range start still deselects it', () => {
-    const c = createCalendarData({ mode: 'range', allowDeselect: false })
+describe('allowDeselect: false — range mode', () => {
+  it('re-clicking the lone range start completes a one-day range', () => {
+    const c = createCalendarData({ mode: 'range', display: 'popup', allowDeselect: false })
+    const { dispatchSpy, flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+
+    c.open()
+    c.selectDate(new CalendarDate(2025, 6, 10))
+    expect(c.isOpen).toBe(true)
+    expect(c.isDateSelectableForRange(new CalendarDate(2025, 6, 10))).toBe(true)
+    dispatchSpy.mockClear()
+
+    c.selectDate(new CalendarDate(2025, 6, 10))
+    flushNextTick()
+
+    expect(c.selectedDates.map((d) => d.toISO())).toEqual(['2025-06-10', '2025-06-10'])
+    const changeEvents = dispatchSpy.mock.calls.filter(
+      (call: unknown[]) => call[0] === 'calendar:change',
+    )
+    expect(changeEvents).toHaveLength(1)
+    expect(changeEvents[0]![1].value).toBe('2025-06-10 – 2025-06-10')
+    expect(c.isOpen).toBe(false)
+    expect(c._statusMessage).toMatch(/^Range: .*2025 \(one day\)$/)
+  })
+
+  it('re-clicking a completed one-day range keeps it and closes the popup', () => {
+    const c = createCalendarData({ mode: 'range', display: 'popup', allowDeselect: false })
+    const { dispatchSpy, flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+
+    c.open()
+    c.selectDate(new CalendarDate(2025, 6, 10))
+    c.selectDate(new CalendarDate(2025, 6, 10))
+    c.open()
+    dispatchSpy.mockClear()
+
+    c.selectDate(new CalendarDate(2025, 6, 10))
+
+    expect(c.selectedDates.map((d) => d.toISO())).toEqual(['2025-06-10', '2025-06-10'])
+    expect(
+      dispatchSpy.mock.calls.filter((call: unknown[]) => call[0] === 'calendar:select'),
+    ).toHaveLength(0)
+    expect(c.isOpen).toBe(false)
+  })
+
+  it('minRange above 1 blocks the one-day range and keeps the start', () => {
+    const c = createCalendarData({ mode: 'range', allowDeselect: false, minRange: 2 })
     const { flushNextTick } = withAlpineMocks(c)
     c.init()
     flushNextTick()
 
     c.selectDate(new CalendarDate(2025, 6, 10))
-    expect(c.selectedDates).toHaveLength(1)
+    expect(c.isDateSelectableForRange(new CalendarDate(2025, 6, 10))).toBe(false)
 
-    // Range toggle semantics: re-clicking the lone start clears it
+    // The start fades only while it is the hovered cell
+    const startCell = {
+      date: new CalendarDate(2025, 6, 10),
+      isCurrentMonth: true,
+      isToday: false,
+      isDisabled: false,
+    }
+    c.hoverDate = new CalendarDate(2025, 6, 10)
+    expect(c.dayClasses(startCell)['rc-day--range-invalid']).toBe(true)
+    c.hoverDate = new CalendarDate(2025, 6, 11)
+    expect(c.dayClasses(startCell)['rc-day--range-invalid']).toBe(false)
+    c.hoverDate = null
+
     c.selectDate(new CalendarDate(2025, 6, 10))
-    expect(c.selectedDates).toHaveLength(0)
+    expect(c.selectedDates.map((d) => d.toISO())).toEqual(['2025-06-10'])
+
+    c.selectDate(new CalendarDate(2025, 6, 11))
+    expect(c.selectedDates.map((d) => d.toISO())).toEqual(['2025-06-10', '2025-06-11'])
   })
 
   it('range building works normally', () => {
@@ -320,6 +381,25 @@ describe('allowDeselect: false — interaction with beforeSelect', () => {
     expect(c.selectedDates).toHaveLength(1)
   })
 
+  it('completing a one-day range reaches beforeSelect as a select', () => {
+    const spy = vi.fn(() => true)
+    const c = createCalendarData({
+      mode: 'range',
+      allowDeselect: false,
+      beforeSelect: spy,
+    })
+    const { flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+
+    c.selectDate(new CalendarDate(2025, 6, 10))
+    spy.mockClear()
+
+    c.selectDate(new CalendarDate(2025, 6, 10))
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(spy.mock.calls[0]![1].action).toBe('select')
+  })
+
   it('beforeSelect still receives deselect actions when allowDeselect is true', () => {
     const spy = vi.fn(() => true)
     const c = createCalendarData({
@@ -336,6 +416,21 @@ describe('allowDeselect: false — interaction with beforeSelect', () => {
 
     c.selectDate(new CalendarDate(2025, 6, 15))
     expect(spy.mock.calls[0]![1].action).toBe('deselect')
+  })
+
+  it('range mode by default: re-clicking the lone start reaches beforeSelect as a deselect', () => {
+    const spy = vi.fn(() => true)
+    const c = createCalendarData({ mode: 'range', beforeSelect: spy })
+    const { flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+
+    c.selectDate(new CalendarDate(2025, 6, 10))
+    spy.mockClear()
+
+    c.selectDate(new CalendarDate(2025, 6, 10))
+    expect(spy.mock.calls[0]![1].action).toBe('deselect')
+    expect(c.selectedDates).toHaveLength(0)
   })
 })
 

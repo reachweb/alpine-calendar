@@ -182,8 +182,12 @@ export interface CalendarConfig {
    * no `calendar:change`. In popup display the click still closes the popup,
    * exactly like a completed selection — it reads as "confirm this date".
    *
+   * In range mode, re-clicking the range start before an end is picked
+   * completes a one-day range (subject to `minRange`), and re-clicking a
+   * completed one-day range keeps it.
+   *
    * Only click/keyboard selection is affected; `clearSelection()`, `clear()`,
-   * `setValue()`, and range mode behave the same regardless of this option.
+   * and `setValue()` behave the same regardless of this option.
    */
   allowDeselect?: boolean
   /**
@@ -1547,13 +1551,15 @@ export function createCalendarData(
       const inRange = this.isInRange(d, this.hoverDate ?? undefined)
       const isOtherMonth = !cell.isCurrentMonth
 
-      // Hover preview constraint feedback: mark dates that would form an invalid range
+      // Hover preview constraint feedback: mark dates that would form an invalid range.
+      // The selected range start is checked only while hovered: with allowDeselect: false,
+      // clicking it completes a one-day range, which minRange can reject.
       let rangeInvalid = false
       if (
         mode === 'range' &&
         this.hoverDate !== null &&
         !cell.isDisabled &&
-        !selected &&
+        (!selected || this.hoverDate.isSame(d)) &&
         (this._selection as RangeSelection).isPartial()
       ) {
         rangeInvalid = !this.isDateSelectableForRange(d)
@@ -2104,11 +2110,19 @@ export function createCalendarData(
       if (!date) return
       if (this._isEffectivelyDisabled(date)) return
 
+      // allowDeselect: false in range mode — re-clicking the lone range start ends
+      // the range there (a one-day range) instead of clearing it.
+      const completesOneDayRange =
+        !allowDeselect &&
+        mode === 'range' &&
+        (this._selection as RangeSelection).isPartial() &&
+        this._selection.isSelected(date)
+
       // Range validation: when about to complete a range, check min/max range
       if (mode === 'range') {
         const range = this._selection as RangeSelection
         const rangeStart = range.getStart()
-        if (range.isPartial() && rangeStart && !date.isSame(rangeStart)) {
+        if (range.isPartial() && rangeStart && (completesOneDayRange || !date.isSame(rangeStart))) {
           // Determine actual start/end after potential swap
           let start: CalendarDate = rangeStart
           let end: CalendarDate = date
@@ -2124,12 +2138,13 @@ export function createCalendarData(
       // allowDeselect: false — re-clicking a selected date confirms it instead of
       // toggling it off. Skips beforeSelect too (there is no 'deselect' action to
       // veto), but still auto-closes the popup like a completed selection.
-      // Range mode is untouched: its toggle() re-click semantics are part of the
-      // start/end picking flow, not a deselection gesture.
+      // In range mode this applies only to a completed one-day range; re-clicking
+      // an endpoint of a longer range still starts a new range.
       if (
         !allowDeselect &&
-        (mode === 'single' || mode === 'multiple') &&
-        this._selection.isSelected(date)
+        (mode === 'range'
+          ? this.isRangeStart(date) && this.isRangeEnd(date)
+          : this._selection.isSelected(date))
       ) {
         if (closeOnSelect && display === 'popup' && this.isOpen) this.close()
         return
@@ -2137,7 +2152,8 @@ export function createCalendarData(
 
       // beforeSelect callback: allow consumers to prevent selection
       if (beforeSelectCb) {
-        const action = this._selection.isSelected(date) ? 'deselect' : 'select'
+        const action =
+          this._selection.isSelected(date) && !completesOneDayRange ? 'deselect' : 'select'
         const result = beforeSelectCb(date, {
           mode,
           selectedDates: this._selection.toArray(),
@@ -2150,7 +2166,11 @@ export function createCalendarData(
       const wasSelected = this._selection.isSelected(date)
       const wasPartialRange = mode === 'range' && (this._selection as RangeSelection).isPartial()
 
-      this._selection.toggle(date)
+      if (completesOneDayRange) {
+        ;(this._selection as RangeSelection).setRange(date, date)
+      } else {
+        this._selection.toggle(date)
+      }
       // Sync all three wizard fields from the actual selection. A user can reach
       // selectDate() in wizard mode with a date whose month/year differs from the
       // earlier month/year step — e.g., when months >= 2 (including mobileMonths)
@@ -2197,7 +2217,11 @@ export function createCalendarData(
               { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' },
               locale,
             )
-            this._announce('Range: ' + startLabel + ' to ' + endLabel)
+            this._announce(
+              (dates[0] as CalendarDate).isSame(dates[1] as CalendarDate)
+                ? 'Range: ' + startLabel + ' (one day)'
+                : 'Range: ' + startLabel + ' to ' + endLabel,
+            )
           }
         }
       }
@@ -2257,8 +2281,9 @@ export function createCalendarData(
       const rangeStart = range.getStart()
       if (!rangeStart) return true
 
-      // Clicking the same date as start deselects — always allowed
-      if (date.isSame(rangeStart)) return true
+      // Clicking the same date as start deselects — always allowed. With
+      // allowDeselect: false it completes a one-day range, validated below.
+      if (allowDeselect && date.isSame(rangeStart)) return true
 
       // Determine actual start/end after potential swap
       let start = rangeStart
