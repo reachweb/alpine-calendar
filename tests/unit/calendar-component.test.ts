@@ -2256,6 +2256,9 @@ describe('popup positioning', () => {
   it('popupStyle is set eagerly for popup display', () => {
     const c = createCalendarData({ display: 'popup' })
     expect(c.popupStyle).toContain('position:fixed')
+    // The inline z-index must read the themable variable; a fixed number would
+    // override --z-calendar-popup.
+    expect(c.popupStyle).toContain('z-index:var(--z-calendar-popup,50)')
   })
 
   it('open() dispatches calendar:open and sets isOpen', () => {
@@ -2267,6 +2270,39 @@ describe('popup positioning', () => {
     c.open()
     expect(c.isOpen).toBe(true)
     expect(dispatchSpy).toHaveBeenCalledWith('calendar:open', null)
+  })
+
+  it('reopening scrolls the overlay back to the top, but open() while open does not', async () => {
+    const c = createCalendarData({ display: 'popup', mode: 'range', months: 2 })
+    const { flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+    const overlay = document.createElement('div')
+    document.body.appendChild(overlay)
+    c._popupOverlayEl = overlay
+    // MutationObserver callbacks run as microtasks; a timer turn lets them finish.
+    const settle = () => new Promise((resolve) => setTimeout(resolve))
+
+    c.open()
+    overlay.scrollTop = 160
+
+    // Input focus calls open() again while open; the user's scroll position stays.
+    c.open()
+    await settle()
+    expect(overlay.scrollTop).toBe(160)
+
+    // x-show hides the overlay on close and reveals it a frame or more after open().
+    // A hidden element can't be scrolled, so the reset has to wait for it.
+    c.close()
+    overlay.style.display = 'none'
+    c.open()
+    await settle()
+    expect(overlay.scrollTop).toBe(160)
+    overlay.style.display = ''
+    await settle()
+    expect(overlay.scrollTop).toBe(0)
+
+    c.destroy()
   })
 
   it('close() resets popupStyle and stops positioning', () => {
@@ -2318,6 +2354,58 @@ describe('handleKeydown', () => {
     expect(preventSpy).toHaveBeenCalled()
     expect(stopSpy).toHaveBeenCalled()
     expect(dispatchSpy).toHaveBeenCalledWith('calendar:close', null)
+  })
+
+  it('Escape on the focused input closes the popup without reaching the page, and the next focus reopens it', () => {
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    const pageHandler = vi.fn()
+    document.addEventListener('keydown', pageHandler)
+    const c = createCalendarData({ display: 'popup', mask: false })
+    const { flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+    c.bindInput(input)
+
+    // Focus stays on the input after it opens the popup, so Escape is pressed there.
+    input.focus()
+    expect(c.isOpen).toBe(true)
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    input.dispatchEvent(event)
+    expect(c.isOpen).toBe(false)
+    expect(event.defaultPrevented).toBe(true)
+    // A modal around the calendar must not close on the same key press.
+    expect(pageHandler).not.toHaveBeenCalled()
+
+    // The input never lost focus, so no focus event is pending to swallow.
+    input.blur()
+    input.focus()
+    expect(c.isOpen).toBe(true)
+
+    document.removeEventListener('keydown', pageHandler)
+    c.destroy()
+    input.remove()
+  })
+
+  it('Escape on the input is left to the page while the popup is closed', () => {
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    const pageHandler = vi.fn()
+    document.addEventListener('keydown', pageHandler)
+    const c = createCalendarData({ display: 'popup', mask: false })
+    const { flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+    c.bindInput(input)
+
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    input.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+    expect(pageHandler).toHaveBeenCalledTimes(1)
+
+    document.removeEventListener('keydown', pageHandler)
+    c.destroy()
+    input.remove()
   })
 
   it('returns focus to input on Escape', () => {
