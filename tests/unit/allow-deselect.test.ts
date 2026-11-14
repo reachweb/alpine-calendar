@@ -270,33 +270,60 @@ describe('allowDeselect: false — range mode', () => {
     expect(c.isOpen).toBe(false)
   })
 
-  it('minRange above 1 blocks the one-day range and keeps the start', () => {
-    const c = createCalendarData({ mode: 'range', allowDeselect: false, minRange: 2 })
+  it('minRange above 1 forbids the one-day range, so the re-click clears the start', () => {
+    const spy = vi.fn(() => true)
+    const c = createCalendarData({
+      mode: 'range',
+      allowDeselect: false,
+      minRange: 2,
+      beforeSelect: spy,
+    })
     const { flushNextTick } = withAlpineMocks(c)
     c.init()
     flushNextTick()
 
     c.selectDate(new CalendarDate(2025, 6, 10))
-    expect(c.isDateSelectableForRange(new CalendarDate(2025, 6, 10))).toBe(false)
+    expect(c.isDateSelectableForRange(new CalendarDate(2025, 6, 10))).toBe(true)
 
-    // The start fades only while it is the hovered cell
-    const startCell = {
+    // The freshly picked start is never dimmed, even while the pointer is still on it
+    c.hoverDate = new CalendarDate(2025, 6, 10)
+    const startClasses = c.dayClasses({
       date: new CalendarDate(2025, 6, 10),
       isCurrentMonth: true,
       isToday: false,
       isDisabled: false,
-    }
-    c.hoverDate = new CalendarDate(2025, 6, 10)
-    expect(c.dayClasses(startCell)['rc-day--range-invalid']).toBe(true)
-    c.hoverDate = new CalendarDate(2025, 6, 11)
-    expect(c.dayClasses(startCell)['rc-day--range-invalid']).toBe(false)
+    })
+    expect(startClasses['rc-day--range-invalid']).toBe(false)
     c.hoverDate = null
+    spy.mockClear()
 
     c.selectDate(new CalendarDate(2025, 6, 10))
-    expect(c.selectedDates.map((d) => d.toISO())).toEqual(['2025-06-10'])
+    expect(c.selectedDates).toHaveLength(0)
+    expect(spy.mock.calls[0]![1].action).toBe('deselect')
 
-    c.selectDate(new CalendarDate(2025, 6, 11))
-    expect(c.selectedDates.map((d) => d.toISO())).toEqual(['2025-06-10', '2025-06-11'])
+    // A different start can then be picked and completed
+    c.selectDate(new CalendarDate(2025, 6, 12))
+    c.selectDate(new CalendarDate(2025, 6, 13))
+    expect(c.selectedDates.map((d) => d.toISO())).toEqual(['2025-06-12', '2025-06-13'])
+  })
+
+  it('a rules minRange forbids the one-day range only for starts inside the rule', () => {
+    const c = createCalendarData({
+      mode: 'range',
+      allowDeselect: false,
+      rules: [{ from: '2025-06-01', to: '2025-06-30', minRange: 3 }],
+    })
+    const { flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+
+    c.selectDate(new CalendarDate(2025, 6, 10))
+    c.selectDate(new CalendarDate(2025, 6, 10))
+    expect(c.selectedDates).toHaveLength(0)
+
+    c.selectDate(new CalendarDate(2025, 7, 10))
+    c.selectDate(new CalendarDate(2025, 7, 10))
+    expect(c.selectedDates.map((d) => d.toISO())).toEqual(['2025-07-10', '2025-07-10'])
   })
 
   it('range building works normally', () => {
@@ -325,6 +352,19 @@ describe('allowDeselect: false — range mode', () => {
 
     expect(c.selectedDates).toHaveLength(1)
     expect(c.selectedDates[0]!.toISO()).toBe('2025-06-10')
+  })
+
+  it('clicking the end of a complete range starts a new range there', () => {
+    const c = createCalendarData({ mode: 'range', allowDeselect: false })
+    const { flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+
+    c.selectDate(new CalendarDate(2025, 6, 10))
+    c.selectDate(new CalendarDate(2025, 6, 20))
+    c.selectDate(new CalendarDate(2025, 6, 20))
+
+    expect(c.selectedDates.map((d) => d.toISO())).toEqual(['2025-06-20'])
   })
 })
 

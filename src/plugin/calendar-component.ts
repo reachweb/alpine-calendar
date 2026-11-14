@@ -183,8 +183,10 @@ export interface CalendarConfig {
    * exactly like a completed selection — it reads as "confirm this date".
    *
    * In range mode, re-clicking the range start before an end is picked
-   * completes a one-day range (subject to `minRange`), and re-clicking a
-   * completed one-day range keeps it.
+   * completes a one-day range, and re-clicking a completed one-day range keeps
+   * it. When `minRange` (including a `rules` override) forbids a one-day range,
+   * the re-click clears the start as it does by default. Clicking an endpoint
+   * of a longer range still starts a new range.
    *
    * Only click/keyboard selection is affected; `clearSelection()`, `clear()`,
    * and `setValue()` behave the same regardless of this option.
@@ -1551,15 +1553,13 @@ export function createCalendarData(
       const inRange = this.isInRange(d, this.hoverDate ?? undefined)
       const isOtherMonth = !cell.isCurrentMonth
 
-      // Hover preview constraint feedback: mark dates that would form an invalid range.
-      // The selected range start is checked only while hovered: with allowDeselect: false,
-      // clicking it completes a one-day range, which minRange can reject.
+      // Hover preview constraint feedback: mark dates that would form an invalid range
       let rangeInvalid = false
       if (
         mode === 'range' &&
         this.hoverDate !== null &&
         !cell.isDisabled &&
-        (!selected || this.hoverDate.isSame(d)) &&
+        !selected &&
         (this._selection as RangeSelection).isPartial()
       ) {
         rangeInvalid = !this.isDateSelectableForRange(d)
@@ -2111,18 +2111,21 @@ export function createCalendarData(
       if (this._isEffectivelyDisabled(date)) return
 
       // allowDeselect: false in range mode — re-clicking the lone range start ends
-      // the range there (a one-day range) instead of clearing it.
+      // the range there (a one-day range) instead of clearing it. When minRange
+      // forbids a one-day range, the re-click clears the start as usual, so a
+      // mis-picked start never gets stuck.
       const completesOneDayRange =
         !allowDeselect &&
         mode === 'range' &&
         (this._selection as RangeSelection).isPartial() &&
-        this._selection.isSelected(date)
+        this._selection.isSelected(date) &&
+        this._isRangeValid(date, date)
 
       // Range validation: when about to complete a range, check min/max range
       if (mode === 'range') {
         const range = this._selection as RangeSelection
         const rangeStart = range.getStart()
-        if (range.isPartial() && rangeStart && (completesOneDayRange || !date.isSame(rangeStart))) {
+        if (range.isPartial() && rangeStart && !date.isSame(rangeStart)) {
           // Determine actual start/end after potential swap
           let start: CalendarDate = rangeStart
           let end: CalendarDate = date
@@ -2281,9 +2284,9 @@ export function createCalendarData(
       const rangeStart = range.getStart()
       if (!rangeStart) return true
 
-      // Clicking the same date as start deselects — always allowed. With
-      // allowDeselect: false it completes a one-day range, validated below.
-      if (allowDeselect && date.isSame(rangeStart)) return true
+      // Clicking the same date as start is always allowed: it deselects, or with
+      // allowDeselect: false completes a one-day range when minRange permits one.
+      if (date.isSame(rangeStart)) return true
 
       // Determine actual start/end after potential swap
       let start = rangeStart

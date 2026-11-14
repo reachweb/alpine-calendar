@@ -9,7 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **`allowDeselect: false` now lets range mode select a single day.** Re-clicking the range start before an end is picked completes a one-day range (start = end) instead of clearing the start: `calendar:change` fires, `beforeSelect` sees a `'select'`, and the popup closes. Re-clicking a completed one-day range keeps it, and re-clicking an endpoint of a longer range still starts a new range. A `minRange` above 1 blocks the one-day range: the hovered start shows as `rc-day--range-invalid`, and the click keeps the start. Range calendars with the default `allowDeselect: true` are unchanged.
+- **`allowDeselect: false` now lets range mode select a single day.** Re-clicking the range start before an end is picked completes a one-day range (start = end) instead of clearing the start: `calendar:change` fires, `beforeSelect` sees a `'select'`, and the popup closes. Re-clicking a completed one-day range keeps it, and re-clicking an endpoint of a longer range still starts a new range. When `minRange` (including a `rules` override) forbids a one-day range, the re-click clears the start as it does by default. Range calendars with the default `allowDeselect: true` are unchanged.
+
+### Fixed
+
+- **A same-day range broke the hidden form inputs.** With `name` set, a range whose start and end are the same day (for example `setValue(['2026-11-18', '2026-11-18'])`) gave the hidden inputs duplicate `x-for` keys, so Alpine threw and the inputs were not rendered. They are now keyed by position, and both values are submitted.
 
 ## [1.3.0]
 
