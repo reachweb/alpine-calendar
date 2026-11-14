@@ -466,6 +466,7 @@ legitimate document-level listeners.
 | Shift + Page Down / Up | Next / previous year |
 | Home / End | First / last day of month |
 | Escape | Close popup or return to day view. Also works from the popup's input while the popup is open |
+| Alt + Down | Open the popup from its input (clicking the input also opens it) |
 
 ## Theming
 

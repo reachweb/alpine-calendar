@@ -1821,10 +1821,25 @@ export function createCalendarData(
       // Focus stays on the input after it opens the popup, so key presses never reach
       // the calendar's own keydown handler. Hand Escape to it while the popup is open;
       // while it is closed the key is left to the page (a modal around the input, say).
+      // Alt+ArrowDown opens a closed popup, as in the ARIA combobox pattern.
       const keydownHandler = (e: KeyboardEvent) => {
-        if (e.key === 'Escape' && display === 'popup' && this.isOpen) this.handleKeydown(e)
+        if (display !== 'popup') return
+        if (e.key === 'Escape' && this.isOpen) {
+          this.handleKeydown(e)
+        } else if (e.key === 'ArrowDown' && e.altKey && !this.isOpen) {
+          e.preventDefault()
+          this.open()
+        }
       }
       el.addEventListener('keydown', keydownHandler)
+
+      // Escape closes the popup with focus still on the input, so no focus event comes
+      // to reopen it: a click opens it too. A click that focuses the input finds the
+      // popup already opened by the focus event, so it doesn't open it twice.
+      const clickHandler = () => {
+        if (display === 'popup' && !this.isOpen) this.open()
+      }
+      el.addEventListener('click', clickHandler)
 
       // Set aria attributes for popup combobox pattern
       if (display === 'popup') {
@@ -1851,6 +1866,7 @@ export function createCalendarData(
         el.removeEventListener('focus', focusHandler)
         el.removeEventListener('blur', blurHandler)
         el.removeEventListener('keydown', keydownHandler)
+        el.removeEventListener('click', clickHandler)
         if (display === 'popup') {
           el.removeAttribute('role')
           el.removeAttribute('aria-haspopup')

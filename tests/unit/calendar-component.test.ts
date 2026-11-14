@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createCalendarData } from '../../src/plugin/calendar-component'
 import type { CalendarConfig } from '../../src/plugin/calendar-component'
 import { CalendarDate } from '../../src/core/calendar-date'
@@ -2472,6 +2472,87 @@ describe('handleKeydown', () => {
 
     c.handleKeydown(new KeyboardEvent('keydown', { key: 'Escape' }))
     expect(c.isOpen).toBe(true) // inline is always open
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Bound input — reopening the popup after Escape
+// ---------------------------------------------------------------------------
+
+describe('bound input — reopening the popup', () => {
+  let input: HTMLInputElement
+  let c: ReturnType<typeof createCalendarData>
+  let dispatchSpy: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    input = document.createElement('input')
+    document.body.appendChild(input)
+    c = createCalendarData({ display: 'popup', mask: false })
+    const mocks = withAlpineMocks(c)
+    dispatchSpy = mocks.dispatchSpy
+    c.init()
+    mocks.flushNextTick()
+    c.bindInput(input)
+  })
+
+  afterEach(() => {
+    c.destroy()
+    input.remove()
+  })
+
+  const pressOnInput = (init: KeyboardEventInit) => {
+    const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init })
+    input.dispatchEvent(event)
+    return event
+  }
+  const openCount = () => dispatchSpy.mock.calls.filter(([type]) => type === 'calendar:open').length
+
+  it('a click on the still-focused input reopens a popup closed with Escape', () => {
+    input.focus()
+    pressOnInput({ key: 'Escape' })
+    expect(c.isOpen).toBe(false)
+    expect(document.activeElement).toBe(input)
+
+    input.click()
+    expect(c.isOpen).toBe(true)
+
+    // Escape from inside the calendar refocuses the input without reopening the popup
+    // (_suppressFocusOpen); a click on the input then reopens it.
+    const grid = document.createElement('div')
+    grid.tabIndex = 0
+    grid.addEventListener('keydown', (e) => c.handleKeydown(e))
+    document.body.appendChild(grid)
+    grid.focus()
+    grid.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(document.activeElement).toBe(input)
+    expect(c.isOpen).toBe(false)
+
+    input.click()
+    expect(c.isOpen).toBe(true)
+    grid.remove()
+  })
+
+  it('Alt+ArrowDown on the input reopens a popup closed with Escape', () => {
+    input.focus()
+    pressOnInput({ key: 'Escape' })
+    expect(c.isOpen).toBe(false)
+
+    expect(pressOnInput({ key: 'ArrowDown' }).defaultPrevented).toBe(false)
+    expect(c.isOpen).toBe(false)
+
+    expect(pressOnInput({ key: 'ArrowDown', altKey: true }).defaultPrevented).toBe(true)
+    expect(c.isOpen).toBe(true)
+  })
+
+  it('a single click on an unfocused input opens the popup exactly once', () => {
+    // The browser fires focus between mousedown and mouseup, then click.
+    input.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    input.focus()
+    input.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+    input.click()
+
+    expect(c.isOpen).toBe(true)
+    expect(openCount()).toBe(1)
   })
 })
 

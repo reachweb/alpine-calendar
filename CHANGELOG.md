@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1]
+
+### Fixed
+
+- **A popup closed with Escape from its input did not reopen on click.** The popup opened only when the input gained focus, and since 1.4.0 Escape closes it with focus still on the input, so clicking the input did nothing until focus left it and came back. Clicking the bound input now opens a closed popup too, and so does Alt+Down, as in the ARIA combobox pattern. A click that focuses the input still opens the popup once, and Escape from inside the calendar still returns focus to the input without reopening it.
+
 ## [1.4.0]
 
 ### Changed
@@ -53,6 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `scrollableDayView()` template helper now takes an `isPopup` flag and routes through a new internal `scrollMaxHeight()` helper.
 - Demo (`demo/index.html`) updated to better showcase the responsive popup behavior.
 
+[1.4.1]: https://github.com/reachweb/alpine-calendar/releases/tag/v1.4.1
 [1.4.0]: https://github.com/reachweb/alpine-calendar/releases/tag/v1.4.0
 [1.3.0]: https://github.com/reachweb/alpine-calendar/releases/tag/v1.3.0
 [1.2.0]: https://github.com/reachweb/alpine-calendar/releases/tag/v1.2.0
