@@ -175,9 +175,10 @@ function dayView(
  * Popup mode: cap with `min(px, calc(100svh - reserve))` so on small screens
  * the scroll area shrinks to fit the viewport. `svh` (small viewport height)
  * is used over `dvh` to avoid layout shifts as the mobile browser chrome
- * shows/hides. The 11rem reserve covers the popup close header, the calendar
- * nav header, and the weekday row; `env(safe-area-inset-bottom)` keeps the
- * last row clear of the iOS home indicator.
+ * shows/hides. The 12rem reserve covers the overlay's padding, the popup close
+ * header, the calendar nav header, and the weekday row, so the calendar fits
+ * the overlay and only the month list scrolls; `env(safe-area-inset-bottom)`
+ * keeps the last row clear of the iOS home indicator.
  */
 function scrollMaxHeight(scrollHeight: number, isPopup: boolean): string {
   if (!isPopup) return `${scrollHeight}px`
@@ -185,7 +186,7 @@ function scrollMaxHeight(scrollHeight: number, isPopup: boolean): string {
   // mobile and a tight cap leaves a lot of empty overlay below the calendar.
   // Capped at 1.5× scrollHeight so a desktop popup doesn't stretch absurdly.
   const popupPx = Math.round(scrollHeight * 1.5)
-  return `min(${popupPx}px, calc(100svh - 11rem - env(safe-area-inset-bottom)))`
+  return `min(${popupPx}px, calc(100svh - 12rem - env(safe-area-inset-bottom)))`
 }
 
 function scrollableDayView(

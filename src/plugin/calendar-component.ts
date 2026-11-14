@@ -175,6 +175,21 @@ export interface CalendarConfig {
   /** Close popup after a date is selected. Default: true. */
   closeOnSelect?: boolean
   /**
+   * Lock page scrolling while the popup is open. Default: true for the built-in
+   * (auto-rendered) popup overlay, false for a custom popup template.
+   *
+   * Sets `overflow: hidden` on `<html>`, or on `<body>` when `<html>` sets no overflow
+   * of its own (padding the scrollbar gap on `<html>` so the page doesn't shift), from
+   * `open()` until `close()` or `destroy()`, so scroll and swipe gestures move the popup
+   * instead of the page behind it. The lock is shared across calendars: the page unlocks
+   * when the last open popup closes. Ignored for inline display.
+   *
+   * With your own popup markup (`template: false` or a provided `.rc-calendar`) the
+   * library can't tell a full-screen overlay from a dropdown anchored to the input, so
+   * it leaves the page alone unless you pass `lockScroll: true`.
+   */
+  lockScroll?: boolean
+  /**
    * Whether clicking an already-selected date deselects it. Default: true.
    *
    * When `false`, re-clicking the selected date in single mode (or an
@@ -597,6 +612,86 @@ function extractConstraintConfig(cfg: Partial<CalendarConfig>): ConstraintConfig
 }
 
 // ---------------------------------------------------------------------------
+// Page scroll lock (shared by every popup calendar on the page)
+// ---------------------------------------------------------------------------
+
+/**
+ * Number of open popups holding the lock. Reference-counted so one calendar
+ * closing can't release the lock while another popup is still open.
+ */
+let scrollLockCount = 0
+
+/** What the lock changed and what was there before, so unlocking undoes only its own writes. */
+let pageScrollLock: {
+  /** The element whose overflow was hidden: `<html>` or `<body>`. */
+  target: HTMLElement
+  overflow: string
+  overflowX: string
+  overflowY: string
+  paddingRight: string
+  /** The `padding-right` written to `<html>`, or null when none was needed. */
+  appliedPaddingRight: string | null
+} | null = null
+
+function lockPageScroll(): void {
+  if (scrollLockCount++ > 0) return
+  const html = document.documentElement
+  const computed = getComputedStyle(html)
+  // The viewport scrolls by <html>'s overflow, or by <body>'s while <html>'s is
+  // `visible`. Hide whichever one it is: giving <html> an overflow of its own would
+  // stop <body>'s (e.g. `overflow-x: hidden`) from reaching the viewport and turn
+  // <body> into a scroll container, which moves sticky headers off-screen. The
+  // shorthand is read too for DOM implementations that don't expand it (e.g. jsdom).
+  const htmlHasOverflow = [computed.overflow, computed.overflowX, computed.overflowY]
+    .join(' ')
+    .split(' ')
+    .some((value) => value !== '' && value !== 'visible')
+  const target = htmlHasOverflow ? html : document.body
+  // Fill the gap the hidden scrollbar leaves so the page doesn't shift, unless the
+  // page already keeps its gutter when scrolling is off (`scrollbar-gutter: stable`).
+  // Add to the page's own right padding (inline or stylesheet) rather than replace it.
+  const scrollbarWidth = window.innerWidth - html.clientWidth
+  const keepsGutter = computed.getPropertyValue('scrollbar-gutter').startsWith('stable')
+  const paddingRight = parseFloat(computed.paddingRight) || 0
+  // Save the shorthand and each axis: the shorthand reads as '' unless both axes are
+  // set, so restoring it alone would drop a lone inline `overflow-x` or `overflow-y`.
+  pageScrollLock = {
+    target,
+    overflow: target.style.overflow,
+    overflowX: target.style.overflowX,
+    overflowY: target.style.overflowY,
+    paddingRight: html.style.paddingRight,
+    appliedPaddingRight: null,
+  }
+  target.style.overflow = 'hidden'
+  if (scrollbarWidth > 0 && !keepsGutter) {
+    html.style.paddingRight = `${paddingRight + scrollbarWidth}px`
+    // Read it back: the browser may serialize the number differently.
+    pageScrollLock.appliedPaddingRight = html.style.paddingRight
+  }
+}
+
+function unlockPageScroll(): void {
+  if (--scrollLockCount > 0 || !pageScrollLock) return
+  const { target, appliedPaddingRight } = pageScrollLock
+  const html = document.documentElement
+  // Undo only what is still ours. Another scroll lock (a modal around the calendar,
+  // say) may have locked or released the page since, and writing the values saved at
+  // open over its work would leave the page locked after both have closed.
+  if (target.style.overflow === 'hidden') {
+    // Shorthand first (in browsers it clears both axes), then each axis on top. DOM
+    // implementations that don't expand the shorthand (e.g. jsdom) still round-trip.
+    target.style.overflow = pageScrollLock.overflow
+    target.style.overflowX = pageScrollLock.overflowX
+    target.style.overflowY = pageScrollLock.overflowY
+  }
+  if (appliedPaddingRight !== null && html.style.paddingRight === appliedPaddingRight) {
+    html.style.paddingRight = pageScrollLock.paddingRight
+  }
+  pageScrollLock = null
+}
+
+// ---------------------------------------------------------------------------
 // Component factory
 // ---------------------------------------------------------------------------
 
@@ -694,6 +789,8 @@ export function createCalendarData(
   const inputRef = config.inputRef ?? 'rc-input'
   const locale = config.locale
   const closeOnSelect = config.closeOnSelect ?? mode !== 'multiple'
+  // Undefined means "lock the built-in overlay only"; see `open()`.
+  const lockScroll = config.lockScroll
   const allowDeselect = config.allowDeselect ?? true
   const beforeSelectCb = config.beforeSelect ?? null
 
@@ -854,7 +951,11 @@ export function createCalendarData(
     monthGrid: [] as MonthCell[][],
     yearGrid: [] as YearCell[][],
     inputValue: computeFormattedValue(selection),
-    popupStyle: display === 'popup' ? 'position:fixed;inset:0;z-index:50;' : '',
+    // The z-index reads the themable `--z-calendar-popup`, as the `.rc-popup-overlay`
+    // rule does. It stays inline for custom popups that bind `popupStyle` to an
+    // element without that class.
+    popupStyle:
+      display === 'popup' ? 'position:fixed;inset:0;z-index:var(--z-calendar-popup,50);' : '',
     focusedDate: null as CalendarDate | null,
     focusedMonth: null as number | null,
     hoverDate: null as CalendarDate | null,
@@ -881,6 +982,10 @@ export function createCalendarData(
     _autoRendered: false,
     _popupOverlayEl: null as HTMLElement | null,
     _rootEl: null as HTMLElement | null,
+    /** Whether this instance holds a reference on the shared page scroll lock. */
+    _scrollLocked: false,
+    /** Watches for the root leaving the document while the lock is held. */
+    _rootRemovalObserver: null as MutationObserver | null,
 
     // Scrollable multi-month state
     isScrollable,
@@ -1202,6 +1307,14 @@ export function createCalendarData(
         }
       })
 
+      // `isOpen` is public state: a template may hide the popup by setting it to false
+      // instead of calling close(). Don't leave the page locked behind a hidden popup.
+      if (display === 'popup' && lockScroll !== false) {
+        alpine(this).$watch('isOpen', () => {
+          if (!this.isOpen) this._releaseScrollLock()
+        })
+      }
+
       // Auto-bind to x-ref input if present
       alpine(this).$nextTick(() => {
         const refs = alpine(this).$refs
@@ -1300,6 +1413,8 @@ export function createCalendarData(
     },
 
     destroy() {
+      // Alpine calls destroy() when the component is removed, possibly while open.
+      this._releaseScrollLock()
       if (this._mediaQueryCleanup) {
         this._mediaQueryCleanup()
         this._mediaQueryCleanup = null
@@ -1697,6 +1812,14 @@ export function createCalendarData(
       el.addEventListener('focus', focusHandler)
       el.addEventListener('blur', blurHandler)
 
+      // Focus stays on the input after it opens the popup, so key presses never reach
+      // the calendar's own keydown handler. Hand Escape to it while the popup is open;
+      // while it is closed the key is left to the page (a modal around the input, say).
+      const keydownHandler = (e: KeyboardEvent) => {
+        if (e.key === 'Escape' && display === 'popup' && this.isOpen) this.handleKeydown(e)
+      }
+      el.addEventListener('keydown', keydownHandler)
+
       // Set aria attributes for popup combobox pattern
       if (display === 'popup') {
         el.setAttribute('role', 'combobox')
@@ -1721,6 +1844,7 @@ export function createCalendarData(
         el.removeEventListener('input', syncHandler)
         el.removeEventListener('focus', focusHandler)
         el.removeEventListener('blur', blurHandler)
+        el.removeEventListener('keydown', keydownHandler)
         if (display === 'popup') {
           el.removeAttribute('role')
           el.removeAttribute('aria-haspopup')
@@ -2705,11 +2829,21 @@ export function createCalendarData(
         this._rebuildMonthGrid()
       }
 
+      const wasOpen = this.isOpen
       this.isOpen = true
+      // By default only the built-in overlay locks the page: custom popup markup may
+      // be a dropdown anchored to the input, and has to ask with `lockScroll: true`.
+      // open() runs again on input focus while already open; take the lock only once.
+      if ((lockScroll ?? this._popupOverlayEl !== null) && !this._scrollLocked) {
+        lockPageScroll()
+        this._scrollLocked = true
+        this._watchRootRemoval()
+      }
       this._inputEl?.setAttribute('aria-expanded', 'true')
       // Pick up any data-rc-theme change the consumer may have made between opens.
       this._syncPortalTheme()
       this._dispatchOnRoot('calendar:open')
+      if (!wasOpen) this._scrollOverlayToTop()
 
       // CSS handles centered modal layout via `.rc-popup-overlay`
       alpine(this).$nextTick(() => {
@@ -2717,11 +2851,61 @@ export function createCalendarData(
       })
     },
 
+    /**
+     * Start a reopened popup at the top. The overlay keeps its scroll offset while
+     * hidden, so a tall popup closed while scrolled down would otherwise reopen with
+     * its header and close button off-screen.
+     *
+     * A hidden element can't be scrolled, and x-show reveals the overlay a frame or
+     * more after `isOpen` changes (`$nextTick` can run before that). So when the
+     * overlay is hidden, wait for x-show to change its inline style: the observer
+     * runs right after that change, before the overlay is painted.
+     */
+    _scrollOverlayToTop() {
+      const overlay = this._popupOverlayEl
+      if (!overlay) return
+      const isShown = () => getComputedStyle(overlay).display !== 'none'
+      if (isShown()) {
+        overlay.scrollTop = 0
+        return
+      }
+      const observer = new MutationObserver(() => {
+        if (!isShown()) return
+        observer.disconnect()
+        if (this.isOpen) overlay.scrollTop = 0
+      })
+      observer.observe(overlay, { attributes: true, attributeFilter: ['style'] })
+    },
+
     close() {
       if (this.display !== 'popup') return
       this.isOpen = false
+      this._releaseScrollLock()
       this._inputEl?.setAttribute('aria-expanded', 'false')
       this._dispatchOnRoot('calendar:close')
+    },
+
+    _releaseScrollLock() {
+      if (!this._scrollLocked) return
+      this._scrollLocked = false
+      this._rootRemovalObserver?.disconnect()
+      this._rootRemovalObserver = null
+      unlockPageScroll()
+    },
+
+    /**
+     * Close the popup, releasing the lock, if the root leaves the document without
+     * `destroy()` running. Alpine only cleans up removed nodes it initialised, so a
+     * swapped-out plain ancestor or `<body>` (Turbo, htmx) never reaches `destroy()`
+     * and would leave the page locked.
+     */
+    _watchRootRemoval() {
+      const root = this._rootEl
+      if (!root?.isConnected) return
+      this._rootRemovalObserver = new MutationObserver(() => {
+        if (!root.isConnected) this.close()
+      })
+      this._rootRemovalObserver.observe(document, { childList: true, subtree: true })
     },
 
     toggle() {
@@ -2770,10 +2954,12 @@ export function createCalendarData(
           this.view = 'days'
           return
         }
-        // If popup is open, close it and return focus to input
+        // If popup is open, close it and return focus to input. Not when the key was
+        // pressed on the input itself: focusing an already-focused input fires no focus
+        // event, so the flag would stay set and swallow the next real focus.
         if (display === 'popup' && this.isOpen) {
           this.close()
-          if (this._inputEl) {
+          if (this._inputEl && e.target !== this._inputEl) {
             this._suppressFocusOpen = true
             this._inputEl.focus()
           }
