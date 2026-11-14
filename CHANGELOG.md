@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Popup calendars taller than the viewport could not be scrolled on mobile.** Below 640px a `months: 2` popup stacks both months (≈830px tall), and the overlay centered it with no overflow handling, so the header and close button sat off-screen above the viewport and scroll or swipe gestures moved the page behind the popup instead. `.rc-popup-overlay` is now its own scroll container (`overflow-y: auto; overscroll-behavior: contain`) and aligns the calendar to the top with `margin-block: auto`, so it stays centered when it fits and starts at the top, scrollable to the end, when it doesn't. Desktop layout is unchanged.
+- **Calendars overflowed horizontally on phones.** Below 640px every day cell had a 44px minimum (`min-height: 2.75rem` with `aspect-ratio: 1`), so a week needed 314px of content width (347px with `showWeekNumbers`). Anywhere narrower, the last columns ran into the padding or out of the calendar: popups below about 372px (405px with week numbers), and inline calendars in padded containers on most phones (by 60px in the demo's cards at 360px). Inline calendars in flex or grid containers, and any calendar in a container under 280px (`min-width: 17.5rem` beat `max-width: 100%`), stuck out of the container entirely. Days on mobile now shrink with their row instead, down to 24px (the WCAG 2.2 AA minimum target size), and stay 44px or larger wherever a 44px week fits: popups fill the screen width, and the weekday header asks for room for 44px days, so inline calendars, which size to their content, still get it when the container allows. The mobile `min-width` is now `min(17.5rem, 100%)`. Below 360px the popup overlay and calendar padding drop to `0.5rem`, and below 390px the weekday labels drop to `0.625rem` with no letter-spacing, so neighbouring labels don't run together in the narrower columns (they overlapped in the demo's cards with week numbers or French labels up to 389px). Desktop is unchanged.
+
+### Added
+
+- **`lockScroll` option (default `true`).** While a popup is open, page scrolling is locked by setting `overflow: hidden` on `<html>` and adding the scrollbar width to its right padding so the page doesn't shift (skipped when there is no scrollbar or the page uses `scrollbar-gutter: stable`). `close()` restores the previous inline values, including a lone `overflow-x` or `overflow-y`. The lock is reference-counted across calendars, so one closing popup can't unlock the page while another is open, and it is released if the component is destroyed or removed while open. Inline calendars never touch `<html>`; pass `lockScroll: false` to opt out.
+- **`--z-calendar-popup` theme variable (default `50`).** The overlay's `z-index` moved from the inline `popupStyle` into CSS as `z-index: var(--z-calendar-popup, 50)`, so sites with sticky headers or cookie banners above `50` can raise the popup without `!important`.
+
 ## [1.3.0]
 
 ### Added

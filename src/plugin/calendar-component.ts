@@ -175,6 +175,15 @@ export interface CalendarConfig {
   /** Close popup after a date is selected. Default: true. */
   closeOnSelect?: boolean
   /**
+   * Lock page scrolling while the popup is open. Default: true.
+   *
+   * Sets `overflow: hidden` on `<html>` (padding the scrollbar gap so the page doesn't
+   * shift) from `open()` until `close()` or `destroy()`, so scroll and swipe gestures
+   * move the popup instead of the page behind it. The lock is shared across calendars:
+   * the page unlocks when the last open popup closes. Ignored for inline display.
+   */
+  lockScroll?: boolean
+  /**
    * Whether clicking an already-selected date deselects it. Default: true.
    *
    * When `false`, re-clicking the selected date in single mode (or an
@@ -597,6 +606,53 @@ function extractConstraintConfig(cfg: Partial<CalendarConfig>): ConstraintConfig
 }
 
 // ---------------------------------------------------------------------------
+// Page scroll lock (shared by every popup calendar on the page)
+// ---------------------------------------------------------------------------
+
+/**
+ * Number of open popups holding the lock. Reference-counted so one calendar
+ * closing can't release the lock while another popup is still open.
+ */
+let scrollLockCount = 0
+let savedHtmlOverflow = ''
+let savedHtmlOverflowX = ''
+let savedHtmlOverflowY = ''
+let savedHtmlPaddingRight = ''
+
+function lockPageScroll(): void {
+  if (scrollLockCount++ > 0) return
+  const html = document.documentElement
+  // Save the shorthand and each axis: the shorthand reads as '' unless both axes are
+  // set, so restoring it alone would drop a lone inline `overflow-x` or `overflow-y`.
+  savedHtmlOverflow = html.style.overflow
+  savedHtmlOverflowX = html.style.overflowX
+  savedHtmlOverflowY = html.style.overflowY
+  savedHtmlPaddingRight = html.style.paddingRight
+  // Fill the gap the hidden scrollbar leaves so the page doesn't shift, unless the
+  // page already keeps its gutter when scrolling is off (`scrollbar-gutter: stable`).
+  // Add to the page's own right padding (inline or stylesheet) rather than replace it.
+  const scrollbarWidth = window.innerWidth - html.clientWidth
+  const computed = getComputedStyle(html)
+  const keepsGutter = computed.getPropertyValue('scrollbar-gutter').startsWith('stable')
+  const paddingRight = parseFloat(computed.paddingRight) || 0
+  html.style.overflow = 'hidden'
+  if (scrollbarWidth > 0 && !keepsGutter) {
+    html.style.paddingRight = `${paddingRight + scrollbarWidth}px`
+  }
+}
+
+function unlockPageScroll(): void {
+  if (--scrollLockCount > 0) return
+  const html = document.documentElement
+  // Shorthand first (in browsers it clears both axes), then each axis on top. DOM
+  // implementations that don't expand the shorthand (e.g. jsdom) still round-trip.
+  html.style.overflow = savedHtmlOverflow
+  html.style.overflowX = savedHtmlOverflowX
+  html.style.overflowY = savedHtmlOverflowY
+  html.style.paddingRight = savedHtmlPaddingRight
+}
+
+// ---------------------------------------------------------------------------
 // Component factory
 // ---------------------------------------------------------------------------
 
@@ -694,6 +750,7 @@ export function createCalendarData(
   const inputRef = config.inputRef ?? 'rc-input'
   const locale = config.locale
   const closeOnSelect = config.closeOnSelect ?? mode !== 'multiple'
+  const lockScroll = config.lockScroll ?? true
   const allowDeselect = config.allowDeselect ?? true
   const beforeSelectCb = config.beforeSelect ?? null
 
@@ -854,7 +911,8 @@ export function createCalendarData(
     monthGrid: [] as MonthCell[][],
     yearGrid: [] as YearCell[][],
     inputValue: computeFormattedValue(selection),
-    popupStyle: display === 'popup' ? 'position:fixed;inset:0;z-index:50;' : '',
+    // z-index comes from CSS (`--z-calendar-popup`) so consumers can theme it.
+    popupStyle: display === 'popup' ? 'position:fixed;inset:0;' : '',
     focusedDate: null as CalendarDate | null,
     focusedMonth: null as number | null,
     hoverDate: null as CalendarDate | null,
@@ -881,6 +939,8 @@ export function createCalendarData(
     _autoRendered: false,
     _popupOverlayEl: null as HTMLElement | null,
     _rootEl: null as HTMLElement | null,
+    /** Whether this instance holds a reference on the shared page scroll lock. */
+    _scrollLocked: false,
 
     // Scrollable multi-month state
     isScrollable,
@@ -1300,6 +1360,8 @@ export function createCalendarData(
     },
 
     destroy() {
+      // Alpine calls destroy() when the component is removed, possibly while open.
+      this._releaseScrollLock()
       if (this._mediaQueryCleanup) {
         this._mediaQueryCleanup()
         this._mediaQueryCleanup = null
@@ -2706,6 +2768,11 @@ export function createCalendarData(
       }
 
       this.isOpen = true
+      // open() runs again on input focus while already open; take the lock only once.
+      if (lockScroll && !this._scrollLocked) {
+        lockPageScroll()
+        this._scrollLocked = true
+      }
       this._inputEl?.setAttribute('aria-expanded', 'true')
       // Pick up any data-rc-theme change the consumer may have made between opens.
       this._syncPortalTheme()
@@ -2720,8 +2787,15 @@ export function createCalendarData(
     close() {
       if (this.display !== 'popup') return
       this.isOpen = false
+      this._releaseScrollLock()
       this._inputEl?.setAttribute('aria-expanded', 'false')
       this._dispatchOnRoot('calendar:close')
+    },
+
+    _releaseScrollLock() {
+      if (!this._scrollLocked) return
+      this._scrollLocked = false
+      unlockPageScroll()
     },
 
     toggle() {

@@ -2236,6 +2236,8 @@ describe('popup positioning', () => {
   it('popupStyle is set eagerly for popup display', () => {
     const c = createCalendarData({ display: 'popup' })
     expect(c.popupStyle).toContain('position:fixed')
+    // Inline z-index would override the themable --z-calendar-popup CSS variable.
+    expect(c.popupStyle).not.toContain('z-index')
   })
 
   it('open() dispatches calendar:open and sets isOpen', () => {

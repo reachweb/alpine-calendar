@@ -215,6 +215,7 @@ All options are passed via `x-data="calendar({ ... })"`.
 | `locale` | `string` | — | BCP 47 locale for month/day names |
 | `timezone` | `string` | — | IANA timezone for resolving "today" |
 | `closeOnSelect` | `boolean` | `true` | Close popup after selection |
+| `lockScroll` | `boolean` | `true` | Lock page scrolling while the popup is open (`overflow: hidden` on `<html>`, with `padding-right` filling the scrollbar gap). Shared across calendars: the page unlocks when the last open popup closes or is destroyed. Ignored for inline display |
 | `allowDeselect` | `boolean` | `true` | When `false`, re-clicking a selected date keeps the selection instead of toggling it off (single/multiple modes; the popup still closes as if the date was picked). Programmatic clearing (`clearSelection()`, `setValue()`) is unaffected |
 | `wizard` | `boolean \| 'year-month' \| 'month-day'` | `false` | Birth date wizard mode |
 | `beforeSelect` | `(date, ctx) => boolean` | — | Custom validation before selection |
@@ -493,10 +494,21 @@ The calendar uses CSS custom properties for all visual styles. Override them in 
   --radius-calendar-day-range-middle: 0;                          /* in-range cells between endpoints */
   --shadow-calendar: 0 10px 15px -3px rgb(0 0 0 / 0.1);
   --font-calendar: system-ui, -apple-system, sans-serif;
+  --z-calendar-popup: 50;                                         /* stacking order of the popup overlay */
 }
 ```
 
 Defaults are declared inside `:where(:root)` (zero specificity), so any consumer override wins regardless of stylesheet load order — no `!important` needed.
+
+#### Popup stacking
+
+The popup overlay's `z-index` comes from `--z-calendar-popup` (default `50`). Raise it when sticky headers, cookie banners, or other fixed UI on your page sit above the popup:
+
+```css
+:root {
+  --z-calendar-popup: 1000;
+}
+```
 
 #### Day-cell shape
 
@@ -765,7 +777,8 @@ A sticky header tracks the currently visible month as you scroll. Default scroll
 
 ## Responsive Behavior
 
-- **Mobile (<640px):** Popup renders as a centered fullscreen overlay. Touch-friendly targets (min 44px).
+- **Mobile (<640px):** Popup renders as a centered fullscreen overlay. Touch-friendly targets: days are 44px or larger wherever a week of 44px days fits (popups fill the screen width, and inline calendars take the room for 44px days when their container allows). In narrower containers, or next to week numbers, days shrink to fit, down to 24px, instead of overflowing.
+- **Tall popups:** When the calendar is taller than the viewport (e.g. two stacked months on a phone), it starts at the top of the overlay and scrolls inside it. The page behind stays put while the popup is open (see `lockScroll`).
 - **Desktop (>=640px):** Popup renders as a centered modal with scale-in animation.
 - **Two months:** Side-by-side on desktop, stacked on mobile. Both nav arrows appear on the top month when stacked.
 - **`mobileMonths`:** Show a different number of months on mobile — fewer (e.g., `mobileMonths: 1` with `months: 2`) or more (e.g., `mobileMonths: 12` with `months: 2` for a booking calendar that's compact on desktop and long-scroll on mobile).

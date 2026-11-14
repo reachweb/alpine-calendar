@@ -55,6 +55,9 @@
 
   /* Typography */
   --font-calendar: system-ui, -apple-system, sans-serif;
+
+  /* Stacking order of the popup overlay */
+  --z-calendar-popup: 50;
 }
 
 /* ---------------------------------------------------------------------------
@@ -77,6 +80,8 @@
 @media (max-width: 639px) {
   .rc-calendar {
     padding: 0.75rem;
+    /* In containers narrower than 280px, fit them instead of overflowing. */
+    min-width: min(17.5rem, 100%);
   }
 }
 
@@ -405,14 +410,26 @@
  *
  * Full-screen backdrop with centered calendar on all screen sizes.
  * Click-outside dismissal is handled by @click.self="close()" on the overlay.
+ *
+ * The overlay is its own scroll container: a calendar taller than the viewport
+ * (e.g. two stacked months on a phone) starts at the top and scrolls inside the
+ * overlay instead of being centered off both edges. `margin-block: auto` on the
+ * calendar keeps it vertically centered whenever it fits.
  * ------------------------------------------------------------------------- */
 
 .rc-popup-overlay {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  z-index: var(--z-calendar-popup, 50);
   background: var(--color-calendar-overlay);
   padding: 1rem;
+}
+
+.rc-popup-overlay > .rc-calendar {
+  margin-block: auto;
 }
 
 /* Mobile: calendar stretches full-width */
@@ -804,11 +821,6 @@
   background-color: var(--color-calendar-hover);
 }
 
-/* Wizard: consistent width across all steps (match 7-col day grid) */
-.rc-calendar--wizard {
-  min-width: 17.5rem;
-}
-
 .rc-wizard-summary {
   text-align: center;
   font-size: 0.8125rem;
@@ -834,9 +846,31 @@
  * ------------------------------------------------------------------------- */
 
 @media (max-width: 639px) {
+  /* Days fill their row and shrink with it in containers too narrow for a week of
+     44px days, down to 24px (the WCAG 2.2 AA minimum target size), instead of
+     pushing the last columns out of the calendar. */
   .rc-day {
-    min-height: 2.75rem; /* 44px touch target */
+    min-height: 1.5rem;
     font-size: 0.9375rem;
+  }
+
+  /* 44px touch targets wherever they fit: popups fill the screen width, and inline
+     calendars (sized to their content) get their width from this header, whose
+     cells ask for 44px and whose gaps match the day rows. Its columns can still
+     shrink in step with the days. */
+  .rc-weekdays {
+    grid-template-columns: repeat(7, minmax(1.5rem, 1fr));
+    column-gap: 1px;
+  }
+
+  .rc-weekdays--week-numbers {
+    grid-template-columns: 2rem repeat(7, minmax(1.5rem, 1fr));
+  }
+
+  .rc-weekday {
+    width: 2.75rem;
+    max-width: 100%;
+    justify-self: center;
   }
 
   .rc-header__nav {
@@ -854,6 +888,28 @@
   .rc-calendar--wizard .rc-year {
     height: 3.5rem;
     font-size: 1rem;
+  }
+}
+
+/* Very narrow phones (<360px, e.g. 320px): trim the padding so more width goes to
+   the days. */
+@media (max-width: 359px) {
+  .rc-popup-overlay {
+    padding: 0.5rem;
+  }
+
+  .rc-calendar {
+    padding: 0.5rem;
+  }
+}
+
+/* Narrow phones (<390px): day columns in padded containers can be narrower than
+   the 12px weekday labels (~34px for "WED", more for some locales or next to week
+   numbers). Tighten the labels so neighbours don't touch. */
+@media (max-width: 389px) {
+  .rc-weekdays {
+    font-size: 0.625rem;
+    letter-spacing: 0;
   }
 }
 

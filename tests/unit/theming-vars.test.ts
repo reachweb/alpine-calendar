@@ -62,6 +62,19 @@ describe('day-cell radius variables', () => {
   })
 })
 
+describe('popup overlay z-index variable', () => {
+  it('declares --z-calendar-popup with the historical default of 50', () => {
+    expect(css).toMatch(/:where\(:root\)\s*\{[^}]*--z-calendar-popup:\s*50;/)
+  })
+
+  it('sets the overlay z-index from --z-calendar-popup', () => {
+    const overlay = css.match(/\.rc-popup-overlay\s*\{[^}]+\}/)
+    expect(overlay).not.toBeNull()
+    if (overlay === null) throw new Error('overlay block missing')
+    expect(overlay[0]).toMatch(/z-index:\s*var\(--z-calendar-popup/)
+  })
+})
+
 describe('slot containers', () => {
   it('ships default styling for .rc-calendar__header', () => {
     expect(css).toMatch(/\.rc-calendar__header\s*\{/)
