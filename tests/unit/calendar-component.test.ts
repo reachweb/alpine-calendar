@@ -2252,27 +2252,37 @@ describe('popup positioning', () => {
     expect(dispatchSpy).toHaveBeenCalledWith('calendar:open', null)
   })
 
-  it('reopening scrolls the overlay back to the top, but open() while open does not', () => {
+  it('reopening scrolls the overlay back to the top, but open() while open does not', async () => {
     const c = createCalendarData({ display: 'popup', mode: 'range', months: 2 })
     const { flushNextTick } = withAlpineMocks(c)
     c.init()
     flushNextTick()
     const overlay = document.createElement('div')
+    document.body.appendChild(overlay)
     c._popupOverlayEl = overlay
+    // MutationObserver callbacks run as microtasks; a timer turn lets them finish.
+    const settle = () => new Promise((resolve) => setTimeout(resolve))
 
     c.open()
-    flushNextTick()
     overlay.scrollTop = 160
 
     // Input focus calls open() again while open; the user's scroll position stays.
     c.open()
-    flushNextTick()
+    await settle()
     expect(overlay.scrollTop).toBe(160)
 
+    // x-show hides the overlay on close and reveals it a frame or more after open().
+    // A hidden element can't be scrolled, so the reset has to wait for it.
     c.close()
+    overlay.style.display = 'none'
     c.open()
-    flushNextTick()
+    await settle()
+    expect(overlay.scrollTop).toBe(160)
+    overlay.style.display = ''
+    await settle()
     expect(overlay.scrollTop).toBe(0)
+
+    c.destroy()
   })
 
   it('close() resets popupStyle and stops positioning', () => {

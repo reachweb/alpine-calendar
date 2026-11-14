@@ -175,13 +175,18 @@ export interface CalendarConfig {
   /** Close popup after a date is selected. Default: true. */
   closeOnSelect?: boolean
   /**
-   * Lock page scrolling while the popup is open. Default: true.
+   * Lock page scrolling while the popup is open. Default: true for the built-in
+   * (auto-rendered) popup overlay, false for a custom popup template.
    *
    * Sets `overflow: hidden` on `<html>`, or on `<body>` when `<html>` sets no overflow
    * of its own (padding the scrollbar gap on `<html>` so the page doesn't shift), from
    * `open()` until `close()` or `destroy()`, so scroll and swipe gestures move the popup
    * instead of the page behind it. The lock is shared across calendars: the page unlocks
    * when the last open popup closes. Ignored for inline display.
+   *
+   * With your own popup markup (`template: false` or a provided `.rc-calendar`) the
+   * library can't tell a full-screen overlay from a dropdown anchored to the input, so
+   * it leaves the page alone unless you pass `lockScroll: true`.
    */
   lockScroll?: boolean
   /**
@@ -784,7 +789,8 @@ export function createCalendarData(
   const inputRef = config.inputRef ?? 'rc-input'
   const locale = config.locale
   const closeOnSelect = config.closeOnSelect ?? mode !== 'multiple'
-  const lockScroll = config.lockScroll ?? true
+  // Undefined means "lock the built-in overlay only"; see `open()`.
+  const lockScroll = config.lockScroll
   const allowDeselect = config.allowDeselect ?? true
   const beforeSelectCb = config.beforeSelect ?? null
 
@@ -1303,7 +1309,7 @@ export function createCalendarData(
 
       // `isOpen` is public state: a template may hide the popup by setting it to false
       // instead of calling close(). Don't leave the page locked behind a hidden popup.
-      if (display === 'popup' && lockScroll) {
+      if (display === 'popup' && lockScroll !== false) {
         alpine(this).$watch('isOpen', () => {
           if (!this.isOpen) this._releaseScrollLock()
         })
@@ -2816,8 +2822,10 @@ export function createCalendarData(
 
       const wasOpen = this.isOpen
       this.isOpen = true
+      // By default only the built-in overlay locks the page: custom popup markup may
+      // be a dropdown anchored to the input, and has to ask with `lockScroll: true`.
       // open() runs again on input focus while already open; take the lock only once.
-      if (lockScroll && !this._scrollLocked) {
+      if ((lockScroll ?? this._popupOverlayEl !== null) && !this._scrollLocked) {
         lockPageScroll()
         this._scrollLocked = true
         this._watchRootRemoval()
@@ -2826,14 +2834,38 @@ export function createCalendarData(
       // Pick up any data-rc-theme change the consumer may have made between opens.
       this._syncPortalTheme()
       this._dispatchOnRoot('calendar:open')
+      if (!wasOpen) this._scrollOverlayToTop()
 
       // CSS handles centered modal layout via `.rc-popup-overlay`
       alpine(this).$nextTick(() => {
-        // The overlay keeps its scroll offset while hidden, so a tall popup closed
-        // while scrolled down would reopen with its header and close button
-        // off-screen. Start at the top again; it has no box to scroll until shown.
-        if (!wasOpen && this._popupOverlayEl) this._popupOverlayEl.scrollTop = 0
+        // Focus management after popup renders
       })
+    },
+
+    /**
+     * Start a reopened popup at the top. The overlay keeps its scroll offset while
+     * hidden, so a tall popup closed while scrolled down would otherwise reopen with
+     * its header and close button off-screen.
+     *
+     * A hidden element can't be scrolled, and x-show reveals the overlay a frame or
+     * more after `isOpen` changes (`$nextTick` can run before that). So when the
+     * overlay is hidden, wait for x-show to change its inline style: the observer
+     * runs right after that change, before the overlay is painted.
+     */
+    _scrollOverlayToTop() {
+      const overlay = this._popupOverlayEl
+      if (!overlay) return
+      const isShown = () => getComputedStyle(overlay).display !== 'none'
+      if (isShown()) {
+        overlay.scrollTop = 0
+        return
+      }
+      const observer = new MutationObserver(() => {
+        if (!isShown()) return
+        observer.disconnect()
+        if (this.isOpen) overlay.scrollTop = 0
+      })
+      observer.observe(overlay, { attributes: true, attributeFilter: ['style'] })
     },
 
     close() {

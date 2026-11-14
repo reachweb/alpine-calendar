@@ -13,8 +13,19 @@ import { withAlpineMocks } from '../helpers'
 const html = document.documentElement
 const created: ReturnType<typeof createCalendarData>[] = []
 
+/** A popup calendar with the built-in overlay, which auto-rendering would teleport to <body>. */
 function calendar(config: CalendarConfig = {}) {
   const c = createCalendarData({ display: 'popup', ...config })
+  withAlpineMocks(c)
+  c.init()
+  if (c.display === 'popup') c._popupOverlayEl = document.createElement('div')
+  created.push(c)
+  return c
+}
+
+/** A popup calendar with the consumer's own markup: no library overlay. */
+function customPopup(config: CalendarConfig = {}) {
+  const c = createCalendarData({ display: 'popup', template: false, ...config })
   withAlpineMocks(c)
   c.init()
   created.push(c)
@@ -99,7 +110,7 @@ describe('popup page scroll lock', () => {
   })
 
   it('setting isOpen = false directly releases the lock', () => {
-    const c = createCalendarData({ display: 'popup' })
+    const c = createCalendarData({ display: 'popup', lockScroll: true })
     const { triggerWatch } = withAlpineMocks(c)
     c.init()
     created.push(c)
@@ -118,7 +129,7 @@ describe('popup page scroll lock', () => {
     const root = document.createElement('div')
     ancestor.appendChild(root)
     document.body.appendChild(ancestor)
-    const c = createCalendarData({ display: 'popup' })
+    const c = createCalendarData({ display: 'popup', lockScroll: true })
     withAlpineMocks(c, { el: root })
     c.init()
     created.push(c)
@@ -213,6 +224,25 @@ describe('popup page scroll lock', () => {
 
     c.open()
     c.toggle()
+    expect(html.style.overflow).toBe('scroll')
+    expect(html.style.paddingRight).toBe('4px')
+  })
+
+  it('a custom popup template is not locked by default, only with lockScroll: true', () => {
+    // Without the library's overlay the popup may be a dropdown anchored to the
+    // input, where freezing the page would be wrong.
+    const dropdown = customPopup()
+    dropdown.open()
+    expect(dropdown.isOpen).toBe(true)
+    expect(html.style.overflow).toBe('scroll')
+    expect(html.style.paddingRight).toBe('4px')
+    dropdown.close()
+
+    const overlay = customPopup({ lockScroll: true })
+    overlay.open()
+    expect(html.style.overflow).toBe('hidden')
+    expect(html.style.paddingRight).toBe('19px')
+    overlay.close()
     expect(html.style.overflow).toBe('scroll')
     expect(html.style.paddingRight).toBe('4px')
   })
