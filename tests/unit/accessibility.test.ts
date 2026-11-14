@@ -324,7 +324,9 @@ describe('Template ARIA attributes', () => {
       scrollHeight: 300,
     })
     // Day view header label should be a button
-    expect(html).toContain('<button class="rc-header__label" @click="setView(\'months\')"')
+    expect(html).toContain(
+      '<button type="button" class="rc-header__label" @click="setView(\'months\')"',
+    )
     // Should not have <span> with @click="setView('months')"
     expect(html).not.toContain('<span class="rc-header__label" @click="setView(\'months\')"')
   })
@@ -342,8 +344,27 @@ describe('Template ARIA attributes', () => {
       scrollHeight: 300,
     })
     // Month view header label should be a button
-    expect(html).toContain('<button class="rc-header__label" @click="setView(\'years\')"')
+    expect(html).toContain(
+      '<button type="button" class="rc-header__label" @click="setView(\'years\')"',
+    )
     expect(html).not.toContain('<span class="rc-header__label" @click="setView(\'years\')"')
+  })
+
+  it('every <button> declares type="button" so it never submits a surrounding form', () => {
+    const html = generateCalendarTemplate({
+      display: 'popup',
+      isDualChrome: true,
+      isWizard: true,
+      hasName: true,
+      showWeekNumbers: false,
+      hasPresets: true,
+      needsDayView: true,
+      needsScrollableView: false,
+      scrollHeight: 300,
+    })
+    const buttons = html.match(/<button\b[^>]*>/g) ?? []
+    expect(buttons.length).toBeGreaterThan(0)
+    for (const tag of buttons) expect(tag).toContain('type="button"')
   })
 
   it('year view header label is a <span> (not clickable)', () => {

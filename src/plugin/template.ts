@@ -71,9 +71,9 @@ function yearPickerView(): string {
   return `<template x-if="view === 'years'">
   <div class="rc-view-enter">
     <div class="rc-header">
-      <button class="rc-header__nav" @click="prev()" :disabled="!canGoPrev" aria-label="Previous decade">&#8249;</button>
+      <button type="button" class="rc-header__nav" @click="prev()" :disabled="!canGoPrev" aria-label="Previous decade">&#8249;</button>
       <span class="rc-header__label" x-text="decadeLabel"></span>
-      <button class="rc-header__nav" @click="next()" :disabled="!canGoNext" aria-label="Next decade">&#8250;</button>
+      <button type="button" class="rc-header__nav" @click="next()" :disabled="!canGoNext" aria-label="Next decade">&#8250;</button>
     </div>
     <div class="rc-year-grid" role="group" :aria-label="decadeLabel">
       <template x-for="cell in yearGrid.flat()" :key="cell.year">
@@ -89,13 +89,13 @@ function monthPickerView(precisionMonth: boolean): string {
   // static span rather than a button that would switch to the (unreachable) year grid.
   const yearLabelEl = precisionMonth
     ? `<span class="rc-header__label" x-text="yearLabel"></span>`
-    : `<button class="rc-header__label" @click="setView('years')" aria-label="Change view" x-text="yearLabel"></button>`
+    : `<button type="button" class="rc-header__label" @click="setView('years')" aria-label="Change view" x-text="yearLabel"></button>`
   return `<template x-if="view === 'months'">
   <div class="rc-view-enter">
     <div class="rc-header">
-      <button class="rc-header__nav" @click="prev()" :disabled="!canGoPrev" aria-label="Previous year">&#8249;</button>
+      <button type="button" class="rc-header__nav" @click="prev()" :disabled="!canGoPrev" aria-label="Previous year">&#8249;</button>
       ${yearLabelEl}
-      <button class="rc-header__nav" @click="next()" :disabled="!canGoNext" aria-label="Next year">&#8250;</button>
+      <button type="button" class="rc-header__nav" @click="next()" :disabled="!canGoNext" aria-label="Next year">&#8250;</button>
     </div>
     <div class="rc-month-grid" role="listbox" :aria-label="yearLabel">
       <template x-for="cell in monthGrid.flat()" :key="cell.month">
@@ -150,9 +150,9 @@ function dayView(
     <template x-for="(mg, gi) in grid" :key="mg.year + '-' + mg.month">
       <div>
         <div class="rc-header">
-          <button class="rc-header__nav" @click="prev()" :disabled="!canGoPrev" aria-label="Previous month"${prevClass}>&#8249;</button>
-          <button class="rc-header__label" @click="setView('months')" aria-label="Change view" x-text="monthYearLabel(gi)"></button>
-          <button class="rc-header__nav" @click="next()" :disabled="!canGoNext" aria-label="Next month"${nextClass}>&#8250;</button>
+          <button type="button" class="rc-header__nav" @click="prev()" :disabled="!canGoPrev" aria-label="Previous month"${prevClass}>&#8249;</button>
+          <button type="button" class="rc-header__label" @click="setView('months')" aria-label="Change view" x-text="monthYearLabel(gi)"></button>
+          <button type="button" class="rc-header__nav" @click="next()" :disabled="!canGoNext" aria-label="Next month"${nextClass}>&#8250;</button>
         </div>
         ${weekdayBlock}
         <div class="rc-grid-wrapper">
@@ -243,7 +243,7 @@ function wizardChrome(): string {
 </div>
 <div class="rc-wizard-label" x-text="wizardStepLabel"></div>
 <template x-if="wizardStep > 1">
-  <button class="rc-wizard-back" @click="wizardBack()" aria-label="Go back">&#8249; Back</button>
+  <button type="button" class="rc-wizard-back" @click="wizardBack()" aria-label="Go back">&#8249; Back</button>
 </template>`
 }
 
@@ -263,14 +263,14 @@ function popupHeader(isWizard: boolean): string {
     : '<span class="rc-popup-header__title">Select Date</span>'
   return `<div class="rc-popup-header">
   ${title}
-  <button class="rc-popup-header__close" @click="close()" aria-label="Close calendar">${closeSvg}</button>
+  <button type="button" class="rc-popup-header__close" @click="close()" aria-label="Close calendar">${closeSvg}</button>
 </div>`
 }
 
 function presetsBlock(): string {
   return `<div class="rc-presets" role="group" aria-label="Quick select">
   <template x-for="(preset, pi) in presets" :key="pi">
-    <button class="rc-preset" @click="applyPreset(pi)" x-text="preset.label"></button>
+    <button type="button" class="rc-preset" @click="applyPreset(pi)" x-text="preset.label"></button>
   </template>
 </div>`
 }
