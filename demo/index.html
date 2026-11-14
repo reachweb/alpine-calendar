@@ -557,6 +557,53 @@
         </details>
       </div>
 
+      <!-- Popup Single, allowDeselect: false -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Popup — Keep Selection</div>
+          <div class="card-desc">With <code>allowDeselect: false</code>, clicking the selected date again keeps it and closes the popup instead of clearing it.</div>
+        </div>
+        <div class="card-body">
+          <div x-data="calendar({ mode: 'single', display: 'popup', allowDeselect: false })">
+            <input x-ref="rc-input" type="text" class="rc-input" placeholder="Pick a date..." readonly>
+          </div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({
+  mode: 'single',
+  display: 'popup',
+  allowDeselect: false })"&gt;
+  &lt;input x-ref="rc-input" type="text" class="rc-input"
+         placeholder="Pick a date..." readonly&gt;
+&lt;/div&gt;</code></pre>
+        </details>
+      </div>
+
+      <!-- Popup Range, one-day ranges allowed -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Popup — One-Day Range</div>
+          <div class="card-desc">With <code>allowDeselect: false</code>, click the same day twice for a one-day range. Clicking a later day still picks a longer range.</div>
+        </div>
+        <div class="card-body">
+          <div x-data="calendar({ mode: 'range', months: 2, display: 'popup', allowDeselect: false })">
+            <input x-ref="rc-input" type="text" class="rc-input" placeholder="Start — End" readonly>
+          </div>
+        </div>
+        <details class="card-code">
+          <summary>View Code</summary>
+          <pre><code>&lt;div x-data="calendar({
+  mode: 'range',
+  months: 2,
+  display: 'popup',
+  allowDeselect: false })"&gt;
+  &lt;input x-ref="rc-input" type="text" class="rc-input"
+         placeholder="Start — End" readonly&gt;
+&lt;/div&gt;</code></pre>
+        </details>
+      </div>
+
     </div>
   </div>
 
