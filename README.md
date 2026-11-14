@@ -465,7 +465,7 @@ legitimate document-level listeners.
 | Page Down / Up | Next / previous month (hops over fully-unavailable months, like the arrows) |
 | Shift + Page Down / Up | Next / previous year |
 | Home / End | First / last day of month |
-| Escape | Close popup or return to day view |
+| Escape | Close popup or return to day view. Also works from the popup's input while the popup is open |
 
 ## Theming
 

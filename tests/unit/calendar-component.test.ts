@@ -2336,6 +2336,58 @@ describe('handleKeydown', () => {
     expect(dispatchSpy).toHaveBeenCalledWith('calendar:close', null)
   })
 
+  it('Escape on the focused input closes the popup without reaching the page, and the next focus reopens it', () => {
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    const pageHandler = vi.fn()
+    document.addEventListener('keydown', pageHandler)
+    const c = createCalendarData({ display: 'popup', mask: false })
+    const { flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+    c.bindInput(input)
+
+    // Focus stays on the input after it opens the popup, so Escape is pressed there.
+    input.focus()
+    expect(c.isOpen).toBe(true)
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    input.dispatchEvent(event)
+    expect(c.isOpen).toBe(false)
+    expect(event.defaultPrevented).toBe(true)
+    // A modal around the calendar must not close on the same key press.
+    expect(pageHandler).not.toHaveBeenCalled()
+
+    // The input never lost focus, so no focus event is pending to swallow.
+    input.blur()
+    input.focus()
+    expect(c.isOpen).toBe(true)
+
+    document.removeEventListener('keydown', pageHandler)
+    c.destroy()
+    input.remove()
+  })
+
+  it('Escape on the input is left to the page while the popup is closed', () => {
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+    const pageHandler = vi.fn()
+    document.addEventListener('keydown', pageHandler)
+    const c = createCalendarData({ display: 'popup', mask: false })
+    const { flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+    c.bindInput(input)
+
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    input.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+    expect(pageHandler).toHaveBeenCalledTimes(1)
+
+    document.removeEventListener('keydown', pageHandler)
+    c.destroy()
+    input.remove()
+  })
+
   it('returns focus to input on Escape', () => {
     const input = document.createElement('input')
     const focusSpy = vi.spyOn(input, 'focus')

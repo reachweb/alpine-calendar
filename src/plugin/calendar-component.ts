@@ -1812,6 +1812,14 @@ export function createCalendarData(
       el.addEventListener('focus', focusHandler)
       el.addEventListener('blur', blurHandler)
 
+      // Focus stays on the input after it opens the popup, so key presses never reach
+      // the calendar's own keydown handler. Hand Escape to it while the popup is open;
+      // while it is closed the key is left to the page (a modal around the input, say).
+      const keydownHandler = (e: KeyboardEvent) => {
+        if (e.key === 'Escape' && display === 'popup' && this.isOpen) this.handleKeydown(e)
+      }
+      el.addEventListener('keydown', keydownHandler)
+
       // Set aria attributes for popup combobox pattern
       if (display === 'popup') {
         el.setAttribute('role', 'combobox')
@@ -1836,6 +1844,7 @@ export function createCalendarData(
         el.removeEventListener('input', syncHandler)
         el.removeEventListener('focus', focusHandler)
         el.removeEventListener('blur', blurHandler)
+        el.removeEventListener('keydown', keydownHandler)
         if (display === 'popup') {
           el.removeAttribute('role')
           el.removeAttribute('aria-haspopup')
@@ -2945,10 +2954,12 @@ export function createCalendarData(
           this.view = 'days'
           return
         }
-        // If popup is open, close it and return focus to input
+        // If popup is open, close it and return focus to input. Not when the key was
+        // pressed on the input itself: focusing an already-focused input fires no focus
+        // event, so the flag would stay set and swallow the next real focus.
         if (display === 'popup' && this.isOpen) {
           this.close()
-          if (this._inputEl) {
+          if (this._inputEl && e.target !== this._inputEl) {
             this._suppressFocusOpen = true
             this._inputEl.focus()
           }
