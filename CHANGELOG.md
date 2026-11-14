@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.4.0]
 
 ### Changed
 
@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Calendars overflowed horizontally on phones.** Below 640px every day cell had a 44px minimum (`min-height: 2.75rem` with `aspect-ratio: 1`), so a week needed 314px of content width (347px with `showWeekNumbers`). Anywhere narrower, the last columns ran into the padding or out of the calendar: popups below about 372px (405px with week numbers), and inline calendars in padded containers on most phones (by 60px in the demo's cards at 360px). Inline calendars in flex or grid containers, and any calendar in a container under 280px (`min-width: 17.5rem` beat `max-width: 100%`), stuck out of the container entirely. Days on mobile now shrink with their row instead, down to 24px (the WCAG 2.2 AA minimum target size), and stay 44px or larger wherever a 44px week fits: popups fill the screen width, and the weekday header asks for room for 44px days, so inline calendars, which size to their content, still get it when the container allows. The mobile `min-width` is now `min(17.5rem, 100%)`, backed by a zero-height `.rc-calendar::before` spacer so wizard steps and month pickers keep their 280px width in flex, grid and inline-block parents. Below 360px the popup overlay and calendar padding drop to `0.5rem`, and below 390px the weekday labels drop to `0.625rem` with no letter-spacing, so neighbouring labels don't run together in the narrower columns (they overlapped in the demo's cards with week numbers or French labels up to 389px). Desktop is unchanged.
 - **Escape did not close a popup opened from its input.** Focus stays on the input after it opens the popup, and only the calendar itself handled key presses, so Escape did nothing until the user clicked inside the calendar. The bound input now passes Escape to the calendar while the popup is open, with the same steps as before (back one wizard step, back to the day view, then close). The key press is consumed, so a modal around the calendar doesn't close with it; while the popup is closed, Escape on the input is left to the page.
 - **A same-day range broke the hidden form inputs.** With `name` set, a range whose start and end are the same day (for example `setValue(['2026-11-18', '2026-11-18'])`) gave the hidden inputs duplicate `x-for` keys, so Alpine threw and the inputs were not rendered. They are now keyed by position, and both values are submitted.
+- **Calendar buttons submitted a surrounding form.** The buttons the calendar renders (month, year and decade arrows, the view-switching header labels, presets, the popup close button and the wizard back button) had no `type`, so inside a `<form>` they defaulted to `type="submit"` and every click, such as moving to the next month, submitted the form. They now all declare `type="button"` (#8).
 
 ### Added
 
@@ -52,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `scrollableDayView()` template helper now takes an `isPopup` flag and routes through a new internal `scrollMaxHeight()` helper.
 - Demo (`demo/index.html`) updated to better showcase the responsive popup behavior.
 
+[1.4.0]: https://github.com/reachweb/alpine-calendar/releases/tag/v1.4.0
 [1.3.0]: https://github.com/reachweb/alpine-calendar/releases/tag/v1.3.0
 [1.2.0]: https://github.com/reachweb/alpine-calendar/releases/tag/v1.2.0
 [1.1.0]: https://github.com/reachweb/alpine-calendar/releases/tag/v1.1.0
