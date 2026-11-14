@@ -3,6 +3,8 @@ import { createCalendarData } from '../../src/plugin/calendar-component'
 import type { CalendarConfig } from '../../src/plugin/calendar-component'
 import { CalendarDate } from '../../src/core/calendar-date'
 import { withAlpineMocks } from '../helpers'
+import Alpine from 'alpinejs'
+import { calendarPlugin } from '../../src/index'
 
 // ---------------------------------------------------------------------------
 // Default configuration
@@ -1373,6 +1375,24 @@ describe('hiddenInputValues', () => {
     c.selectDate('2025-06-15')
     c.selectDate('2025-06-20')
     expect(c.hiddenInputValues).toEqual(['2025-06-15', '2025-06-20'])
+  })
+
+  it('renders both hidden inputs for a one-day range', async () => {
+    Alpine.plugin(calendarPlugin)
+    document.body.innerHTML = `<form><div x-data="calendar({ mode: 'range', name: 'stay' })"></div></form>`
+    const form = document.querySelector('form')!
+    Alpine.initTree(form)
+
+    const calendar = Alpine.$data(form.querySelector('div')!) as ReturnType<
+      typeof createCalendarData
+    >
+    calendar.setValue(['2025-06-10', '2025-06-10'])
+    await Alpine.nextTick()
+
+    expect(new FormData(form).getAll('stay')).toEqual(['2025-06-10', '2025-06-10'])
+
+    Alpine.destroyTree(form)
+    form.remove()
   })
 })
 

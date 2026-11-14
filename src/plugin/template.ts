@@ -286,7 +286,7 @@ function footerSlotBlock(html: string): string {
 
 function hiddenInputs(): string {
   return `<template x-if="inputName">
-  <template x-for="val in hiddenInputValues" :key="val">
+  <template x-for="(val, i) in hiddenInputValues" :key="i">
     <input type="hidden" :name="inputName" :value="val">
   </template>
 </template>`
