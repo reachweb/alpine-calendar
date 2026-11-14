@@ -2236,8 +2236,9 @@ describe('popup positioning', () => {
   it('popupStyle is set eagerly for popup display', () => {
     const c = createCalendarData({ display: 'popup' })
     expect(c.popupStyle).toContain('position:fixed')
-    // Inline z-index would override the themable --z-calendar-popup CSS variable.
-    expect(c.popupStyle).not.toContain('z-index')
+    // The inline z-index must read the themable variable; a fixed number would
+    // override --z-calendar-popup.
+    expect(c.popupStyle).toContain('z-index:var(--z-calendar-popup,50)')
   })
 
   it('open() dispatches calendar:open and sets isOpen', () => {
@@ -2249,6 +2250,29 @@ describe('popup positioning', () => {
     c.open()
     expect(c.isOpen).toBe(true)
     expect(dispatchSpy).toHaveBeenCalledWith('calendar:open', null)
+  })
+
+  it('reopening scrolls the overlay back to the top, but open() while open does not', () => {
+    const c = createCalendarData({ display: 'popup', mode: 'range', months: 2 })
+    const { flushNextTick } = withAlpineMocks(c)
+    c.init()
+    flushNextTick()
+    const overlay = document.createElement('div')
+    c._popupOverlayEl = overlay
+
+    c.open()
+    flushNextTick()
+    overlay.scrollTop = 160
+
+    // Input focus calls open() again while open; the user's scroll position stays.
+    c.open()
+    flushNextTick()
+    expect(overlay.scrollTop).toBe(160)
+
+    c.close()
+    c.open()
+    flushNextTick()
+    expect(overlay.scrollTop).toBe(0)
   })
 
   it('close() resets popupStyle and stops positioning', () => {

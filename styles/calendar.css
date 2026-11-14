@@ -83,6 +83,18 @@
     /* In containers narrower than 280px, fit them instead of overflowing. */
     min-width: min(17.5rem, 100%);
   }
+
+  /* The percentage above gives no floor in shrink-to-fit parents (flex, grid,
+     inline-block), where it resolves against a parent sized by the calendar itself.
+     This zero-height spacer asks for the same 280px through the content instead
+     (17.5rem less the padding and border), so wizard steps and month pickers keep
+     one width there too. */
+  .rc-calendar::before {
+    content: '';
+    display: block;
+    width: calc(17.5rem - 1.5rem - 2px);
+    max-width: 100%;
+  }
 }
 
 /* 2-month layout: stacked on mobile, side-by-side on sm+ */
@@ -90,6 +102,15 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 1rem;
+}
+
+/* On mobile the month column may shrink below its content's preferred width, so
+   the header and day rows follow a narrow calendar instead of sticking out of it.
+   Days reach their 24px floor in a 200px container (233px with week numbers). */
+@media (max-width: 639px) {
+  .rc-months {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (min-width: 640px) {
@@ -842,7 +863,7 @@
 }
 
 /* ---------------------------------------------------------------------------
- * Touch-friendly: enlarge targets on mobile (44px minimum tap targets)
+ * Mobile sizing: 44px tap targets wherever they fit, shrinking to a 24px floor
  * ------------------------------------------------------------------------- */
 
 @media (max-width: 639px) {
@@ -900,6 +921,11 @@
 
   .rc-calendar {
     padding: 0.5rem;
+  }
+
+  /* Keep the 280px floor with the smaller padding. */
+  .rc-calendar::before {
+    width: calc(17.5rem - 1rem - 2px);
   }
 }
 

@@ -75,6 +75,22 @@ describe('popup overlay z-index variable', () => {
   })
 })
 
+describe('tall popups and narrow containers', () => {
+  it('makes the overlay a scroll container and centers the calendar with auto margins', () => {
+    const overlay = css.match(/\.rc-popup-overlay\s*\{[^}]+\}/)
+    if (overlay === null) throw new Error('overlay block missing')
+    expect(overlay[0]).toMatch(/overflow-y:\s*auto/)
+    expect(overlay[0]).toMatch(/align-items:\s*flex-start/)
+    expect(css).toMatch(/\.rc-popup-overlay > \.rc-calendar\s*\{[^}]*margin-block:\s*auto/)
+  })
+
+  it('lets mobile calendars fit containers under 280px while keeping the 280px floor elsewhere', () => {
+    expect(css).toMatch(/\.rc-calendar\s*\{[^}]*min-width:\s*min\(17\.5rem, 100%\)/)
+    expect(css).toMatch(/\.rc-calendar::before\s*\{[^}]*width:\s*calc\(17\.5rem - 1\.5rem - 2px\)/)
+    expect(css).toMatch(/\.rc-months\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/)
+  })
+})
+
 describe('slot containers', () => {
   it('ships default styling for .rc-calendar__header', () => {
     expect(css).toMatch(/\.rc-calendar__header\s*\{/)
