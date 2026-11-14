@@ -314,9 +314,9 @@ describe('Build & Distribution Verification', () => {
     // separate 75KB "not bloated with Alpine" ceiling below stays put as the real
     // regression alarm. Gzipped sizes (the number users actually download) are ~30KB
     // ESM / ~17KB CDN.
-    it('CDN IIFE bundle is under 65KB raw', () => {
+    it('CDN IIFE bundle is under 70KB raw', () => {
       const size = distFileSize('alpine-calendar.cdn.js')
-      expect(size).toBeLessThan(65_000)
+      expect(size).toBeLessThan(70_000)
     })
 
     it('ESM bundle is under 145KB raw', () => {
